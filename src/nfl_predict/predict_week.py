@@ -146,6 +146,7 @@ def build_inference_dataset(
 # Predictions
 # -----------------------------------------------------------
 
+
 def make_predictions(
     df_feat: pd.DataFrame,
     X: pd.DataFrame,
@@ -155,9 +156,7 @@ def make_predictions(
     target_week: int,
     position: str,
 ) -> pd.DataFrame:
-
     cat_idx = [X.columns.get_loc(c) for c in cat_cols if c in X.columns]
-
     pool = Pool(X, cat_features=cat_idx if cat_idx else None)
     preds = model.predict(pool)
 
@@ -192,24 +191,44 @@ def make_predictions(
 # -----------------------------------------------------------
 # Typer CLI
 # -----------------------------------------------------------
+def _clean_option(value: any) -> any:
+    """
+    Se arriva un Typer OptionInfo (per chiamate errate), lo tratta come None.
+    Così siamo robusti anche se qualcuno chiama per sbaglio il comando Typer da codice.
+    """
+    from typer.models import OptionInfo
 
-@app.command()
-@app.command()
-def predict(
-    season: Optional[int] = typer.Option(None, help="Season NFL. Default = stagione più recente nei dati."),
-    week: Optional[int] = typer.Option(None, help="Week da prevedere. Default = prossima week rispetto ai dati."),
-    position: str = typer.Option("WR", help="Posizione: WR, RB, QB, TE"),
+    if isinstance(value, OptionInfo):
+        return None
+    return value
+
+
+def run_predictions(
+    season: Optional[int] = None,
+    week: Optional[int] = None,
+    position: str = "WR",
 ):
-    """Previsione fantasy next-week."""
+    """
+    Funzione core: fa le previsioni senza dipendere da Typer.
+    Può essere chiamata sia da CLI Typer sia da altri moduli Python.
+    """
 
-    # 1) Carichiamo i dati UNA volta sola
+    # Protezione da OptionInfo nel caso qualcuno chiami male
+    season = _clean_option(season)
+    week = _clean_option(week)
+    position = _clean_option(position) or "WR"
+
+    # 1) Carico le features
     df = load_features()
 
-    # 2) Se mancano season/week, usiamo i default dai dati
+    # 2) Se mancano season/week, usa i default basati sui dati
     if season is None or week is None:
         data_season, data_week = get_default_season_and_week_from_data(df)
         season = season or data_season
         week = week or data_week
+
+    season = int(season)
+    week = int(week)
 
     print(f"\n=== Fantasy Predictions ===")
     print(f"Season (default dai dati): {season}")
@@ -245,6 +264,29 @@ def predict(
     print(f"\nSalvato CSV in: {out_path}\n")
     print("Top 10:\n")
     print(preds[["player_name", "team", "expected_ppr_points"]].head(10).to_string(index=False))
+
+    return preds
+
+
+# -----------------------------------------------------------
+# Typer CLI wrapper
+# -----------------------------------------------------------
+
+@app.command()
+def predict(
+    season: Optional[int] = typer.Option(
+        None,
+        help="Season NFL. Default = stagione più recente nei dati.",
+    ),
+    week: Optional[int] = typer.Option(
+        None,
+        help="Week da prevedere. Default = prossima week rispetto ai dati.",
+    ),
+    position: str = typer.Option("WR", help="Posizione: WR, RB, QB, TE"),
+):
+    """Previsione fantasy next-week (wrapper Typer)."""
+    run_predictions(season=season, week=week, position=position)
+
 
 if __name__ == "__main__":
     app()

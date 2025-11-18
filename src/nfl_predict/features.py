@@ -40,17 +40,70 @@ def prepare_base_weekly(
     snap counts offensivi.
     """
 
-    # --- Merge con rosters per avere posizione "ufficiale" e info extra ---
-    # nfl_data_py di solito ha 'player_id' in entrambi
-    rosters_min = rosters[
-        [
-            "player_id",
-            "position",
-            "team",
-        ]
-    ].drop_duplicates("player_id")
+def prepare_base_weekly(
+    weekly: pd.DataFrame,
+    rosters: pd.DataFrame,
+    snaps: pd.DataFrame | None = None,
+    offensive_only: bool = True,
+) -> pd.DataFrame:
+    # Copie locali per sicurezza
+    weekly = weekly.copy()
+    rosters = rosters.copy()
 
-    df = weekly.merge(rosters_min, on="player_id", how="left", suffixes=("", "_roster"))
+    # ------------------------------------------------------------------
+    # 1) Armonizza gli ID giocatore tra weekly e rosters
+    #    - nflreadpy usa "gsis_id" nei rosters
+    #    - le weekly hanno già "player_id" tipo "00-0019596"
+    # ------------------------------------------------------------------
+    if "player_id" not in rosters.columns:
+        if "gsis_id" in rosters.columns:
+            rosters["player_id"] = rosters["gsis_id"]
+        else:
+            raise KeyError(
+                "Rosters non ha né 'player_id' né 'gsis_id'. "
+                "Controlla le colonne di rosters.parquet."
+            )
+
+    # ------------------------------------------------------------------
+    # 2) Armonizza le colonne team/recent_team
+    #    - in weekly: preferiamo usare "recent_team"
+    #    - in rosters: usiamo "team"
+    # ------------------------------------------------------------------
+    if "recent_team" not in weekly.columns and "team" in weekly.columns:
+        weekly.rename(columns={"team": "recent_team"}, inplace=True)
+
+    if "team" not in rosters.columns and "recent_team" in rosters.columns:
+        rosters.rename(columns={"recent_team": "team"}, inplace=True)
+
+    # ------------------------------------------------------------------
+    # 3) Ora possiamo selezionare le colonne minime dal roster
+    # ------------------------------------------------------------------
+    rosters_min = rosters[
+        [c for c in ["player_id", "position", "team", "season", "week"] if c in rosters.columns]
+    ].copy()
+
+    # se non hai week in rosters, deduplica solo per (season, player_id)
+    if "week" in rosters_min.columns:
+        rosters_min = (
+            rosters_min
+            .sort_values(["season", "week"])
+            .drop_duplicates(["season", "player_id"], keep="last")
+        )
+    else:
+        rosters_min = (
+            rosters_min
+            .sort_values(["season"])
+            .drop_duplicates(["season", "player_id"], keep="last")
+        )
+
+    # ------------------------------------------------------------------
+    # 4) Merge con weekly sui campi comuni (player_id + season)
+    # ------------------------------------------------------------------
+    merge_keys = ["player_id"]
+    if "season" in weekly.columns and "season" in rosters_min.columns:
+        merge_keys.append("season")
+
+    df = weekly.merge(rosters_min, on=merge_keys, how="left", suffixes=("", "_roster"))
 
     # Se la posizione nel weekly è mancante, usa quella del roster
     if "position" in weekly.columns:

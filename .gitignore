@@ -21,3 +21,4 @@ src/nfl_predict.egg-info/PKG-INFO
 src/nfl_predict.egg-info/requires.txt
 src/nfl_predict.egg-info/SOURCES.txt
 src/nfl_predict.egg-info/top_level.txt
+src/nfl_predict/__pycache__/predict_week.cpython-312.pyc
