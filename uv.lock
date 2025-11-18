@@ -462,7 +462,7 @@ wheels = [
 [[package]]
 name = "nfl-predict"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "catboost" },
     { name = "nfl-data-py" },

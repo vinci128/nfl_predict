@@ -11,3 +11,13 @@ catboost_info/learn/events.out.tfevents
 catboost_info/test/events.out.tfevents
 models/wr_catboost_meta.json
 models/wr_catboost.cbm
+src/nfl_predict/__pycache__/cli.cpython-312.pyc
+src/nfl_predict/__pycache__/features.cpython-312.pyc
+src/nfl_predict/__pycache__/fetch_nfl_data.cpython-312.pyc
+src/nfl_predict/__pycache__/train_model.cpython-312.pyc
+src/nfl_predict.egg-info/dependency_links.txt
+src/nfl_predict.egg-info/entry_points.txt
+src/nfl_predict.egg-info/PKG-INFO
+src/nfl_predict.egg-info/requires.txt
+src/nfl_predict.egg-info/SOURCES.txt
+src/nfl_predict.egg-info/top_level.txt

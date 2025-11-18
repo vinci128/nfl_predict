@@ -11,3 +11,16 @@ dependencies = [
     "pyarrow>=22.0.0",
     "typer>=0.20.0",
 ]
+
+[project.scripts]
+nfl-predict = "nfl_predict.cli:app"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

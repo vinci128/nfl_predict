@@ -2,10 +2,14 @@ import nfl_data_py as nfl
 import pandas as pd
 from pathlib import Path
 
+from datetime import date
+
+CURRENT_YEAR = date.today().year
+SEASONS = list(range(2015, CURRENT_YEAR + 1))
+
+
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
-
-SEASONS = list(range(2015, 2025))  # dal 2015 a oggi (modifica se vuoi)
 
 def save_parquet(df: pd.DataFrame, name: str):
     path = DATA_DIR / f"{name}.parquet"
@@ -79,11 +83,15 @@ def fetch_betting_lines():
     save_parquet(df,"betting_lines")
     print(f"betting lines: {df.shape}")
 
-if __name__ == "__main__":
+def main():
     fetch_weekly_stats()
     fetch_rosters()
     #fetch_pbp()              # opzionale ma utile per metriche avanzate
     fetch_snap_counts()
     fetch_team_schedules()
     #fetch_betting_lines()
+
+if __name__ == "__main__":
+    main()
+
 
