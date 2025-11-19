@@ -13,7 +13,8 @@ dependencies = [
 ]
 
 [project.scripts]
-nfl-predict = "nfl_predict.cli:app"
+nfl-predict = "nfl_predict.cli:app" 
+suggest = "nfl_predict.lineup:app"
 
 [build-system]
 requires = ["setuptools>=61"]
