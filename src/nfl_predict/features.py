@@ -44,7 +44,7 @@ def prepare_base_weekly(
     weekly: pd.DataFrame,
     rosters: pd.DataFrame,
     snaps: pd.DataFrame | None = None,
-    offensive_only: bool = True,
+    offensive_only: bool = False,
 ) -> pd.DataFrame:
     # Copie locali per sicurezza
     weekly = weekly.copy()
@@ -116,6 +116,9 @@ def prepare_base_weekly(
     # Filtro solo ruoli offensivi per fantasy (QB, RB, WR, TE) nella v1
     if offensive_only:
         df = df[df["position"].isin(["QB", "RB", "WR", "TE"])].copy()
+    else:
+        print("Keeping all positions (filtering positions that have no point).")
+        df = df[~df["position"].isin(["LS", "NT", "DL", "OL"])].copy()
 
     # --- Merge con snap counts (se disponibili) ---
     if snaps is not None:
@@ -267,7 +270,7 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
     """
     weekly, rosters, snaps = load_raw_data()
 
-    df = prepare_base_weekly(weekly, rosters, snaps=snaps, offensive_only=True)
+    df = prepare_base_weekly(weekly, rosters, snaps=snaps, offensive_only=False)
     df = add_lag_and_rolling_features(df)
     df = add_simple_season_features(df)
 

@@ -3,22 +3,9 @@
 *.csv
 
 # Model data
-catboost_info/catboost_training.json
-catboost_info/learn_error.tsv
-catboost_info/test_error.tsv
-catboost_info/time_left.tsv
-catboost_info/learn/events.out.tfevents
-catboost_info/test/events.out.tfevents
-models/wr_catboost_meta.json
-models/wr_catboost.cbm
-src/nfl_predict/__pycache__/cli.cpython-312.pyc
-src/nfl_predict/__pycache__/features.cpython-312.pyc
-src/nfl_predict/__pycache__/fetch_nfl_data.cpython-312.pyc
-src/nfl_predict/__pycache__/train_model.cpython-312.pyc
-src/nfl_predict.egg-info/dependency_links.txt
-src/nfl_predict.egg-info/entry_points.txt
-src/nfl_predict.egg-info/PKG-INFO
-src/nfl_predict.egg-info/requires.txt
-src/nfl_predict.egg-info/SOURCES.txt
-src/nfl_predict.egg-info/top_level.txt
-src/nfl_predict/__pycache__/predict_week.cpython-312.pyc
+models
+catboost_info
+
+# package files
+src/nfl_predict/__pycache__/
+src/nfl_predict.egg-info/

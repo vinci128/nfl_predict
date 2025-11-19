@@ -29,9 +29,9 @@ def add_target_next_week(df: pd.DataFrame) -> pd.DataFrame:
         )
 
     # target = punti PPR della settimana successiva per lo stesso giocatore
-    df["target_points_next_week"] = (
-        df.groupby("player_id", group_keys=False)["fantasy_points_ppr"].shift(-1)
-    )
+    df["target_points_next_week"] = df.groupby("player_id", group_keys=False)[
+        "fantasy_points_ppr"
+    ].shift(-1)
 
     # Rimuovi righe senza target (ultima partita di ogni player)
     df = df[~df["target_points_next_week"].isna()].copy()
@@ -75,7 +75,7 @@ def train_wr_model(df_wr: pd.DataFrame):
         "recent_team",
         "opponent_team",
         "position",
-        "headshot_url",   # inutile come feature
+        "headshot_url",  # inutile come feature
     ]
 
     drop_exact = [c for c in drop_exact if c in train_df.columns]
@@ -163,6 +163,129 @@ def train_wr_model(df_wr: pd.DataFrame):
     print("Metadati WR salvati.")
 
 
+def train_position_model(df: pd.DataFrame, position: str):
+    """Generalized training function for any position.
+
+    Args:
+        df (pd.DataFrame): DataFrame with features and target.
+        position (str): Player position to filter on (e.g., "WR", "RB").
+
+    Returns:
+        None
+    """
+    df_pos = df[df["position"] == position].copy()
+    print(f"{position} subset:", df_pos.shape)
+
+    if df_pos.empty:
+        print(f"Nessun dato per {position}, skip.")
+        return
+
+    max_season = df_pos["season"].max()
+    train_df = df_pos[df_pos["season"] < max_season].copy()
+    valid_df = df_pos[df_pos["season"] == max_season].copy()
+
+    target_col = "target_points_next_week"
+
+    # stessa logica di drop_cols / feature_cols che hai per WR
+    drop_cols = [
+        "fantasy_points_ppr",
+        "headshot_url",
+        "opponent_team",
+        "player_display_name",
+        "player_id",
+        "player_name",
+        "position",
+        "recent_team",
+        "target_points_next_week",
+    ]
+
+    y_col = "target_points_next_week"
+
+    # --- 2) Costruisci il set di feature ------------------------
+    feature_cols = [c for c in train_df.columns if c not in drop_cols]
+
+    feature_cols = [c for c in train_df.columns if c not in drop_cols + [y_col]]
+    cat_cols = [
+        c
+        for c in [
+            "position_group",
+            "season_type",
+            "team",
+            "fg_made_list",
+            "fg_missed_list",
+            "fg_blocked_list",
+        ]
+        if c in feature_cols
+    ]
+
+    X_train = train_df[feature_cols].copy()
+    y_train = train_df[target_col].copy()
+
+    X_valid = valid_df[feature_cols].copy()
+    y_valid = valid_df[target_col].copy()
+
+    # cast categoriali ecc... (come fai già ora)
+
+    # forza team come categorica se non lo fosse già
+    for c in ["team", "season_type", "position_group"]:
+        if c in X_train.columns and c not in cat_cols:
+            cat_cols.append(c)
+
+    # assicurati che season/week NON siano categoriali
+    for c in ["season", "week"]:
+        if c in cat_cols:
+            cat_cols.remove(c)
+
+    # normalizza le categorical: string + fillna
+    for c in cat_cols:
+        X_train[c] = X_train[c].astype("string").fillna("__NA__")
+        X_valid[c] = X_valid[c].astype("string").fillna("__NA__")
+
+    # CatBoost vuole gli INDICI delle colonne categoriche
+    cat_idx = [X_train.columns.get_loc(c) for c in cat_cols]
+
+    print(f"Using {len(feature_cols)} features")
+    print("Sample features:", feature_cols[:10])
+    print(f"Categorical columns ({len(cat_cols)}):", cat_cols)
+
+    train_pool = Pool(X_train, y_train, cat_features=cat_idx if cat_idx else None)
+    valid_pool = Pool(X_valid, y_valid, cat_features=cat_idx if cat_idx else None)
+
+    model = CatBoostRegressor(
+        depth=6,
+        learning_rate=0.05,
+        loss_function="RMSE",
+        iterations=2000,
+        od_type="Iter",
+        od_wait=100,  # early stopping
+        random_seed=42,
+        verbose=100,
+    )
+
+    model.fit(train_pool, eval_set=valid_pool)
+
+    pred_valid = model.predict(valid_pool)
+    valid_mae = (abs(pred_valid - y_valid)).mean()
+    print(f"Validation MAE (PPR points): {valid_mae:.3f}")
+
+    model_path = MODEL_DIR / f"{position.lower()}_catboost.cbm"
+    model.save_model(model_path)
+    print(f"WR model salvato in: {model_path}")
+
+    meta = {
+        "position": "WR",
+        "feature_cols": feature_cols,
+        "cat_cols": cat_cols,
+        "train_seasons": sorted(map(int, train_df["season"].unique())),
+        "valid_season": int(max_season),
+        "valid_mae": float(valid_mae),
+    }
+    meta_path = MODEL_DIR / f"{position.lower()}_catboost_meta.json"
+
+    pd.Series(meta).to_json(meta_path, indent=2)
+    print(f"Metadati {position} salvati.")
+
+
 def main():
     df = load_features()
     print("Loaded features:", df.shape)
@@ -171,10 +294,17 @@ def main():
     print("After adding target:", df.shape)
 
     # Per ora facciamo solo WR
-    df_wr = filter_position(df, "WR")
-    print("WR subset:", df_wr.shape)
+    # df_wr = filter_position(df, "WR")
+    # print("WR subset:", df_wr.shape)
 
-    train_wr_model(df_wr)
+    # train_wr_model(df_wr)
+
+    positions = df["position"].unique().tolist()
+    print("Training models for positions:", positions)
+
+    for pos in positions:
+        print(f"\n=== Training {pos} model ===")
+        train_position_model(df, pos)
 
 
 if __name__ == "__main__":
