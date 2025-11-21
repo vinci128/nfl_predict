@@ -10,6 +10,8 @@ dependencies = [
     "pandas>=2.3.3",
     "pyarrow>=22.0.0",
     "typer>=0.20.0",
+    "fastapi>=0.95.0",
+    "uvicorn[standard]>=0.22.0",
 ]
 
 [project.scripts]
