@@ -135,10 +135,25 @@ def build_inference_dataset(
 
     X = df_feat[feature_cols].copy()
 
-    # Normalizza categoriali
-    for c in cat_cols:
+    # Normalize categorical columns. Also detect any non-numeric
+    # feature columns that weren't listed in meta's `cat_cols` and
+    # treat them as categorical to avoid CatBoost trying to convert
+    # list-like strings (e.g. '39;54') to floats.
+    import pandas as _pd
+
+    inferred_cat_cols = list(cat_cols) if cat_cols is not None else []
+    for c in feature_cols:
+        if c in X.columns and not _pd.api.types.is_numeric_dtype(X[c]):
+            if c not in inferred_cat_cols:
+                inferred_cat_cols.append(c)
+
+    for c in inferred_cat_cols:
         if c in X.columns:
             X[c] = X[c].astype("string").fillna("__NA__")
+
+    # return inferred_cat_cols alongside X if caller needs it? We keep
+    # original signature but the caller (`make_predictions`) will compute
+    # cat indices from X columns where necessary.
 
     return df_feat, X
 

@@ -32,17 +32,6 @@ def load_raw_data():
 def prepare_base_weekly(
     weekly: pd.DataFrame,
     rosters: pd.DataFrame,
-    snaps: Optional[pd.DataFrame] = None,
-    offensive_only: bool = True,
-) -> pd.DataFrame:
-    """
-    Crea una tabella base player-week con info anagrafiche e, opzionalmente,
-    snap counts offensivi.
-    """
-
-def prepare_base_weekly(
-    weekly: pd.DataFrame,
-    rosters: pd.DataFrame,
     snaps: pd.DataFrame | None = None,
     offensive_only: bool = False,
 ) -> pd.DataFrame:
@@ -182,9 +171,41 @@ def _select_stat_columns(df: pd.DataFrame) -> List[str]:
         # usage from snaps
         "snaps_offense",
         "snap_pct_offense",
+        # kicking (FG / PAT) - useful for K models
+        "fg_made",
+        "fg_att",
+        "fg_missed",
+        "fg_long",
+        "fg_pct",
+        "fg_made_0_19",
+        "fg_made_20_29",
+        "fg_made_30_39",
+        "fg_made_40_49",
+        "fg_made_50_59",
+        "fg_made_60_",
+        "fg_missed_0_19",
+        "fg_missed_20_29",
+        "fg_missed_30_39",
+        "fg_missed_40_49",
+        "fg_missed_50_59",
+        "fg_missed_60_",
+        "fg_made_list",
+        "fg_missed_list",
+        "fg_made_distance",
+        "fg_missed_distance",
+        "pat_made",
+        "pat_att",
+        "pat_missed",
+        "pat_blocked",
+        "pat_pct",
     ]
 
-    return [c for c in candidate_cols if c in df.columns]
+    # Keep only candidate columns that exist in df and are numeric.
+    present = [c for c in candidate_cols if c in df.columns]
+    numeric = [c for c in present if pd.api.types.is_numeric_dtype(df[c])]
+    # If some columns are present but non-numeric (e.g. 'fg_made_list'),
+    # we skip them for lag/rolling calculations to avoid aggregation errors.
+    return numeric
 
 
 def add_lag_and_rolling_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -259,6 +280,162 @@ def add_simple_season_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+
+def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcola i punti fantasy secondo le regole della tua lega NFL.com:
+
+    Passing Yards: 1 per 10
+    Passing TD: 4
+    INT lanciate: -2
+    Rushing Yards: 1 per 10
+    Rushing TD: 6
+    Receptions: 1
+    Receiving Yards: 1 per 10
+    Receiving TD: 6
+    Kick/Punt Return TD: 6
+    Fumble Recovered for TD: 6
+    Fumbles Lost: -2
+    2pt Conversion (qualsiasi): 2
+
+    Kicking:
+    PAT made: 1
+    FG 0-19: 3
+    FG 20-29: 3
+    FG 30-39: 3
+    FG 40-49: 4
+    FG 50+: 5
+
+    NB: per ora non calcola i punti Defense/ST di squadra (DST).
+    """
+
+    pts = pd.Series(0.0, index=df.index, dtype="float64")
+
+    def col(name: str) -> pd.Series:
+        # helper comodo: se la colonna non esiste, restituisce 0
+        if name in df.columns:
+            return df[name].fillna(0)
+        return pd.Series(0, index=df.index, dtype="float64")
+
+    # ----- OFFENSE -----
+
+    # Passing
+    pts += 0.1 * col("passing_yards")          # 1 pt / 10 yards
+    # in nflreadpy spesso è "passing_tds" e "interceptions"
+    pts += 4.0 * col("passing_tds")
+    pts += -2.0 * (col("interceptions") + col("passing_interceptions"))
+
+    # Rushing
+    pts += 0.1 * col("rushing_yards")
+    pts += 6.0 * col("rushing_tds")
+
+    # Receiving
+    pts += 1.0 * col("receptions")
+    pts += 0.1 * col("receiving_yards")
+    pts += 6.0 * col("receiving_tds")
+
+    # Return TD (kickoff + punt + altri ST TD)
+    return_tds = (
+        col("kick_return_tds") +
+        col("punt_return_tds") +
+        col("special_teams_tds")
+    )
+    pts += 6.0 * return_tds
+
+    # Fumble recovered for TD (se presente)
+    pts += 6.0 * (
+        col("fumble_recovery_tds") +
+        col("defense_tds")  # nel dubbio, meglio includerlo
+    )
+
+    # Fumbles lost (varie declinazioni)
+    fumbles_lost = (
+        col("fumbles_lost") +
+        col("rushing_fumbles_lost") +
+        col("receiving_fumbles_lost") +
+        col("sack_fumbles_lost")
+    )
+    pts += -2.0 * fumbles_lost
+
+    # 2-point conversions (passing / rushing / receiving)
+    two_pt = (
+        col("passing_2pt_conversions") +
+        col("rushing_2pt_conversions") +
+        col("receiving_2pt_conversions") +
+        col("two_point_conversions")
+    )
+    pts += 2.0 * two_pt
+
+    # ----- KICKING -----
+
+    # ----- KICKING (range approximation) -----
+
+    fg_made = (
+        col("field_goals_made") +
+        col("fg_made") +
+        col("fgm")  # fallback nel caso appaia nei tuoi dati
+    )
+
+    fg_long = (
+        col("field_goals_longest") +
+        col("fg_long") +
+        col("fg_longest")
+    )
+    # Stima punteggio FG
+    # Preferiamo usare i bucket per distanza se presenti (colonne come
+    # fg_made_30_39, fg_made_40_49, fg_made_50_59, fg_made_60_).
+    # Se i bucket non sono disponibili, usiamo una fallback basata su
+    # `fg_long` ma assegnando a TUTTE le FG lo stesso punteggio (es. 5*x
+    # per fg_made quando fg_long>=50) — questo evita il bug precedente
+    # che faceva 5 + (n-1)*4.
+
+    fg_points = pd.Series(0.0, index=df.index)
+
+    # bucket columns (may not exist)
+    fg0 = col("fg_made_0_19")
+    fg20 = col("fg_made_20_29")
+    fg30 = col("fg_made_30_39")
+    fg40 = col("fg_made_40_49")
+    fg50 = col("fg_made_50_59")
+    fg60 = col("fg_made_60_")
+
+    # If any bucket column exists (non-zero in at least some rows), use buckets
+    if (fg0.sum() + fg20.sum() + fg30.sum() + fg40.sum() + fg50.sum() + fg60.sum()) > 0:
+        fg_points = (
+            3 * (fg0 + fg20 + fg30)
+            + 4 * fg40
+            + 5 * (fg50 + fg60)
+        )
+    else:
+        # fallback: use fg_long to assign a per-FG value (avoid 5+(n-1)*4 bug)
+        mask_50 = fg_long >= 50
+        fg_points[mask_50] = 5 * fg_made[mask_50]
+
+        mask_40 = (fg_long >= 40) & (fg_long < 50)
+        fg_points[mask_40] = 4 * fg_made[mask_40]
+
+        mask_30 = (fg_long >= 30) & (fg_long < 40)
+        fg_points[mask_30] = 3 * fg_made[mask_30]
+
+        mask_20 = (fg_long >= 20) & (fg_long < 30)
+        fg_points[mask_20] = 3 * fg_made[mask_20]
+
+        mask_0 = (fg_long < 20)
+        fg_points[mask_0] = 3 * fg_made[mask_0]
+
+    pts += fg_points
+
+    # PAT (extra points)
+    pat_made = (
+        col("extra_points_made") +
+        col("xpmade") +
+        col("pat_made")
+    )
+    pts += pat_made * 1
+
+    df["fantasy_points_custom"] = pts
+    return df
+
 def build_player_week_features(save: bool = True) -> pd.DataFrame:
     """
     Pipeline completa:
@@ -271,6 +448,7 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
     weekly, rosters, snaps = load_raw_data()
 
     df = prepare_base_weekly(weekly, rosters, snaps=snaps, offensive_only=False)
+    df = add_custom_league_points(df)      # ⬅️ QUI
     df = add_lag_and_rolling_features(df)
     df = add_simple_season_features(df)
 

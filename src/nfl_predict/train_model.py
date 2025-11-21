@@ -22,15 +22,15 @@ def load_features() -> pd.DataFrame:
 def add_target_next_week(df: pd.DataFrame) -> pd.DataFrame:
     df = df.sort_values(["player_id", "season", "week"]).copy()
 
-    if "fantasy_points_ppr" not in df.columns:
+    if "fantasy_points_custom" not in df.columns:
         raise KeyError(
-            "Colonna 'fantasy_points_ppr' non trovata in player_week_features. "
+            "Colonna 'fantasy_points_custom' non trovata in player_week_features. "
             "Controlla che weekly_stats la includa e che features.py non l'abbia droppata."
         )
 
     # target = punti PPR della settimana successiva per lo stesso giocatore
     df["target_points_next_week"] = df.groupby("player_id", group_keys=False)[
-        "fantasy_points_ppr"
+        "fantasy_points_custom"
     ].shift(-1)
 
     # Rimuovi righe senza target (ultima partita di ogni player)
@@ -58,6 +58,7 @@ def train_wr_model(df_wr: pd.DataFrame):
     # --- 1) Colonne da escludere hard-coded --------------------
     drop_exact = [
         target_col,
+        "fantasy_points_custom"
         "fantasy_points_ppr",  # punti della week corrente
         "player_id",
         "gsis_id",
@@ -186,37 +187,95 @@ def train_position_model(df: pd.DataFrame, position: str):
 
     target_col = "target_points_next_week"
 
-    # stessa logica di drop_cols / feature_cols che hai per WR
-    drop_cols = [
-        "fantasy_points_ppr",
-        "headshot_url",
-        "opponent_team",
-        "player_display_name",
-        "player_id",
-        "player_name",
-        "position",
-        "recent_team",
-        "target_points_next_week",
-    ]
+    # Build position-specific feature set (only use features relevant to the position)
+    def get_relevant_feature_cols(df_frame: pd.DataFrame, pos: str, target_col: str = "target_points_next_week") -> list:
+        """Return a list of feature columns relevant for `pos` by pattern matching.
 
-    y_col = "target_points_next_week"
+        This keeps training compact and avoids feeding irrelevant signals to each position model.
+        If no relevant features are found, fall back to a conservative default.
+        """
+        pos = (pos or "").upper()
 
-    # --- 2) Costruisci il set di feature ------------------------
-    feature_cols = [c for c in train_df.columns if c not in drop_cols]
+        # Patterns to include per position (substring matches on lowercase column names)
+        RELEVANT_PATTERNS = {
+            "QB": [
+                "passing_",
+                "passing",
+                "interception",
+                "sack",
+                "rushing_",
+                "rushing",
+                "air_yards",
+                "epa",
+                "fantasy_points",
+            ],
+            "RB": [
+                "rushing_",
+                "rushing",
+                "carry",
+                "snap",
+                "target",
+                "reception",
+                "fantasy_points",
+            ],
+            "WR": [
+                "receiv",
+                "target",
+                "air_yards",
+                "target_share",
+                "wopr",
+                "snap",
+                "fantasy_points",
+            ],
+            "TE": [
+                "receiv",
+                "target",
+                "snap",
+                "fantasy_points",
+            ],
+            "K": [
+                "fg_",
+                "pat_",
+                "fgm",
+                "fg_long",
+                "fg_made",
+                "fg_att",
+                "fantasy_points",
+            ],
+            # Defensive / special teams
+            "DST": ["def_", "sack", "interception", "def_tds", "fantasy_points"],
+        }
 
-    feature_cols = [c for c in train_df.columns if c not in drop_cols + [y_col]]
-    cat_cols = [
-        c
-        for c in [
-            "position_group",
-            "season_type",
-            "team",
-            "fg_made_list",
-            "fg_missed_list",
-            "fg_blocked_list",
-        ]
-        if c in feature_cols
-    ]
+        # Columns to always allow (ids/names removed separately)
+        always_allow = {"season", "week", "team", "position_group", "season_type", "player_id"}
+
+        cols = [c for c in df_frame.columns if c != target_col]
+
+        patterns = RELEVANT_PATTERNS.get(pos, [])
+
+        chosen = set()
+        for c in cols:
+            lower = c.lower()
+            if c in always_allow:
+                chosen.add(c)
+                continue
+            for p in patterns:
+                if p in lower:
+                    chosen.add(c)
+                    break
+
+        # Exclude obvious identifier/name columns
+        exclude_id = {"player_id", "player_name", "player_display_name", "gsis_id", "pfr_player_id"}
+        chosen = [c for c in sorted(chosen) if c not in exclude_id]
+
+        # Fallback: if no columns selected, use a broad default (exclude identifiers + target)
+        if not chosen:
+            chosen = [c for c in cols if c not in exclude_id]
+
+        return chosen
+
+    feature_cols = get_relevant_feature_cols(train_df, position)
+    cat_cols = [c for c in ["position_group", "season_type", "team"] if c in feature_cols]
 
     X_train = train_df[feature_cols].copy()
     y_train = train_df[target_col].copy()
@@ -236,10 +295,24 @@ def train_position_model(df: pd.DataFrame, position: str):
         if c in cat_cols:
             cat_cols.remove(c)
 
+    # Detect any non-numeric columns among feature_cols and treat them as categorical
+    import pandas as _pd
+    non_numeric = [c for c in feature_cols if c in X_train.columns and not _pd.api.types.is_numeric_dtype(X_train[c])]
+    for c in non_numeric:
+        if c not in cat_cols:
+            cat_cols.append(c)
+
+    # assicurati che season/week NON siano categoriali
+    for c in ["season", "week"]:
+        if c in cat_cols:
+            cat_cols.remove(c)
+
     # normalizza le categorical: string + fillna
     for c in cat_cols:
-        X_train[c] = X_train[c].astype("string").fillna("__NA__")
-        X_valid[c] = X_valid[c].astype("string").fillna("__NA__")
+        if c in X_train.columns:
+            X_train[c] = X_train[c].astype("string").fillna("__NA__")
+        if c in X_valid.columns:
+            X_valid[c] = X_valid[c].astype("string").fillna("__NA__")
 
     # CatBoost vuole gli INDICI delle colonne categoriche
     cat_idx = [X_train.columns.get_loc(c) for c in cat_cols]
