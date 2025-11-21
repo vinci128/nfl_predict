@@ -113,6 +113,9 @@ def build_inference_dataset(
 ) -> pd.DataFrame:
     """
     Usiamo le feature della settimana (target_week - 1) per prevedere target_week.
+    Se la week delle feature è parziale (alcuni giocatori non hanno ancora una riga
+    per quella week), usiamo per ciascun giocatore la sua ultima riga con
+    week <= feature_week (fallback alla settimana precedente disponibile).
     """
 
     feature_week = target_week - 1
@@ -121,12 +124,42 @@ def build_inference_dataset(
 
     df_season = df[df["season"] == season].copy()
     df_pos = df_season[df_season["position"] == position].copy()
-    df_feat = df_pos[df_pos["week"] == feature_week].copy()
 
-    if df_feat.empty:
+    # Consideriamo tutte le righe fino alla feature_week (inclusa). Per i giocatori
+    # che non hanno ancora una riga in feature_week, prenderemo la loro ultima
+    # riga disponibile (es. week-1, week-2, ...)
+    df_up_to = df_pos[df_pos["week"] <= feature_week].copy()
+
+    if df_up_to.empty:
         raise ValueError(
-            f"Non esistono feature per season={season}, week={feature_week}. "
+            f"Non esistono feature per season={season} fino a week={feature_week}. "
             "Scaricare i dati più recenti?"
+        )
+
+    # Scegliamo l'identificatore del giocatore: preferiamo `player_id`, altrimenti
+    # `player_display_name` o `player_name`.
+    id_col = None
+    for cand in ["player_id", "player_display_name", "player_name"]:
+        if cand in df_up_to.columns:
+            id_col = cand
+            break
+
+    if id_col is None:
+        # Se non abbiamo alcun identificatore, usiamo l'indice e prendiamo
+        # l'ultima riga per indice (poco probabile ma gestito)
+        idx = df_up_to.groupby(df_up_to.index)["week"].idxmax()
+        df_feat = df_up_to.loc[idx].copy()
+    else:
+        idx = df_up_to.groupby(id_col)["week"].idxmax()
+        df_feat = df_up_to.loc[idx].copy()
+
+    # Informazione: se non tutti i giocatori provengono dalla feature_week, avvisiamo
+    weeks_used = sorted(df_feat["week"].unique())
+    if not (len(weeks_used) == 1 and weeks_used[0] == feature_week):
+        # Non un errore: comportamento voluto quando la settimana è parziale
+        print(
+            f"Nota: alcuni giocatori usano dati di settimane precedenti. "
+            f"Weeks usate per le features: {weeks_used[:5]}{'...' if len(weeks_used)>5 else ''}"
         )
 
     missing = [c for c in feature_cols if c not in df_feat.columns]
