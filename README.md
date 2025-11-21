@@ -70,8 +70,4 @@ python -m nfl_predict.predict_week        # run predictions
   - `/models` and `/health` endpoints
   - Containerize the API (Dockerfile + small entrypoint)
 
-If you want, I can:
-- Retrain only the `K` model and show updated predictions after the fixes applied.
-- Add a minimal FastAPI app scaffold and Dockerfile for serving predictions.
-
 License: (none specified)
