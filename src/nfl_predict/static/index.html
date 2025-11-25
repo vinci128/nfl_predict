@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>nfl-predict — UI</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>nfl-predict — Quick UI</h1>
+
+    <form id="predict-form">
+      <label>Season: <input type="number" id="season" placeholder="auto" /></label>
+      <label>Week: <input type="number" id="week" placeholder="auto" /></label>
+      <label>Position:
+        <select id="position">
+          <option value="WR">WR</option>
+          <option value="RB">RB</option>
+          <option value="QB">QB</option>
+          <option value="TE">TE</option>
+          <option value="K">K</option>
+        </select>
+      </label>
+      <label>Top N: <input type="number" id="top_n" value="25" min="1" /></label>
+      <button type="submit">Run Predictions</button>
+    </form>
+
+    <div id="note">Tip: predictions are computed server-side and saved in `outputs/`.</div>
+
+    <div id="results" class="hidden">
+      <h2>Predictions</h2>
+      <table id="pred-table">
+        <thead>
+          <tr><th>Player</th><th>Team</th><th>Expected PPR</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div id="error" class="error hidden"></div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

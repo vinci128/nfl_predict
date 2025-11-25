@@ -1,12 +1,20 @@
 from typing import Optional
 
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from nfl_predict.predict_week import run_predictions
 
 
 app = FastAPI(title="nfl-predict API", version="0.1.0")
+
+# Serve a small single-page app from `static/`
+static_dir = Path(__file__).resolve().parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 class PredictRequest(BaseModel):
@@ -44,6 +52,14 @@ def predict(req: PredictRequest):
 
     top_n = max(0, int(req.top_n or 0))
     return {"count": len(records), "predictions": records[:top_n]}
+
+
+@app.get("/")
+def read_index():
+    index_path = static_dir / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    return {"status": "ok", "note": "Static UI not installed."}
 
 
 if __name__ == "__main__":
