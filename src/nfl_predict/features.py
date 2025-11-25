@@ -436,6 +436,99 @@ def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
     df["fantasy_points_custom"] = pts
     return df
 
+
+def add_opponent_defense_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggiunge feature che rappresentano la "forza difensiva" della squadra avversaria
+    misurata come punti fantasy concessi a ciascuna posizione (e totale) nelle
+    settimane precedenti. Per ogni (season, week, opponent_team, position) calcoliamo
+    i punti concessi nella settimana e poi costruiamo lag1 + rolling mean (3/5/8)
+    per usare come feature d'input al modello.
+    """
+
+    df = df.copy()
+
+    if "opponent_team" not in df.columns:
+        print("Nessuna colonna 'opponent_team' trovata — salto le feature difensive dell'avversario.")
+        return df
+
+    if "fantasy_points_custom" not in df.columns:
+        print("Nessuna colonna 'fantasy_points_custom' trovata — assicurati di chiamare add_custom_league_points prima.")
+        return df
+
+    # Punti concessi dall'avversario per posizione nella specifica settimana
+    team_allowed = (
+        df.groupby(["season", "week", "opponent_team", "position"], dropna=False)["fantasy_points_custom"]
+        .sum()
+        .reset_index(name="points_allowed")
+        .rename(columns={"opponent_team": "team"})
+    )
+
+    # Ordinamento e calcolo lag/rolling per (team, position)
+    team_allowed = team_allowed.sort_values(["team", "position", "season", "week"]).reset_index(drop=True)
+    grouped = team_allowed.groupby(["team", "position"], group_keys=False)
+
+    team_allowed["points_allowed_lag1"] = grouped["points_allowed"].shift(1)
+
+    for w in ROLLING_WINDOWS:
+        col = f"points_allowed_roll{w}"
+        team_allowed[col] = (
+            grouped["points_allowed_lag1"].rolling(window=w, min_periods=1).mean().reset_index(level=[0,1], drop=True)
+        )
+
+    # Aggiungiamo anche il totale (tutte le posizioni insieme) per dar misura complessiva
+    total_allowed = (
+        df.groupby(["season", "week", "opponent_team"], dropna=False)["fantasy_points_custom"]
+        .sum()
+        .reset_index(name="points_allowed_total")
+        .rename(columns={"opponent_team": "team"})
+    )
+
+    total_allowed = total_allowed.sort_values(["team", "season", "week"]).reset_index(drop=True)
+    gtot = total_allowed.groupby(["team"], group_keys=False)
+    total_allowed["points_allowed_total_lag1"] = gtot["points_allowed_total"].shift(1)
+    for w in ROLLING_WINDOWS:
+        total_allowed[f"points_allowed_total_roll{w}"] = (
+            gtot["points_allowed_total_lag1"].rolling(window=w, min_periods=1).mean().reset_index(level=0, drop=True)
+        )
+
+    # Rinominiamo le colonne per evitare collisioni al merge
+    rename_map = {"points_allowed_lag1": "opp_points_allowed_lag1"}
+    for w in ROLLING_WINDOWS:
+        rename_map[f"points_allowed_roll{w}"] = f"opp_points_allowed_roll{w}"
+        rename_map[f"points_allowed_total_roll{w}"] = f"opp_points_allowed_total_roll{w}"
+    rename_map["points_allowed_total_lag1"] = "opp_points_allowed_total_lag1"
+
+    team_allowed = team_allowed.rename(columns={k: v for k, v in rename_map.items() if k in team_allowed.columns})
+    total_allowed = total_allowed.rename(columns={k: v for k, v in rename_map.items() if k in total_allowed.columns})
+
+    # Merge delle stats position-specific
+    merge_cols = ["season", "week", "team", "position"] + [v for k, v in rename_map.items() if k.startswith("points_allowed_roll")]
+    merge_cols = [c for c in merge_cols if c in team_allowed.columns]
+
+    df = df.merge(
+        team_allowed[["season", "week", "team", "position"] + [c for c in team_allowed.columns if c.startswith("opp_")]],
+        left_on=["season", "week", "opponent_team", "position"],
+        right_on=["season", "week", "team", "position"],
+        how="left",
+    )
+
+    # Merge delle stats totali
+    df = df.merge(
+        total_allowed[["season", "week", "team"] + [c for c in total_allowed.columns if c.startswith("opp_")]],
+        left_on=["season", "week", "opponent_team"],
+        right_on=["season", "week", "team"],
+        how="left",
+        suffixes=(None, "_tot"),
+    )
+
+    # Pulisci colonne di join duplicate
+    for c in ["team", "team_tot"]:
+        if c in df.columns:
+            df.drop(columns=[c], inplace=True)
+
+    return df
+
 def build_player_week_features(save: bool = True) -> pd.DataFrame:
     """
     Pipeline completa:
@@ -449,6 +542,10 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
 
     df = prepare_base_weekly(weekly, rosters, snaps=snaps, offensive_only=False)
     df = add_custom_league_points(df)      # ⬅️ QUI
+
+    # Add opponent defense features (points allowed to positions / total)
+    df = add_opponent_defense_features(df)
+
     df = add_lag_and_rolling_features(df)
     df = add_simple_season_features(df)
 
