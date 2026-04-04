@@ -10,6 +10,9 @@ backtest_results/*.parquet
 models
 catboost_info
 
+# Draft/prediction outputs (generated artifacts)
+outputs/
+
 # package files
 **/__pycache__/
 *.pyc
