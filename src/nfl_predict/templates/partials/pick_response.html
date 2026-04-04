@@ -1,0 +1,39 @@
+{% include "partials/board_table.html" %}
+
+<div id="roster-panel" hx-swap-oob="innerHTML">
+  {% include "partials/roster_panel.html" %}
+</div>
+
+<div id="suggestions-panel" hx-swap-oob="innerHTML">
+  {% include "partials/suggestions.html" %}
+</div>
+
+<header hx-swap-oob="outerHTML:header">
+  <header class="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-6 shrink-0">
+    <span class="text-green-400 font-bold text-lg">🏈 Draft</span>
+    <div class="flex gap-5 text-sm">
+      <span>Pick <strong class="text-green-400" id="hdr-pick">{{ current_pick }}</strong></span>
+      <span>Round <strong>{{ round }}</strong>.<strong>{{ pick_in_round }}</strong></span>
+      <span class="text-gray-400">{{ n_available }} available</span>
+    </div>
+    <nav class="flex gap-1 ml-4" id="pos-tabs">
+      {% for p in positions %}
+      <a href="/draft/board?pos={{ p }}"
+         hx-get="/draft/partials/board?pos={{ p }}"
+         hx-target="#board-section"
+         hx-swap="outerHTML"
+         hx-push-url="/draft/board?pos={{ p }}"
+         class="px-3 py-1 rounded text-xs font-medium transition
+                {% if p == pos_filter %}bg-green-600 text-white{% else %}bg-gray-800 hover:bg-gray-700 text-gray-300{% endif %}">
+        {{ p }}
+      </a>
+      {% endfor %}
+    </nav>
+    <span class="ml-auto text-xs text-gray-500">
+      Slot #{{ draft_position }} · {{ league_size }}-team league
+    </span>
+    <form action="/draft/reset" method="post" onsubmit="return confirm('Reset draft session?')">
+      <button class="text-xs text-red-500 hover:text-red-400 ml-2">Reset</button>
+    </form>
+  </header>
+</header>
