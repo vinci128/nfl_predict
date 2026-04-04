@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pandas as pd
 import typer
@@ -19,7 +19,9 @@ def _find_latest_prediction_files() -> list[Path]:
     """
     pred_files = list(OUT_DIR.glob("predictions_*.csv"))
     if not pred_files:
-        raise FileNotFoundError(f"Nessun file di predictions_*.csv trovato in {OUT_DIR}")
+        raise FileNotFoundError(
+            f"Nessun file di predictions_*.csv trovato in {OUT_DIR}"
+        )
 
     pattern = re.compile(
         r"predictions_(?P<position>[A-Za-z]+)_(?P<season>\d{4})_week(?P<week>\d+)\.csv"
@@ -112,7 +114,11 @@ def suggest(
     merged = merged.sort_values("expected_ppr_points", ascending=False)
 
     print("\nI TUOI giocatori (ordinati per expected PPR):\n")
-    cols = [c for c in ["player_name", "team", "position", "expected_ppr_points"] if c in merged.columns]
+    cols = [
+        c
+        for c in ["player_name", "team", "position", "expected_ppr_points"]
+        if c in merged.columns
+    ]
     print(merged[cols].head(top_n).to_string(index=False))
 
 

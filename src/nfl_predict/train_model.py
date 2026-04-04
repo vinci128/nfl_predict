@@ -188,7 +188,9 @@ def train_position_model(df: pd.DataFrame, position: str):
     target_col = "target_points_next_week"
 
     # Build position-specific feature set (only use features relevant to the position)
-    def get_relevant_feature_cols(df_frame: pd.DataFrame, pos: str, target_col: str = "target_points_next_week") -> list:
+    def get_relevant_feature_cols(
+        df_frame: pd.DataFrame, pos: str, target_col: str = "target_points_next_week"
+    ) -> list:
         """Return a list of feature columns relevant for `pos` by pattern matching.
 
         This keeps training compact and avoids feeding irrelevant signals to each position model.
@@ -247,7 +249,14 @@ def train_position_model(df: pd.DataFrame, position: str):
         }
 
         # Columns to always allow (ids/names removed separately)
-        always_allow = {"season", "week", "team", "position_group", "season_type", "player_id"}
+        always_allow = {
+            "season",
+            "week",
+            "team",
+            "position_group",
+            "season_type",
+            "player_id",
+        }
 
         cols = [c for c in df_frame.columns if c != target_col]
 
@@ -265,7 +274,13 @@ def train_position_model(df: pd.DataFrame, position: str):
                     break
 
         # Exclude obvious identifier/name columns
-        exclude_id = {"player_id", "player_name", "player_display_name", "gsis_id", "pfr_player_id"}
+        exclude_id = {
+            "player_id",
+            "player_name",
+            "player_display_name",
+            "gsis_id",
+            "pfr_player_id",
+        }
         chosen = [c for c in sorted(chosen) if c not in exclude_id]
 
         # Fallback: if no columns selected, use a broad default (exclude identifiers + target)
@@ -275,7 +290,9 @@ def train_position_model(df: pd.DataFrame, position: str):
         return chosen
 
     feature_cols = get_relevant_feature_cols(train_df, position)
-    cat_cols = [c for c in ["position_group", "season_type", "team"] if c in feature_cols]
+    cat_cols = [
+        c for c in ["position_group", "season_type", "team"] if c in feature_cols
+    ]
 
     X_train = train_df[feature_cols].copy()
     y_train = train_df[target_col].copy()
@@ -297,7 +314,12 @@ def train_position_model(df: pd.DataFrame, position: str):
 
     # Detect any non-numeric columns among feature_cols and treat them as categorical
     import pandas as _pd
-    non_numeric = [c for c in feature_cols if c in X_train.columns and not _pd.api.types.is_numeric_dtype(X_train[c])]
+
+    non_numeric = [
+        c
+        for c in feature_cols
+        if c in X_train.columns and not _pd.api.types.is_numeric_dtype(X_train[c])
+    ]
     for c in non_numeric:
         if c not in cat_cols:
             cat_cols.append(c)
