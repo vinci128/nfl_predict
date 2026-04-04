@@ -1,6 +1,7 @@
 # Raw data
 *.parquet
 *.csv
+data/.fetch_manifest.json
 
 # Model data
 models
