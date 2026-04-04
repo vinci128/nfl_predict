@@ -20,13 +20,14 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 # Default SEASON & WEEK utilities
 # -----------------------------------------------------------
 
-def get_default_season_and_week():
+def get_default_season_and_week(today: datetime.date | None = None):
     """
     Calcola automaticamente la season e la week correnti in base al calendario NFL.
     Funziona per tutte le stagioni future.
     """
 
-    today = datetime.date.today()
+    if today is None:
+        today = datetime.date.today()
     year = today.year
 
     # Se siamo a gennaio -> stagione dell'anno precedente
@@ -35,10 +36,11 @@ def get_default_season_and_week():
     else:
         season = year
 
-    # Inizio NFL 2024 (regola: primo TNF)
-    # Per stagioni future basterà aggiornare questa data o potremmo
-    # costruire un file con il calendario. Per ora semplice.
-    season_start = datetime.date(2024, 9, 5)  # Opening game
+    # Opening game: first Thursday of September on or after the 5th (day after Labor Day week)
+    d = datetime.date(season, 9, 1)
+    while d.day < 5 or d.weekday() != 3:  # weekday 3 = Thursday
+        d += datetime.timedelta(days=1)
+    season_start = d
 
     # Calcolo week relativa
     if today < season_start:

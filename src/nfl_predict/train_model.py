@@ -58,7 +58,7 @@ def train_wr_model(df_wr: pd.DataFrame):
     # --- 1) Colonne da escludere hard-coded --------------------
     drop_exact = [
         target_col,
-        "fantasy_points_custom"
+        "fantasy_points_custom",
         "fantasy_points_ppr",  # punti della week corrente
         "player_id",
         "gsis_id",
@@ -343,10 +343,10 @@ def train_position_model(df: pd.DataFrame, position: str):
 
     model_path = MODEL_DIR / f"{position.lower()}_catboost.cbm"
     model.save_model(model_path)
-    print(f"WR model salvato in: {model_path}")
+    print(f"{position} model salvato in: {model_path}")
 
     meta = {
-        "position": "WR",
+        "position": position,
         "feature_cols": feature_cols,
         "cat_cols": cat_cols,
         "train_seasons": sorted(map(int, train_df["season"].unique())),
