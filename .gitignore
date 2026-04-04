@@ -3,6 +3,9 @@
 *.csv
 data/.fetch_manifest.json
 
+# Backtest artifacts (parquet covered above, keep JSON summaries)
+backtest_results/*.parquet
+
 # Model data
 models
 catboost_info
