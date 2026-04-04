@@ -1,3 +1,4 @@
+import pandas as pd
 import typer
 
 from nfl_predict import features, fetch_nfl_data, predict_week, train_model
@@ -288,6 +289,167 @@ def board(
     ]
     print(top[cols].to_string(index=False))
     print(f"\nFull board exported to: {export_path}")
+
+
+# ---------------------------------------------------------------------------
+# draft-start: initialise a live draft session
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="draft-start")
+def draft_start(
+    season: int | None = typer.Option(
+        None,
+        help="Draft board season to load (default: most recent in outputs/).",
+    ),
+    league_size: int = typer.Option(12, help="Number of teams in the league."),
+    draft_position: int = typer.Option(1, help="Your draft slot (1-based)."),
+    board_path: str | None = typer.Option(
+        None, help="Path to draft board CSV (auto-detected if omitted)."
+    ),
+    state_path: str | None = typer.Option(
+        None, help="Where to save draft state JSON (default: outputs/draft_state.json)."
+    ),
+) -> None:
+    """Initialise a live draft session from a draft board CSV."""
+    import glob as _glob
+    from pathlib import Path
+
+    from nfl_predict.draft_assistant import init_draft_state, render_board, save_state
+
+    # Locate board CSV
+    if board_path is None:
+        if season is not None:
+            board_path = f"outputs/draft_board_{season}.csv"
+        else:
+            csvs = sorted(_glob.glob("outputs/draft_board_*.csv"))
+            if not csvs:
+                print("No draft board CSV found. Run `nfl-predict board` first.")
+                raise typer.Exit(1)
+            board_path = csvs[-1]  # most recent
+            print(f"Using board: {board_path}")
+
+    if not Path(board_path).exists():
+        print(f"Board file not found: {board_path}")
+        raise typer.Exit(1)
+
+    board = pd.read_csv(board_path)
+    from pathlib import Path as _Path
+
+    sp = _Path(state_path) if state_path else None
+    state = init_draft_state(
+        board,
+        league_size=league_size,
+        draft_position=draft_position,
+        state_path=sp,
+    )
+    save_state(state)
+
+    print(render_board(state, n=30))
+    print(f"\nDraft session started — state saved to {state.state_path}")
+    print("Use `nfl-predict draft-pick <NAME>` to record each pick.")
+
+
+# ---------------------------------------------------------------------------
+# draft-pick: record a pick and get suggestions
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="draft-pick")
+def draft_pick(
+    player: str = typer.Argument(
+        help="Player name (or unique substring) being drafted."
+    ),
+    drafter: str = typer.Option(
+        "other",
+        help="Who made the pick: 'me' for your pick, or any label for opponents.",
+    ),
+    needs: str | None = typer.Option(
+        None,
+        help="Comma-separated positions to prioritise, e.g. 'RB,WR'. "
+        "Auto-detected from your roster if omitted.",
+    ),
+    suggest: int = typer.Option(
+        5, help="Number of best-available suggestions to show."
+    ),
+    show_board: bool = typer.Option(
+        False, help="Redisplay the full board after the pick."
+    ),
+    state_path: str | None = typer.Option(
+        None, help="Draft state JSON path (default: outputs/draft_state.json)."
+    ),
+    llm: bool = typer.Option(
+        False, help="Ask Claude for a natural-language pick recommendation."
+    ),
+) -> None:
+    """Record a draft pick and show best-available suggestions."""
+    from pathlib import Path as _Path
+
+    from nfl_predict.draft_assistant import (
+        analyse_roster_needs,
+        get_llm_suggestion,
+        load_state,
+        mark_drafted,
+        render_board,
+        save_state,
+        suggest_best_available,
+    )
+
+    sp = _Path(state_path) if state_path else None
+    state = load_state(sp)
+
+    # Mark the pick
+    try:
+        state = mark_drafted(state, player, drafter=drafter)
+    except ValueError as e:
+        print(f"Error: {e}")
+        raise typer.Exit(1) from e
+
+    last = state.picks[-1]
+    marker = " ← YOUR PICK" if drafter == "me" else ""
+    print(
+        f"\nPick #{last.overall_pick}  R{last.round}.{last.pick_in_round}  "
+        f"{last.player_name} ({last.position}, {last.team})  "
+        f"VOR={last.vor:.1f}{marker}"
+    )
+
+    # Determine positional needs
+    if needs:
+        need_list = [n.strip().upper() for n in needs.split(",")]
+    else:
+        need_list = analyse_roster_needs(state)
+
+    if need_list:
+        print(f"Positional needs: {', '.join(need_list)}")
+
+    # Best available
+    suggestions = suggest_best_available(state, needs=need_list, n=suggest)
+    if not suggestions.empty:
+        print(f"\nTop {suggest} available:")
+        cols = [
+            c
+            for c in ("player_name", "position", "proj_p50", "vor", "tier")
+            if c in suggestions.columns
+        ]
+        print(suggestions[cols].to_string(index=False))
+
+    # Optional LLM advice
+    if llm:
+        print("\nAsking Claude for a recommendation...")
+        try:
+            advice = get_llm_suggestion(state, needs=need_list)
+            print(f"\n{advice}")
+        except ImportError as e:
+            print(f"LLM unavailable: {e}")
+        except Exception as e:
+            print(f"LLM error: {e}")
+
+    if show_board:
+        print()
+        print(render_board(state, n=30, show_drafted=True))
+
+    save_state(state)
+    print(f"\n{len(state.available)} players remaining.")
 
 
 if __name__ == "__main__":
