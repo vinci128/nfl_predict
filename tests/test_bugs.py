@@ -10,7 +10,7 @@ import datetime
 import sys
 from pathlib import Path
 
-import pytest
+from nfl_predict.predict_week import get_default_season_and_week
 
 SRC = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(SRC))
@@ -19,6 +19,7 @@ sys.path.insert(0, str(SRC))
 # ---------------------------------------------------------------------------
 # Bug 1: Missing comma between "fantasy_points_custom" and "fantasy_points_ppr"
 # ---------------------------------------------------------------------------
+
 
 def test_drop_exact_no_concatenated_string():
     """
@@ -46,15 +47,17 @@ def test_drop_exact_no_concatenated_string():
         "Found concatenated string 'fantasy_points_customfantasy_points_ppr' — "
         "missing comma between the two list entries."
     )
-    assert found_custom, "Expected 'fantasy_points_custom' as a standalone string in drop_exact."
-    assert found_ppr, "Expected 'fantasy_points_ppr' as a standalone string in drop_exact."
+    assert found_custom, (
+        "Expected 'fantasy_points_custom' as a standalone string in drop_exact."
+    )
+    assert found_ppr, (
+        "Expected 'fantasy_points_ppr' as a standalone string in drop_exact."
+    )
 
 
 # ---------------------------------------------------------------------------
 # Bug 2: Hardcoded 2024 season start date
 # ---------------------------------------------------------------------------
-
-from nfl_predict.predict_week import get_default_season_and_week
 
 
 def test_season_start_2024():
@@ -90,8 +93,12 @@ def test_week_advances_correctly():
     """Week count should increase by 1 every 7 days from the opener."""
     opener_2024 = datetime.date(2024, 9, 5)
     _, week1 = get_default_season_and_week(today=opener_2024)
-    _, week2 = get_default_season_and_week(today=opener_2024 + datetime.timedelta(days=7))
-    _, week3 = get_default_season_and_week(today=opener_2024 + datetime.timedelta(days=14))
+    _, week2 = get_default_season_and_week(
+        today=opener_2024 + datetime.timedelta(days=7)
+    )
+    _, week3 = get_default_season_and_week(
+        today=opener_2024 + datetime.timedelta(days=14)
+    )
     assert week1 == 1
     assert week2 == 2
     assert week3 == 3
@@ -107,6 +114,7 @@ def test_january_resolves_to_previous_season():
 # Bug 3: Metadata always saves position as "WR"
 # ---------------------------------------------------------------------------
 
+
 def test_metadata_position_uses_variable():
     """
     In train_position_model(), the meta dict must use the `position` variable,
@@ -121,15 +129,21 @@ def test_metadata_position_uses_variable():
             target_func = node
             break
 
-    assert target_func is not None, "Function 'train_position_model' not found in train_model.py"
+    assert target_func is not None, (
+        "Function 'train_position_model' not found in train_model.py"
+    )
 
     hardcoded_wr_in_meta = False
     for node in ast.walk(target_func):
         if isinstance(node, ast.Dict):
-            for key, value in zip(node.keys, node.values):
-                if isinstance(key, ast.Constant) and key.value == "position":
-                    if isinstance(value, ast.Constant) and value.value == "WR":
-                        hardcoded_wr_in_meta = True
+            for key, value in zip(node.keys, node.values, strict=False):
+                if (
+                    isinstance(key, ast.Constant)
+                    and key.value == "position"
+                    and isinstance(value, ast.Constant)
+                    and value.value == "WR"
+                ):
+                    hardcoded_wr_in_meta = True
 
     assert not hardcoded_wr_in_meta, (
         "In train_position_model(), meta['position'] is hardcoded to 'WR' "

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import nflreadpy as nfl
-import pandas as pd
 from pathlib import Path
 
-from datetime import date
+import nflreadpy as nfl
+import pandas as pd
 
 # === Config base paths ===
 # Adatta se nel tuo progetto usavi già un BASE_DIR diverso
@@ -13,14 +12,15 @@ DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-
 def save_parquet(df: pd.DataFrame, name: str) -> None:
     """Salva un DataFrame in data/<name>.parquet."""
     path = DATA_DIR / f"{name}.parquet"
     df.to_parquet(path, index=False)
     print(f"Saved {name} -> {path} shape={df.shape}")
 
+
 # === Seasons helper via nflreadpy ===
+
 
 def get_seasons(first_season: int = 2015) -> list[int]:
     """
@@ -35,6 +35,7 @@ def get_seasons(first_season: int = 2015) -> list[int]:
 SEASONS = get_seasons()
 
 # === Fetch functions usando nflreadpy (Polars -> Pandas) ===
+
 
 def fetch_weekly_stats() -> None:
     """
