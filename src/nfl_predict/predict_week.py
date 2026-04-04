@@ -2,7 +2,7 @@
 
 import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import pandas as pd
 import typer
@@ -20,6 +20,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 # Default SEASON & WEEK utilities
 # -----------------------------------------------------------
 
+
 def get_default_season_and_week(today: datetime.date | None = None):
     """
     Calcola automaticamente la season e la week correnti in base al calendario NFL.
@@ -31,10 +32,7 @@ def get_default_season_and_week(today: datetime.date | None = None):
     year = today.year
 
     # Se siamo a gennaio -> stagione dell'anno precedente
-    if today.month < 3:
-        season = year - 1
-    else:
-        season = year
+    season = year - 1 if today.month < 3 else year
 
     # Opening game: first Thursday of September on or after the 5th (day after Labor Day week)
     d = datetime.date(season, 9, 1)
@@ -55,6 +53,7 @@ def get_default_season_and_week(today: datetime.date | None = None):
 
     return season, week
 
+
 def get_default_season_and_week_from_data(df: pd.DataFrame):
     """
     Usa i dati disponibili per scegliere una default season/week:
@@ -62,7 +61,9 @@ def get_default_season_and_week_from_data(df: pd.DataFrame):
     - week = ultima week nei dati + 1
     """
     if df.empty:
-        raise ValueError("player_week_features è vuoto, impossibile determinare i default.")
+        raise ValueError(
+            "player_week_features è vuoto, impossibile determinare i default."
+        )
 
     max_season = int(df["season"].max())
     df_season = df[df["season"] == max_season]
@@ -71,9 +72,11 @@ def get_default_season_and_week_from_data(df: pd.DataFrame):
     target_week = max_week + 1
     return max_season, target_week
 
+
 # -----------------------------------------------------------
 # Data loading
 # -----------------------------------------------------------
+
 
 def load_features() -> pd.DataFrame:
     path = PROCESSED_DIR / "player_week_features.parquet"
@@ -101,9 +104,11 @@ def load_model_and_meta(position: str = "WR"):
 
     return model, feature_cols, cat_cols, meta
 
+
 # -----------------------------------------------------------
 # Build inference dataset
 # -----------------------------------------------------------
+
 
 def build_inference_dataset(
     df: pd.DataFrame,
@@ -112,7 +117,7 @@ def build_inference_dataset(
     position: str,
     feature_cols,
     cat_cols,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Usiamo le feature della settimana (target_week - 1) per prevedere target_week.
     Se la week delle feature è parziale (alcuni giocatori non hanno ancora una riga
@@ -122,7 +127,9 @@ def build_inference_dataset(
 
     feature_week = target_week - 1
     if feature_week < 1:
-        raise ValueError("Non posso prevedere la week 1: serve almeno una week precedente.")
+        raise ValueError(
+            "Non posso prevedere la week 1: serve almeno una week precedente."
+        )
 
     df_season = df[df["season"] == season].copy()
     df_pos = df_season[df_season["position"] == position].copy()
@@ -161,7 +168,7 @@ def build_inference_dataset(
         # Non un errore: comportamento voluto quando la settimana è parziale
         print(
             f"Nota: alcuni giocatori usano dati di settimane precedenti. "
-            f"Weeks usate per le features: {weeks_used[:5]}{'...' if len(weeks_used)>5 else ''}"
+            f"Weeks usate per le features: {weeks_used[:5]}{'...' if len(weeks_used) > 5 else ''}"
         )
 
     missing = [c for c in feature_cols if c not in df_feat.columns]
@@ -178,9 +185,12 @@ def build_inference_dataset(
 
     inferred_cat_cols = list(cat_cols) if cat_cols is not None else []
     for c in feature_cols:
-        if c in X.columns and not _pd.api.types.is_numeric_dtype(X[c]):
-            if c not in inferred_cat_cols:
-                inferred_cat_cols.append(c)
+        if (
+            c in X.columns
+            and not _pd.api.types.is_numeric_dtype(X[c])
+            and c not in inferred_cat_cols
+        ):
+            inferred_cat_cols.append(c)
 
     for c in inferred_cat_cols:
         if c in X.columns:
@@ -191,6 +201,7 @@ def build_inference_dataset(
     # cat indices from X columns where necessary.
 
     return df_feat, X
+
 
 # -----------------------------------------------------------
 # Predictions
@@ -228,7 +239,9 @@ def make_predictions(
             "season": season,
             "feature_week": df_feat["week"].values,
             "predicted_week": target_week,
-            "player_id": df_feat.get("player_id", pd.Series([None] * len(df_feat))).values,
+            "player_id": df_feat.get(
+                "player_id", pd.Series([None] * len(df_feat))
+            ).values,
             "player_name": df_feat[name_col].values if name_col else None,
             "team": df_feat[team_col].values if team_col else None,
             "position": position,
@@ -236,12 +249,15 @@ def make_predictions(
         }
     )
 
-    return out.sort_values("expected_ppr_points", ascending=False).reset_index(drop=True)
+    return out.sort_values("expected_ppr_points", ascending=False).reset_index(
+        drop=True
+    )
+
 
 # -----------------------------------------------------------
 # Typer CLI
 # -----------------------------------------------------------
-def _clean_option(value: any) -> any:
+def _clean_option(value: Any) -> Any:
     """
     Se arriva un Typer OptionInfo (per chiamate errate), lo tratta come None.
     Così siamo robusti anche se qualcuno chiama per sbaglio il comando Typer da codice.
@@ -254,8 +270,8 @@ def _clean_option(value: any) -> any:
 
 
 def run_predictions(
-    season: Optional[int] = None,
-    week: Optional[int] = None,
+    season: int | None = None,
+    week: int | None = None,
     position: str = "WR",
 ):
     """
@@ -280,9 +296,9 @@ def run_predictions(
     season = int(season)
     week = int(week)
 
-    print(f"\n=== Fantasy Predictions ===")
+    print("\n=== Fantasy Predictions ===")
     print(f"Season (default dai dati): {season}")
-    print(f"Target week: {week} (usa week {week-1} come feature)")
+    print(f"Target week: {week} (usa week {week - 1} come feature)")
     print(f"Position: {position}\n")
 
     model, feature_cols, cat_cols, meta = load_model_and_meta(position=position)
@@ -296,7 +312,7 @@ def run_predictions(
         cat_cols=cat_cols,
     )
 
-    print(f"Trovati {len(df_feat)} giocatori {position} per week {week-1}")
+    print(f"Trovati {len(df_feat)} giocatori {position} per week {week - 1}")
 
     preds = make_predictions(
         df_feat=df_feat,
@@ -313,7 +329,11 @@ def run_predictions(
 
     print(f"\nSalvato CSV in: {out_path}\n")
     print("Top 10:\n")
-    print(preds[["player_name", "team", "expected_ppr_points"]].head(10).to_string(index=False))
+    print(
+        preds[["player_name", "team", "expected_ppr_points"]]
+        .head(10)
+        .to_string(index=False)
+    )
 
     return preds
 
@@ -322,13 +342,14 @@ def run_predictions(
 # Typer CLI wrapper
 # -----------------------------------------------------------
 
+
 @app.command()
 def predict(
-    season: Optional[int] = typer.Option(
+    season: int | None = typer.Option(
         None,
         help="Season NFL. Default = stagione più recente nei dati.",
     ),
-    week: Optional[int] = typer.Option(
+    week: int | None = typer.Option(
         None,
         help="Week da prevedere. Default = prossima week rispetto ai dati.",
     ),
