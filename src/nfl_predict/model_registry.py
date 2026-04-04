@@ -121,6 +121,7 @@ class ModelRegistry:
             {
                 "version_id": version_id,
                 "created_at": full_meta["created_at"],
+                "model_type": meta.get("model_type", "week"),
                 "valid_season": meta.get("valid_season"),
                 "valid_mae": meta.get("valid_mae"),
                 "backtest_mae": backtest_metrics.get("mae")
