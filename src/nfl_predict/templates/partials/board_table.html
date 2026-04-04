@@ -1,0 +1,84 @@
+<div id="board-section">
+<table class="w-full text-xs">
+  <thead class="bg-gray-800 sticky top-0 z-10">
+    <tr class="text-gray-400 text-left">
+      <th class="px-2 py-2 w-10">#</th>
+      <th class="px-2 py-2 w-6">T</th>
+      <th class="px-2 py-2">Player</th>
+      <th class="px-2 py-2 w-10">Pos</th>
+      <th class="px-2 py-2 w-12">Team</th>
+      <th class="px-2 py-2 w-14 text-right">Floor</th>
+      <th class="px-2 py-2 w-14 text-right">Median</th>
+      <th class="px-2 py-2 w-14 text-right">Ceil</th>
+      <th class="px-2 py-2 w-14 text-right">VOR</th>
+      {% if board_rows and board_rows[0] is defined and 'adp' in board_rows[0] %}
+      <th class="px-2 py-2 w-12 text-right">ADP</th>
+      <th class="px-2 py-2 w-12 text-right">+/-</th>
+      {% endif %}
+      <th class="px-2 py-2 w-20"></th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-gray-800">
+    {% for row in board_rows %}
+    {% set vor = row.vor | float %}
+    {% set tier = row.tier | int %}
+    <tr class="hover:bg-gray-800/50 transition group
+               {% if tier == 1 %}text-gray-100{% elif tier == 2 %}text-gray-200{% elif tier <= 4 %}text-gray-300{% else %}text-gray-400{% endif %}">
+      <td class="px-2 py-1.5 text-gray-500">{{ row.overall_rank | int }}</td>
+      <td class="px-2 py-1.5">
+        <span class="inline-block w-5 h-5 rounded text-center text-xs font-bold leading-5
+               {% if tier == 1 %}bg-yellow-500 text-black
+               {% elif tier == 2 %}bg-orange-600 text-white
+               {% elif tier == 3 %}bg-blue-700 text-white
+               {% else %}bg-gray-700 text-gray-300{% endif %}">
+          {{ tier }}
+        </span>
+      </td>
+      <td class="px-2 py-1.5 font-medium">{{ row.player_name }}</td>
+      <td class="px-2 py-1.5">
+        <span class="px-1.5 py-0.5 rounded text-xs font-semibold
+               {% if row.position == 'QB' %}bg-red-900 text-red-300
+               {% elif row.position == 'RB' %}bg-green-900 text-green-300
+               {% elif row.position == 'WR' %}bg-blue-900 text-blue-300
+               {% elif row.position == 'TE' %}bg-purple-900 text-purple-300
+               {% else %}bg-gray-800 text-gray-400{% endif %}">
+          {{ row.position }}
+        </span>
+      </td>
+      <td class="px-2 py-1.5 text-gray-400">{{ row.team }}</td>
+      <td class="px-2 py-1.5 text-right text-gray-500">{{ "%.0f" | format(row.proj_p10 | float) }}</td>
+      <td class="px-2 py-1.5 text-right font-medium">{{ "%.0f" | format(row.proj_p50 | float) }}</td>
+      <td class="px-2 py-1.5 text-right text-gray-500">{{ "%.0f" | format(row.proj_p90 | float) }}</td>
+      <td class="px-2 py-1.5 text-right font-semibold
+                 {% if vor > 50 %}text-green-400{% elif vor > 0 %}text-green-600{% else %}text-red-500{% endif %}">
+        {{ "%.1f" | format(vor) }}
+      </td>
+      {% if 'adp' in row %}
+      <td class="px-2 py-1.5 text-right text-gray-500">{{ "%.0f" | format(row.adp | float) if row.adp else '—' }}</td>
+      <td class="px-2 py-1.5 text-right text-xs
+                 {% set delta = (row.adp_rank | float - row.overall_rank | float) if row.adp_rank else 0 %}
+                 {% if delta > 10 %}text-green-400{% elif delta < -10 %}text-red-400{% else %}text-gray-500{% endif %}">
+        {% if row.adp_rank %}{{ "%+.0f" | format(row.adp_rank | float - row.overall_rank | float) }}{% else %}—{% endif %}
+      </td>
+      {% endif %}
+      <td class="px-2 py-1.5">
+        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+          <button data-pick-name="{{ row.player_name }}"
+                  class="px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-xs">
+            Fill
+          </button>
+          <button data-pick-name="{{ row.player_name }}" data-pick-mine="1"
+                  class="px-2 py-0.5 bg-green-700 hover:bg-green-600 rounded text-xs text-green-200">
+            Mine
+          </button>
+        </div>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="12" class="text-center py-8 text-gray-500">No players available</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>

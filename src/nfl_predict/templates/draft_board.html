@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Draft Board — Pick #{{ current_pick }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 h-screen flex flex-col overflow-hidden">
+
+  <!-- ── Top bar ─────────────────────────────────────────────────────── -->
+  <header class="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-6 shrink-0">
+    <span class="text-green-400 font-bold text-lg">🏈 Draft</span>
+    <div class="flex gap-5 text-sm">
+      <span>Pick <strong class="text-green-400" id="hdr-pick">{{ current_pick }}</strong></span>
+      <span>Round <strong>{{ round }}</strong>.<strong>{{ pick_in_round }}</strong></span>
+      <span class="text-gray-400">{{ n_available }} available</span>
+    </div>
+
+    <!-- Position filter tabs -->
+    <nav class="flex gap-1 ml-4" id="pos-tabs">
+      {% for p in positions %}
+      <a href="/draft/board?pos={{ p }}"
+         hx-get="/draft/partials/board?pos={{ p }}"
+         hx-target="#board-section"
+         hx-swap="outerHTML"
+         hx-push-url="/draft/board?pos={{ p }}"
+         class="px-3 py-1 rounded text-xs font-medium transition
+                {% if p == pos_filter %}bg-green-600 text-white{% else %}bg-gray-800 hover:bg-gray-700 text-gray-300{% endif %}">
+        {{ p }}
+      </a>
+      {% endfor %}
+    </nav>
+
+    <span class="ml-auto text-xs text-gray-500">
+      Slot #{{ draft_position }} · {{ league_size }}-team league
+    </span>
+    <form action="/draft/reset" method="post" onsubmit="return confirm('Reset draft session?')">
+      <button class="text-xs text-red-500 hover:text-red-400 ml-2">Reset</button>
+    </form>
+  </header>
+
+  <!-- ── Main layout ──────────────────────────────────────────────────── -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- LEFT: available board -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- Error banner (htmx swap target) -->
+      <div id="pick-error"></div>
+
+      <!-- Board table -->
+      <div class="flex-1 overflow-y-auto">
+        {% include "partials/board_table.html" %}
+      </div>
+
+      <!-- Pick input bar -->
+      <div class="bg-gray-900 border-t border-gray-700 px-4 py-3 shrink-0">
+        <form id="pick-form"
+              hx-post="/draft/pick"
+              hx-target="#board-section"
+              hx-swap="outerHTML"
+              hx-on::after-request="this.reset(); document.getElementById('pick-error').innerHTML='';"
+              class="flex gap-3 items-center">
+          <input type="hidden" name="pos" value="{{ pos_filter }}">
+          <input id="player-input"
+                 name="player_name"
+                 type="text"
+                 placeholder="Player name or substring…"
+                 required
+                 autocomplete="off"
+                 class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm
+                        focus:outline-none focus:border-green-500 placeholder-gray-500">
+
+          <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-300">
+            <input type="checkbox" id="mine-check" name="_mine_check" class="hidden peer">
+            <span class="peer-checked:hidden flex items-center gap-1">
+              <span class="w-3 h-3 rounded-full bg-gray-600 inline-block"></span> Opponent
+            </span>
+            <span class="hidden peer-checked:flex items-center gap-1">
+              <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span> Mine
+            </span>
+          </label>
+          <!-- Hidden drafter field, toggled by checkbox -->
+          <input type="hidden" name="drafter" id="drafter-field" value="other">
+
+          <button type="submit"
+                  class="bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-lg
+                         font-semibold text-sm transition">
+            Draft ↵
+          </button>
+        </form>
+      </div>
+    </main>
+
+    <!-- RIGHT: roster + suggestions sidebar -->
+    <aside class="w-72 bg-gray-900 border-l border-gray-700 flex flex-col overflow-hidden shrink-0">
+
+      <!-- Suggestions -->
+      <div id="suggestions-panel" class="border-b border-gray-700 p-3">
+        {% include "partials/suggestions.html" %}
+      </div>
+
+      <!-- My roster -->
+      <div id="roster-panel" class="flex-1 overflow-y-auto p-3">
+        {% include "partials/roster_panel.html" %}
+      </div>
+
+      <!-- Claude advisor (Phase 3) -->
+      {% if llm_available %}
+      <div class="p-3 border-t border-gray-700 shrink-0">
+        <button hx-post="/draft/llm-suggest"
+                hx-target="#llm-panel"
+                hx-swap="innerHTML"
+                hx-indicator="#llm-spinner"
+                class="w-full bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium
+                       py-2 rounded-lg transition flex items-center justify-center gap-2">
+          <span id="llm-spinner" class="htmx-indicator animate-spin">⟳</span>
+          Ask Claude
+        </button>
+        <div id="llm-panel" class="mt-2 text-xs text-gray-400"></div>
+      </div>
+      {% else %}
+      <div class="p-3 border-t border-gray-700 text-xs text-gray-600 shrink-0">
+        Set <code>ANTHROPIC_API_KEY</code> to enable AI advisor
+      </div>
+      {% endif %}
+
+    </aside>
+  </div>
+
+  <!-- Recent picks drawer (bottom-right, collapsible) -->
+  <div class="fixed bottom-0 right-72 bg-gray-900 border border-gray-700 rounded-t-lg
+              text-xs w-80 z-10" x-data="{ open: false }" id="picks-drawer">
+    <button onclick="this.parentElement.querySelector('#picks-list').classList.toggle('hidden');
+                     this.textContent = this.textContent.includes('▲') ? '▼ Recent picks' : '▲ Recent picks';"
+            class="w-full text-left px-3 py-2 text-gray-400 hover:text-gray-200 font-medium">
+      ▼ Recent picks ({{ n_picks }} total)
+    </button>
+    <div id="picks-list" class="hidden max-h-48 overflow-y-auto px-3 pb-2 space-y-1">
+      {% for p in recent_picks %}
+      <div class="flex justify-between {% if p.is_mine %}text-green-400{% else %}text-gray-400{% endif %}">
+        <span>#{{ p.pick }} {{ p.player }} ({{ p.position }})</span>
+        <span>{{ p.drafter }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>
+    // Sync Mine/Opponent checkbox to hidden drafter field
+    document.getElementById('mine-check').addEventListener('change', function() {
+      document.getElementById('drafter-field').value = this.checked ? 'me' : 'other';
+    });
+
+    // Click a row in the board to pre-fill the input
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-pick-name]');
+      if (btn) {
+        document.getElementById('player-input').value = btn.dataset.pickName;
+        document.getElementById('player-input').focus();
+        // Auto-select Mine if it was a Mine button
+        if (btn.dataset.pickMine) {
+          document.getElementById('mine-check').checked = true;
+          document.getElementById('drafter-field').value = 'me';
+        }
+      }
+    });
+
+    // After any htmx request updates the sidebar, update the header pick number
+    document.body.addEventListener('htmx:afterRequest', function(e) {
+      const newPick = document.querySelector('[data-current-pick]');
+      if (newPick) {
+        document.getElementById('hdr-pick').textContent = newPick.dataset.currentPick;
+      }
+    });
+  </script>
+</body>
+</html>
