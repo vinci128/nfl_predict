@@ -1,10 +1,10 @@
 import typer
-from typing import Optional
+
 from nfl_predict import (
-    fetch_nfl_data,
     features,
-    train_model,
+    fetch_nfl_data,
     predict_week,
+    train_model,
 )  # se li rendi moduli importabili
 
 app = typer.Typer(help="CLI per la pipeline NFL fantasy.")
@@ -14,7 +14,9 @@ app = typer.Typer(help="CLI per la pipeline NFL fantasy.")
 def update_all(
     fetch: bool = typer.Option(True, help="Scaricare dati aggiornati?"),
     train: bool = typer.Option(True, help="Riallenare i modelli dopo l'update dati?"),
-    position: Optional[str] = typer.Option(None, help="Posizione per le predizioni. Default = all main positions."),
+    position: str | None = typer.Option(
+        None, help="Posizione per le predizioni. Default = all main positions."
+    ),
 ):
     """Fetch + features (+ train) in un colpo solo."""
     print(">> Fetching raw NFL data...")

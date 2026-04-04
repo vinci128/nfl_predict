@@ -1,13 +1,11 @@
-from typing import Optional
-
 from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from nfl_predict.predict_week import run_predictions
-
 
 app = FastAPI(title="nfl-predict API", version="0.1.0")
 
@@ -18,10 +16,10 @@ if static_dir.exists():
 
 
 class PredictRequest(BaseModel):
-    season: Optional[int] = None
-    week: Optional[int] = None
-    position: Optional[str] = "WR"
-    top_n: Optional[int] = 20
+    season: int | None = None
+    week: int | None = None
+    position: str | None = "WR"
+    top_n: int | None = 20
 
 
 @app.get("/health")
@@ -39,9 +37,11 @@ def predict(req: PredictRequest):
     """
 
     try:
-        df = run_predictions(season=req.season, week=req.week, position=req.position)
+        df = run_predictions(
+            season=req.season, week=req.week, position=req.position or "WR"
+        )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     # convert DataFrame to JSON-serializable list of records
     try:

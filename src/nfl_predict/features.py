@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 
@@ -68,21 +67,21 @@ def prepare_base_weekly(
     # 3) Ora possiamo selezionare le colonne minime dal roster
     # ------------------------------------------------------------------
     rosters_min = rosters[
-        [c for c in ["player_id", "position", "team", "season", "week"] if c in rosters.columns]
+        [
+            c
+            for c in ["player_id", "position", "team", "season", "week"]
+            if c in rosters.columns
+        ]
     ].copy()
 
     # se non hai week in rosters, deduplica solo per (season, player_id)
     if "week" in rosters_min.columns:
-        rosters_min = (
-            rosters_min
-            .sort_values(["season", "week"])
-            .drop_duplicates(["season", "player_id"], keep="last")
+        rosters_min = rosters_min.sort_values(["season", "week"]).drop_duplicates(
+            ["season", "player_id"], keep="last"
         )
     else:
-        rosters_min = (
-            rosters_min
-            .sort_values(["season"])
-            .drop_duplicates(["season", "player_id"], keep="last")
+        rosters_min = rosters_min.sort_values(["season"]).drop_duplicates(
+            ["season", "player_id"], keep="last"
         )
 
     # ------------------------------------------------------------------
@@ -143,7 +142,7 @@ def prepare_base_weekly(
     return df
 
 
-def _select_stat_columns(df: pd.DataFrame) -> List[str]:
+def _select_stat_columns(df: pd.DataFrame) -> list[str]:
     """
     Seleziona un set di colonne di stats da usare per rolling features,
     prendendo solo quelle effettivamente presenti nel DataFrame.
@@ -273,12 +272,14 @@ def add_simple_season_features(df: pd.DataFrame) -> pd.DataFrame:
         cum_mean_col = f"{col}_season_mean"
 
         df[cum_sum_col] = grouped[src_col].cumsum()
-        df[cum_mean_col] = grouped[src_col].expanding(min_periods=1).mean().reset_index(
-            level=[0, 1], drop=True
+        df[cum_mean_col] = (
+            grouped[src_col]
+            .expanding(min_periods=1)
+            .mean()
+            .reset_index(level=[0, 1], drop=True)
         )
 
     return df
-
 
 
 def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
@@ -320,7 +321,7 @@ def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
     # ----- OFFENSE -----
 
     # Passing
-    pts += 0.1 * col("passing_yards")          # 1 pt / 10 yards
+    pts += 0.1 * col("passing_yards")  # 1 pt / 10 yards
     # in nflreadpy spesso è "passing_tds" e "interceptions"
     pts += 4.0 * col("passing_tds")
     pts += -2.0 * (col("interceptions") + col("passing_interceptions"))
@@ -336,33 +337,30 @@ def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
 
     # Return TD (kickoff + punt + altri ST TD)
     return_tds = (
-        col("kick_return_tds") +
-        col("punt_return_tds") +
-        col("special_teams_tds")
+        col("kick_return_tds") + col("punt_return_tds") + col("special_teams_tds")
     )
     pts += 6.0 * return_tds
 
     # Fumble recovered for TD (se presente)
     pts += 6.0 * (
-        col("fumble_recovery_tds") +
-        col("defense_tds")  # nel dubbio, meglio includerlo
+        col("fumble_recovery_tds") + col("defense_tds")  # nel dubbio, meglio includerlo
     )
 
     # Fumbles lost (varie declinazioni)
     fumbles_lost = (
-        col("fumbles_lost") +
-        col("rushing_fumbles_lost") +
-        col("receiving_fumbles_lost") +
-        col("sack_fumbles_lost")
+        col("fumbles_lost")
+        + col("rushing_fumbles_lost")
+        + col("receiving_fumbles_lost")
+        + col("sack_fumbles_lost")
     )
     pts += -2.0 * fumbles_lost
 
     # 2-point conversions (passing / rushing / receiving)
     two_pt = (
-        col("passing_2pt_conversions") +
-        col("rushing_2pt_conversions") +
-        col("receiving_2pt_conversions") +
-        col("two_point_conversions")
+        col("passing_2pt_conversions")
+        + col("rushing_2pt_conversions")
+        + col("receiving_2pt_conversions")
+        + col("two_point_conversions")
     )
     pts += 2.0 * two_pt
 
@@ -371,16 +369,12 @@ def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
     # ----- KICKING (range approximation) -----
 
     fg_made = (
-        col("field_goals_made") +
-        col("fg_made") +
-        col("fgm")  # fallback nel caso appaia nei tuoi dati
+        col("field_goals_made")
+        + col("fg_made")
+        + col("fgm")  # fallback nel caso appaia nei tuoi dati
     )
 
-    fg_long = (
-        col("field_goals_longest") +
-        col("fg_long") +
-        col("fg_longest")
-    )
+    fg_long = col("field_goals_longest") + col("fg_long") + col("fg_longest")
     # Stima punteggio FG
     # Preferiamo usare i bucket per distanza se presenti (colonne come
     # fg_made_30_39, fg_made_40_49, fg_made_50_59, fg_made_60_).
@@ -401,11 +395,7 @@ def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
 
     # If any bucket column exists (non-zero in at least some rows), use buckets
     if (fg0.sum() + fg20.sum() + fg30.sum() + fg40.sum() + fg50.sum() + fg60.sum()) > 0:
-        fg_points = (
-            3 * (fg0 + fg20 + fg30)
-            + 4 * fg40
-            + 5 * (fg50 + fg60)
-        )
+        fg_points = 3 * (fg0 + fg20 + fg30) + 4 * fg40 + 5 * (fg50 + fg60)
     else:
         # fallback: use fg_long to assign a per-FG value (avoid 5+(n-1)*4 bug)
         mask_50 = fg_long >= 50
@@ -420,17 +410,13 @@ def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
         mask_20 = (fg_long >= 20) & (fg_long < 30)
         fg_points[mask_20] = 3 * fg_made[mask_20]
 
-        mask_0 = (fg_long < 20)
+        mask_0 = fg_long < 20
         fg_points[mask_0] = 3 * fg_made[mask_0]
 
     pts += fg_points
 
     # PAT (extra points)
-    pat_made = (
-        col("extra_points_made") +
-        col("xpmade") +
-        col("pat_made")
-    )
+    pat_made = col("extra_points_made") + col("xpmade") + col("pat_made")
     pts += pat_made * 1
 
     df["fantasy_points_custom"] = pts
@@ -449,23 +435,31 @@ def add_opponent_defense_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     if "opponent_team" not in df.columns:
-        print("Nessuna colonna 'opponent_team' trovata — salto le feature difensive dell'avversario.")
+        print(
+            "Nessuna colonna 'opponent_team' trovata — salto le feature difensive dell'avversario."
+        )
         return df
 
     if "fantasy_points_custom" not in df.columns:
-        print("Nessuna colonna 'fantasy_points_custom' trovata — assicurati di chiamare add_custom_league_points prima.")
+        print(
+            "Nessuna colonna 'fantasy_points_custom' trovata — assicurati di chiamare add_custom_league_points prima."
+        )
         return df
 
     # Punti concessi dall'avversario per posizione nella specifica settimana
     team_allowed = (
-        df.groupby(["season", "week", "opponent_team", "position"], dropna=False)["fantasy_points_custom"]
+        df.groupby(["season", "week", "opponent_team", "position"], dropna=False)[
+            "fantasy_points_custom"
+        ]
         .sum()
         .reset_index(name="points_allowed")
         .rename(columns={"opponent_team": "team"})
     )
 
     # Ordinamento e calcolo lag/rolling per (team, position)
-    team_allowed = team_allowed.sort_values(["team", "position", "season", "week"]).reset_index(drop=True)
+    team_allowed = team_allowed.sort_values(
+        ["team", "position", "season", "week"]
+    ).reset_index(drop=True)
     grouped = team_allowed.groupby(["team", "position"], group_keys=False)
 
     team_allowed["points_allowed_lag1"] = grouped["points_allowed"].shift(1)
@@ -473,41 +467,62 @@ def add_opponent_defense_features(df: pd.DataFrame) -> pd.DataFrame:
     for w in ROLLING_WINDOWS:
         col = f"points_allowed_roll{w}"
         team_allowed[col] = (
-            grouped["points_allowed_lag1"].rolling(window=w, min_periods=1).mean().reset_index(level=[0,1], drop=True)
+            grouped["points_allowed_lag1"]
+            .rolling(window=w, min_periods=1)
+            .mean()
+            .reset_index(level=[0, 1], drop=True)
         )
 
     # Aggiungiamo anche il totale (tutte le posizioni insieme) per dar misura complessiva
     total_allowed = (
-        df.groupby(["season", "week", "opponent_team"], dropna=False)["fantasy_points_custom"]
+        df.groupby(["season", "week", "opponent_team"], dropna=False)[
+            "fantasy_points_custom"
+        ]
         .sum()
         .reset_index(name="points_allowed_total")
         .rename(columns={"opponent_team": "team"})
     )
 
-    total_allowed = total_allowed.sort_values(["team", "season", "week"]).reset_index(drop=True)
+    total_allowed = total_allowed.sort_values(["team", "season", "week"]).reset_index(
+        drop=True
+    )
     gtot = total_allowed.groupby(["team"], group_keys=False)
     total_allowed["points_allowed_total_lag1"] = gtot["points_allowed_total"].shift(1)
     for w in ROLLING_WINDOWS:
         total_allowed[f"points_allowed_total_roll{w}"] = (
-            gtot["points_allowed_total_lag1"].rolling(window=w, min_periods=1).mean().reset_index(level=0, drop=True)
+            gtot["points_allowed_total_lag1"]
+            .rolling(window=w, min_periods=1)
+            .mean()
+            .reset_index(level=0, drop=True)
         )
 
     # Rinominiamo le colonne per evitare collisioni al merge
     rename_map = {"points_allowed_lag1": "opp_points_allowed_lag1"}
     for w in ROLLING_WINDOWS:
         rename_map[f"points_allowed_roll{w}"] = f"opp_points_allowed_roll{w}"
-        rename_map[f"points_allowed_total_roll{w}"] = f"opp_points_allowed_total_roll{w}"
+        rename_map[f"points_allowed_total_roll{w}"] = (
+            f"opp_points_allowed_total_roll{w}"
+        )
     rename_map["points_allowed_total_lag1"] = "opp_points_allowed_total_lag1"
 
-    team_allowed = team_allowed.rename(columns={k: v for k, v in rename_map.items() if k in team_allowed.columns})
-    total_allowed = total_allowed.rename(columns={k: v for k, v in rename_map.items() if k in total_allowed.columns})
+    team_allowed = team_allowed.rename(
+        columns={k: v for k, v in rename_map.items() if k in team_allowed.columns}
+    )
+    total_allowed = total_allowed.rename(
+        columns={k: v for k, v in rename_map.items() if k in total_allowed.columns}
+    )
 
     # Merge delle stats position-specific
-    merge_cols = ["season", "week", "team", "position"] + [v for k, v in rename_map.items() if k.startswith("points_allowed_roll")]
+    merge_cols = ["season", "week", "team", "position"] + [
+        v for k, v in rename_map.items() if k.startswith("points_allowed_roll")
+    ]
     merge_cols = [c for c in merge_cols if c in team_allowed.columns]
 
     df = df.merge(
-        team_allowed[["season", "week", "team", "position"] + [c for c in team_allowed.columns if c.startswith("opp_")]],
+        team_allowed[
+            ["season", "week", "team", "position"]
+            + [c for c in team_allowed.columns if c.startswith("opp_")]
+        ],
         left_on=["season", "week", "opponent_team", "position"],
         right_on=["season", "week", "team", "position"],
         how="left",
@@ -515,7 +530,10 @@ def add_opponent_defense_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # Merge delle stats totali
     df = df.merge(
-        total_allowed[["season", "week", "team"] + [c for c in total_allowed.columns if c.startswith("opp_")]],
+        total_allowed[
+            ["season", "week", "team"]
+            + [c for c in total_allowed.columns if c.startswith("opp_")]
+        ],
         left_on=["season", "week", "opponent_team"],
         right_on=["season", "week", "team"],
         how="left",
@@ -529,6 +547,7 @@ def add_opponent_defense_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
+
 def build_player_week_features(save: bool = True) -> pd.DataFrame:
     """
     Pipeline completa:
@@ -541,7 +560,7 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
     weekly, rosters, snaps = load_raw_data()
 
     df = prepare_base_weekly(weekly, rosters, snaps=snaps, offensive_only=False)
-    df = add_custom_league_points(df)      # ⬅️ QUI
+    df = add_custom_league_points(df)  # ⬅️ QUI
 
     # Add opponent defense features (points allowed to positions / total)
     df = add_opponent_defense_features(df)
@@ -563,4 +582,3 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
 
 if __name__ == "__main__":
     build_player_week_features()
-

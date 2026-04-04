@@ -7,5 +7,6 @@ models
 catboost_info
 
 # package files
-src/nfl_predict/__pycache__/
+**/__pycache__/
+*.pyc
 src/nfl_predict.egg-info/
