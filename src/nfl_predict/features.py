@@ -174,8 +174,9 @@ def _select_stat_columns(df: pd.DataFrame) -> list[str]:
         "targets",
         # ball security
         "fumbles_lost",
-        # fantasy
+        # fantasy (both PPR and custom — lag of custom is the ideal baseline)
         "fantasy_points_ppr",
+        "fantasy_points_custom",
         # usage from snaps
         "snaps_offense",
         "snap_pct_offense",
