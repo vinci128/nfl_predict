@@ -36,6 +36,34 @@
     <span class="ml-auto text-xs text-gray-500">
       Slot #{{ draft_position }} · {{ league_size }}-team league
     </span>
+    <!-- Undo last pick -->
+    <form id="undo-form"
+          hx-post="/draft/undo"
+          hx-target="#board-section"
+          hx-swap="outerHTML"
+          hx-vals='{"pos":"{{ pos_filter }}"}'>
+      <button type="submit"
+              class="text-xs text-yellow-400 hover:text-yellow-300 ml-2 px-2 py-1 rounded
+                     border border-yellow-700 hover:border-yellow-500 transition"
+              title="Undo last pick">
+        ↩ Undo
+      </button>
+    </form>
+    <!-- NFL Fantasy sync (shown only when configured) -->
+    <form id="sync-form"
+          hx-post="/draft/nfl-sync"
+          hx-target="#board-section"
+          hx-swap="outerHTML"
+          hx-vals='{"pos":"{{ pos_filter }}"}'
+          hx-indicator="#sync-spinner">
+      <button type="submit"
+              id="nfl-sync-btn"
+              class="hidden text-xs text-blue-400 hover:text-blue-300 ml-1 px-2 py-1 rounded
+                     border border-blue-700 hover:border-blue-500 transition"
+              title="Sync picks from NFL Fantasy">
+        <span id="sync-spinner" class="htmx-indicator">⟳</span> NFL Sync
+      </button>
+    </form>
     <form action="/draft/reset" method="post" onsubmit="return confirm('Reset draft session?')">
       <button class="text-xs text-red-500 hover:text-red-400 ml-2">Reset</button>
     </form>
@@ -64,12 +92,21 @@
               hx-on::after-request="this.reset(); document.getElementById('pick-error').innerHTML='';"
               class="flex gap-3 items-center">
           <input type="hidden" name="pos" value="{{ pos_filter }}">
+          <input type="hidden" name="player_id" id="player-id-field" value="">
+          <!-- Autocomplete datalist — populated via htmx on keyup -->
+          <datalist id="player-suggestions"></datalist>
           <input id="player-input"
                  name="player_name"
                  type="text"
+                 list="player-suggestions"
                  placeholder="Player name or substring…"
                  required
                  autocomplete="off"
+                 hx-get="/draft/autocomplete"
+                 hx-trigger="keyup changed delay:150ms"
+                 hx-target="#player-suggestions"
+                 hx-swap="innerHTML"
+                 hx-vals="js:{q: document.getElementById('player-input').value}"
                  class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm
                         focus:outline-none focus:border-green-500 placeholder-gray-500">
 
@@ -154,13 +191,13 @@
       document.getElementById('drafter-field').value = this.checked ? 'me' : 'other';
     });
 
-    // Click a row in the board to pre-fill the input
+    // Click a row in the board to pre-fill the input + player_id
     document.addEventListener('click', function(e) {
       const btn = e.target.closest('[data-pick-name]');
       if (btn) {
         document.getElementById('player-input').value = btn.dataset.pickName;
+        document.getElementById('player-id-field').value = btn.dataset.playerId || '';
         document.getElementById('player-input').focus();
-        // Auto-select Mine if it was a Mine button
         if (btn.dataset.pickMine) {
           document.getElementById('mine-check').checked = true;
           document.getElementById('drafter-field').value = 'me';
@@ -168,13 +205,31 @@
       }
     });
 
-    // After any htmx request updates the sidebar, update the header pick number
+    // When user picks from datalist, also populate player_id hidden field
+    document.getElementById('player-input').addEventListener('change', function() {
+      const val = this.value;
+      const list = document.getElementById('player-suggestions');
+      const opt = Array.from(list.options).find(o => o.value === val);
+      document.getElementById('player-id-field').value = opt ? (opt.dataset.pid || '') : '';
+    });
+
+    // After htmx pick/undo, update the header pick number
     document.body.addEventListener('htmx:afterRequest', function(e) {
       const newPick = document.querySelector('[data-current-pick]');
       if (newPick) {
         document.getElementById('hdr-pick').textContent = newPick.dataset.currentPick;
       }
     });
+
+    // Show NFL Sync button only when server says it's available
+    fetch('/draft/nfl-sync-status')
+      .then(r => r.json())
+      .then(d => {
+        if (d.available) {
+          document.getElementById('nfl-sync-btn').classList.remove('hidden');
+        }
+      })
+      .catch(() => {});
   </script>
 </body>
 </html>

@@ -64,10 +64,12 @@
       <td class="px-2 py-1.5">
         <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
           <button data-pick-name="{{ row.player_name }}"
+                  data-player-id="{{ row.get('player_id', '') if row is mapping else '' }}"
                   class="px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-xs">
             Fill
           </button>
           <button data-pick-name="{{ row.player_name }}" data-pick-mine="1"
+                  data-player-id="{{ row.get('player_id', '') if row is mapping else '' }}"
                   class="px-2 py-0.5 bg-green-700 hover:bg-green-600 rounded text-xs text-green-200">
             Mine
           </button>

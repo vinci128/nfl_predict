@@ -1,9 +1,12 @@
+from pathlib import Path
+
 import pandas as pd
 import typer
 
 from nfl_predict import features, fetch_nfl_data, predict_week, train_model
 
 app = typer.Typer(help="NFL fantasy prediction pipeline CLI.")
+OUTPUT_DIR = Path("outputs")
 
 # ---------------------------------------------------------------------------
 # update-all: fetch → features → train → predict
@@ -238,10 +241,19 @@ def board(
         None, help="Path to ADP CSV (columns: player_name, adp)."
     ),
     league_size: int = typer.Option(12, help="Number of teams in the league."),
-    fmt: str = typer.Option("csv", help="Export format: 'csv' or 'json'."),
+    fmt: str = typer.Option(
+        "csv", help="Export format: 'csv', 'json', or 'table' (terminal preview only)."
+    ),
     out: str | None = typer.Option(None, help="Output file path (auto if not set)."),
     positions: str | None = typer.Option(
         None, help="Comma-separated positions to include (default: all)."
+    ),
+    qb_scarcity: float = typer.Option(
+        0.7,
+        help="QB VOR scarcity multiplier (0.7 = standard 1-QB, 1.0 = superflex).",
+    ),
+    superflex: bool = typer.Option(
+        False, help="Superflex league: sets --qb-scarcity 1.0 automatically."
     ),
 ) -> None:
     """Build and export the full fantasy draft board with VOR and tiers."""
@@ -252,13 +264,28 @@ def board(
     )
     from nfl_predict.season_features import load_features
 
+    if fmt not in ("csv", "json", "table"):
+        print(f"Error: --fmt must be 'csv', 'json', or 'table'. Got: '{fmt}'")
+        raise typer.Exit(1)
+
     if season is None:
         df = load_features()
         season = int(df["season"].max())
         print(f"Using most recent season as feature source: {season}")
 
     pos_list = [p.strip().upper() for p in positions.split(",")] if positions else None
-    settings = DraftSettings(league_size=league_size)
+
+    effective_qb_scarcity = 1.0 if superflex else qb_scarcity
+    settings = DraftSettings(
+        league_size=league_size,
+        positional_scarcity={
+            "QB": effective_qb_scarcity,
+            "RB": 1.0,
+            "WR": 1.0,
+            "TE": 0.85,
+            "K": 0.5,
+        },
+    )
 
     draft_board = build_draft_board(
         as_of_season=season,
@@ -267,14 +294,7 @@ def board(
         settings=settings,
     )
 
-    export_path = export_draft_board(
-        draft_board, out_path=out, fmt=fmt, season=season + 1
-    )
-
-    # Print top 20 to terminal
-    top = draft_board.head(20)
-    print(f"\nTop 20 overall (VOR) — {season + 1} draft board:\n")
-    cols = [
+    table_cols = [
         c
         for c in (
             "overall_rank",
@@ -284,10 +304,31 @@ def board(
             "pos_rank",
             "proj_p50",
             "vor",
+            "adp",
         )
-        if c in top.columns
+        if c in draft_board.columns
     ]
-    print(top[cols].to_string(index=False))
+
+    if fmt == "table":
+        # Terminal preview — no file export
+        n = 40
+        print(
+            f"\nTop {n} overall (VOR) — {season + 1} draft board "
+            f"[QB scarcity={effective_qb_scarcity}]:\n"
+        )
+        print(draft_board[table_cols].head(n).to_string(index=False))
+        return
+
+    export_path = export_draft_board(
+        draft_board, out_path=out, fmt=fmt, season=season + 1
+    )
+
+    # Always print top 20 summary
+    print(
+        f"\nTop 20 overall (VOR) — {season + 1} draft board "
+        f"[QB scarcity={effective_qb_scarcity}]:\n"
+    )
+    print(draft_board[table_cols].head(20).to_string(index=False))
     print(f"\nFull board exported to: {export_path}")
 
 
@@ -485,6 +526,62 @@ def fetch_adp_cmd(
 
     print(f"\nTop 10 ADP:\n{df.head(10).to_string(index=False)}")
     print(f"\nSaved {len(df)} players → {path}")
+
+
+# ---------------------------------------------------------------------------
+# nfl-sync: poll NFL Fantasy live draft and auto-record picks
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="nfl-sync")
+def nfl_sync_cmd(
+    interval: int = typer.Option(30, help="Seconds between polls."),
+    max_rounds: int = typer.Option(
+        20, help="Stop polling after this many draft rounds."
+    ),
+) -> None:
+    """
+    Poll the NFL Fantasy draft and auto-record picks into the local state.
+
+    Requires NFL_FANTASY_USERNAME, NFL_FANTASY_PASSWORD, and
+    NFL_FANTASY_LEAGUE_ID environment variables.  Optionally set
+    NFL_FANTASY_TEAM_ID to identify your picks as 'mine'.
+
+    Run this in a separate terminal while the UI is open — it updates
+    the same draft_state.json that the web UI reads.
+    """
+    from nfl_predict.draft_assistant import load_state, mark_drafted, save_state
+    from nfl_predict.nfl_fantasy import NflFantasyClient, NflFantasyError, poll_draft
+
+    try:
+        client = NflFantasyClient.from_env()
+    except NflFantasyError as e:
+        print(f"Error: {e}")
+        raise typer.Exit(1) from e
+
+    state_path = OUTPUT_DIR / "draft_state.json"
+    if not state_path.exists():
+        print("No active draft session. Run `nfl-predict draft-start` first.")
+        raise typer.Exit(1)
+
+    def on_pick(pick: dict) -> None:
+        state = load_state(state_path)
+        try:
+            updated = mark_drafted(
+                state,
+                pick["player_name"],
+                drafter="me" if pick.get("is_mine") else "other",
+            )
+            save_state(updated)
+            marker = " ← MINE" if pick.get("is_mine") else ""
+            print(
+                f"  #{pick['overall_pick']:>3}  {pick['player_name']:<28} "
+                f"{pick.get('position', '')}{marker}"
+            )
+        except ValueError as e:
+            print(f"  Warning: Could not record {pick['player_name']!r}: {e}")
+
+    poll_draft(client, on_pick=on_pick, interval=interval, max_rounds=max_rounds)
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ Typical usage
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -50,6 +50,18 @@ class DraftSettings:
     # Extra buffer beyond the last starter (accounts for bye weeks / handcuffs)
     replacement_buffer: int = 3
     scoring: str = "custom"
+    # Positional scarcity multipliers applied to VOR after calculation.
+    # < 1.0 pushes a position down the board relative to pure VOR math.
+    # Use 1.0 for superflex (QB virtually as scarce as RB/WR).
+    positional_scarcity: dict[str, float] = field(
+        default_factory=lambda: {
+            "QB": 0.7,  # 1-QB leagues: QBs drafted later than pure VOR suggests
+            "RB": 1.0,
+            "WR": 1.0,
+            "TE": 0.85,  # slight discount vs RB/WR
+            "K": 0.5,  # kickers always last
+        }
+    )
 
     def replacement_ranks(self) -> dict[str, int]:
         """
@@ -114,7 +126,9 @@ def compute_vor(
         repl_idx = min(rank - 1, len(sorted_pts) - 1)
         repl_pts = float(sorted_pts.iloc[repl_idx])
 
-        vor[mask] = df.loc[mask, "proj_p50"] - repl_pts
+        raw_vor = df.loc[mask, "proj_p50"] - repl_pts
+        scarcity = settings.positional_scarcity.get(pos, 1.0)
+        vor[mask] = raw_vor * scarcity
         baseline[mask] = repl_pts
 
     df["vor"] = vor.round(1)
@@ -345,6 +359,7 @@ def export_draft_board(
     path = Path(out_path)
 
     display_cols = [
+        "player_id",  # kept for dedup / mark_drafted lookup
         "overall_rank",
         "tier",
         "pos_rank",
@@ -367,6 +382,10 @@ def export_draft_board(
         if col in export_df.columns:
             export_df[col] = export_df[col].round(1)
 
+    if fmt == "table":
+        # Terminal pretty-print — no file written; caller prints via cli.py
+        return path
+
     if fmt == "csv":
         export_df.to_csv(path, index=False)
     elif fmt == "json":
@@ -386,7 +405,7 @@ def export_draft_board(
         }
         path.write_text(json.dumps(result, indent=2))
     else:
-        raise ValueError(f"Unknown format '{fmt}'. Use 'csv' or 'json'.")
+        raise ValueError(f"Unknown format '{fmt}'. Use 'csv', 'json', or 'table'.")
 
     print(f"  Draft board saved → {path}")
     return path

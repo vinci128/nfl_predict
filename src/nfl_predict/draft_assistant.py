@@ -137,6 +137,7 @@ def mark_drafted(
     state: DraftState,
     player_name: str,
     drafter: str = "other",
+    player_id: str | None = None,
 ) -> DraftState:
     """
     Record a pick and remove the player from the available board.
@@ -146,20 +147,32 @@ def mark_drafted(
     state       : Current DraftState
     player_name : Player's display name (case-insensitive, partial match OK)
     drafter     : "me" for user's pick, or any label for an opponent
+    player_id   : Optional exact player_id for unambiguous lookup (preferred
+                  when available, e.g. from the board UI buttons)
 
     Returns
     -------
     Updated DraftState (mutates in-place and returns self).
     """
-    # Find player — try exact first, then case-insensitive substring
     avail = state.available
     name_col = "player_name"
 
-    match = avail[avail[name_col].str.lower() == player_name.lower()]
-    if match.empty:
-        match = avail[
-            avail[name_col].str.lower().str.contains(player_name.lower(), na=False)
-        ]
+    # 1. Exact player_id match (most reliable — no name collision possible)
+    if player_id and "player_id" in avail.columns:
+        match = avail[avail["player_id"] == player_id]
+        if not match.empty:
+            pass  # found it
+        else:
+            player_id = None  # fall through to name matching
+
+    if not player_id or "player_id" not in avail.columns:
+        # 2. Exact name match
+        match = avail[avail[name_col].str.lower() == player_name.lower()]
+        # 3. Case-insensitive substring
+        if match.empty:
+            match = avail[
+                avail[name_col].str.lower().str.contains(player_name.lower(), na=False)
+            ]
 
     if match.empty:
         raise ValueError(
@@ -202,6 +215,46 @@ def mark_drafted(
         state.available[name_col] != row[name_col]
     ].reset_index(drop=True)
 
+    return state
+
+
+def undo_last_pick(state: DraftState) -> DraftState:
+    """
+    Reverse the most recent pick.
+
+    Removes the last entry from picks, restores the player to the available
+    board, updates my_roster if it was the user's pick, and decrements the
+    pick counter.  A no-op if no picks have been recorded yet.
+
+    Returns
+    -------
+    Updated DraftState.
+    """
+    if not state.picks:
+        return state
+
+    last = state.picks.pop()
+
+    if last.drafter == "me":
+        # Also remove from my_picks
+        state.my_picks = [
+            p for p in state.my_picks if p.overall_pick != last.overall_pick
+        ]
+        # Remove from my_roster
+        roster_slot = state.my_roster.get(last.position, [])
+        if last.player_name in roster_slot:
+            roster_slot.remove(last.player_name)
+
+    # Restore the player row from the full board
+    board_row = state.board[state.board["player_name"] == last.player_name]
+    if not board_row.empty:
+        state.available = (
+            pd.concat([state.available, board_row], ignore_index=True)
+            .sort_values("overall_rank")
+            .reset_index(drop=True)
+        )
+
+    state.current_pick = max(1, state.current_pick - 1)
     return state
 
 

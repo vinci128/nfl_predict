@@ -22,8 +22,8 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from nfl_predict.draft_assistant import (
@@ -33,6 +33,7 @@ from nfl_predict.draft_assistant import (
     mark_drafted,
     save_state,
     suggest_best_available,
+    undo_last_pick,
 )
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -239,12 +240,18 @@ async def draft_pick(
     player_name: str = Form(...),
     drafter: str = Form("other"),
     pos: str = Form("ALL"),
+    player_id: str = Form(""),
 ):
     """Record a pick and return the refreshed board + roster partials."""
     state = _load_or_404()
 
     try:
-        state = mark_drafted(state, player_name, drafter=drafter)
+        state = mark_drafted(
+            state,
+            player_name,
+            drafter=drafter,
+            player_id=player_id or None,
+        )
     except ValueError as e:
         # Return an error banner that htmx can swap into #pick-error
         return HTMLResponse(
@@ -306,3 +313,127 @@ async def draft_reset():
     if STATE_PATH.exists():
         STATE_PATH.unlink()
     return RedirectResponse(url="/draft", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Undo last pick
+# ---------------------------------------------------------------------------
+
+
+@router.post("/undo", response_class=HTMLResponse)
+async def draft_undo(request: Request, pos: str = Form("ALL")):
+    """Reverse the last recorded pick."""
+    state = _load_or_404()
+
+    if not state.picks:
+        return HTMLResponse(
+            '<div id="pick-error" class="bg-yellow-100 border border-yellow-400 '
+            'text-yellow-700 px-4 py-2 rounded mb-2">No picks to undo.</div>',
+            status_code=200,
+        )
+
+    state = undo_last_pick(state)
+    save_state(state)
+
+    ctx = _state_to_dict(state)
+    ctx["board_rows"] = _board_rows(state, pos)
+    ctx["pos_filter"] = pos
+    ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
+    ctx["request"] = request
+
+    return templates.TemplateResponse("partials/pick_response.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Autocomplete player names
+# ---------------------------------------------------------------------------
+
+
+@router.get("/autocomplete", response_class=HTMLResponse)
+async def autocomplete(q: str = Query(default="")):
+    """
+    Return <option> elements for the player-name datalist.
+    htmx swaps these into #player-suggestions on each keyup.
+    """
+    if not _state_exists() or not q:
+        return HTMLResponse("")
+    state = load_state(STATE_PATH)
+    avail = state.available
+    names = avail["player_name"]
+    matches = avail[names.str.contains(q, case=False, na=False)].head(10)
+    # Each option carries data-player-id so JS can populate the hidden field
+    options = "".join(
+        f'<option value="{row["player_name"]}" data-pid="{row.get("player_id", "")}">'
+        for _, row in matches.iterrows()
+    )
+    return HTMLResponse(options)
+
+
+# ---------------------------------------------------------------------------
+# NFL Fantasy live sync
+# ---------------------------------------------------------------------------
+
+
+@router.get("/nfl-sync-status")
+async def nfl_sync_status():
+    """Check whether NFL Fantasy sync is configured."""
+    from nfl_predict.nfl_fantasy import NflFantasyClient
+
+    creds_ok = NflFantasyClient.credentials_available()
+    return JSONResponse({"available": creds_ok})
+
+
+@router.post("/nfl-sync", response_class=HTMLResponse)
+async def nfl_sync(request: Request, pos: str = Form("ALL")):
+    """
+    Pull the latest picks from NFL Fantasy and record any new ones.
+
+    Requires NFL_FANTASY_USERNAME and NFL_FANTASY_PASSWORD env vars, plus
+    NFL_FANTASY_LEAGUE_ID.  Returns the same OOB swap as /draft/pick so the
+    board refreshes automatically.
+    """
+    from nfl_predict.nfl_fantasy import NflFantasyClient, NflFantasyError
+
+    state = _load_or_404()
+
+    try:
+        client = NflFantasyClient.from_env()
+        new_picks = client.fetch_new_picks(
+            already_recorded=len(state.picks),
+        )
+    except NflFantasyError as e:
+        return HTMLResponse(
+            f'<div id="pick-error" class="bg-red-100 border border-red-400 '
+            f'text-red-700 px-4 py-2 rounded mb-2">NFL Fantasy sync error: {e}</div>',
+            status_code=200,
+        )
+
+    if not new_picks:
+        return HTMLResponse(
+            '<div id="pick-error" class="bg-blue-100 border border-blue-400 '
+            'text-blue-700 px-4 py-2 rounded mb-2">No new picks since last sync.</div>',
+            status_code=200,
+        )
+
+    errors: list[str] = []
+    for pick in new_picks:
+        try:
+            state = mark_drafted(
+                state,
+                pick["player_name"],
+                drafter="me" if pick.get("is_mine") else "other",
+            )
+        except ValueError as e:
+            errors.append(str(e))
+
+    save_state(state)
+
+    ctx = _state_to_dict(state)
+    ctx["board_rows"] = _board_rows(state, pos)
+    ctx["pos_filter"] = pos
+    ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
+    ctx["request"] = request
+    ctx["sync_errors"] = errors
+    ctx["sync_count"] = len(new_picks) - len(errors)
+
+    return templates.TemplateResponse("partials/pick_response.html", ctx)
