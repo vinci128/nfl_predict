@@ -4,6 +4,24 @@ NFL Fantasy API connector.
 Authenticates to NFL.com and polls the live draft picks endpoint so the
 draft UI can auto-record picks without manual typing.
 
+Authentication notes
+--------------------
+This module uses the NFL Fantasy **mobile app's internal OAuth2 endpoint**
+(``https://id.nfl.com/account/login``) with the hardcoded client_id
+``"fantasy-football"``.  This is reverse-engineered from the NFL Fantasy
+iOS app (v25.x) and is **not officially documented**.
+
+Known risks:
+  - NFL rotated its identity infrastructure in late 2024; the endpoint has
+    been intermittently unreliable.  If auth returns HTTP 4xx or a body
+    with no ``access_token``, the most likely cause is a backend change.
+  - There is no public Gigya Site ID available, so the officially
+    documented Gigya-based flow is not available for personal use.
+  - ``client_id`` may be rotated without notice.
+  - Token refresh (``/account/token``) is unverified — this module always
+    re-authenticates from scratch when the cached token expires, which is
+    the safe fallback.
+
 Configuration (environment variables)
 --------------------------------------
     NFL_FANTASY_USERNAME   your NFL.com email
@@ -36,8 +54,9 @@ from typing import Any
 # Constants
 # ---------------------------------------------------------------------------
 
+# Mobile app reverse-engineered endpoint.  No refresh URL is used — we always
+# re-auth from scratch because the token endpoint is unverified.
 _AUTH_URL = "https://id.nfl.com/account/login"
-_TOKEN_URL = "https://id.nfl.com/account/token"
 _API_BASE = "https://api.fantasy.nfl.com/v2"
 
 # Maps NFL.com position strings to our internal position codes
@@ -134,13 +153,20 @@ class NflFantasyClient:
     # ------------------------------------------------------------------
 
     def _ensure_token(self) -> str:
-        """Return a valid bearer token, refreshing if expired."""
+        """
+        Return a valid bearer token, re-authenticating from scratch if expired.
+
+        Always re-auths (no separate refresh endpoint) — the token refresh
+        URL is unverified so we take the safe path.
+        """
         if self._token and time.time() < self._token_expiry - 60:
             return self._token  # type: ignore[return-value]
 
         import json
         import urllib.request
 
+        # The NFL Fantasy mobile app uses client_id="fantasy-football".
+        # If that stops working, "nfl-fantasy-football" is a known alternate.
         payload = json.dumps(
             {
                 "username": self.username,
@@ -155,6 +181,7 @@ class NflFantasyClient:
             data=payload,
             headers={
                 "Content-Type": "application/json",
+                "Accept": "application/json",
                 "User-Agent": "NFLFantasy/25.0 (iOS)",
             },
             method="POST",
@@ -164,13 +191,19 @@ class NflFantasyClient:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data: dict = json.loads(resp.read())
         except Exception as e:
-            raise NflFantasyError(f"NFL.com auth failed: {e}") from e
+            raise NflFantasyError(
+                f"NFL.com auth failed: {e}\n"
+                "  Check that NFL_FANTASY_USERNAME / PASSWORD are correct and\n"
+                "  that https://id.nfl.com is reachable from this machine."
+            ) from e
 
         token = data.get("access_token") or data.get("token")
         if not token:
             raise NflFantasyError(
-                f"No access_token in NFL.com auth response. "
-                f"Keys returned: {list(data.keys())}"
+                f"No access_token in NFL.com auth response (endpoint may have changed).\n"
+                f"  Keys returned: {list(data.keys())}\n"
+                "  If NFL rotated the client_id, try setting client_id to\n"
+                "  'nfl-fantasy-football' in nfl_fantasy._ensure_token."
             )
 
         self._token = token
