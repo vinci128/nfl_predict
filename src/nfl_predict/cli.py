@@ -452,5 +452,40 @@ def draft_pick(
     print(f"\n{len(state.available)} players remaining.")
 
 
+# ---------------------------------------------------------------------------
+# fetch-adp: pull ADP from Sleeper / FantasyPros / synthetic
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="fetch-adp")
+def fetch_adp_cmd(
+    source: str = typer.Option(
+        "sleeper",
+        help="ADP source: 'sleeper', 'fantasypros', or 'synthetic'.",
+    ),
+    scoring: str = typer.Option("ppr", help="Scoring format: 'ppr', 'half', or 'std'."),
+    out: str = typer.Option("data/adp_current.csv", help="Output CSV path."),
+    no_fallback: bool = typer.Option(
+        False, help="Do not fall back to synthetic ADP on live-fetch failure."
+    ),
+) -> None:
+    """Fetch ADP data and save to CSV (use with `nfl-predict board --adp`)."""
+    from nfl_predict.adp_fetch import fetch_adp, save_adp_csv
+
+    df = fetch_adp(
+        source=source,
+        scoring=scoring,
+        fallback_to_synthetic=not no_fallback,
+    )
+    if df.empty:
+        print("No ADP data fetched.")
+        raise typer.Exit(1)
+
+    path = save_adp_csv(df, path=out)
+
+    print(f"\nTop 10 ADP:\n{df.head(10).to_string(index=False)}")
+    print(f"\nSaved {len(df)} players → {path}")
+
+
 if __name__ == "__main__":
     app()
