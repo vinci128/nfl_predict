@@ -1,3 +1,6 @@
+# Secrets — never commit
+.env
+
 # Raw data
 *.parquet
 *.csv
