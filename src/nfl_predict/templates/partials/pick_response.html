@@ -9,13 +9,19 @@
 </div>
 
 <header hx-swap-oob="outerHTML:header">
-  <header class="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-6 shrink-0">
+  <header class="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-6 shrink-0
+                 {% if is_my_turn %}ring-2 ring-green-500{% endif %}">
     <span class="text-green-400 font-bold text-lg">🏈 Draft</span>
     <div class="flex gap-5 text-sm">
       <span>Pick <strong class="text-green-400" id="hdr-pick">{{ current_pick }}</strong></span>
       <span>Round <strong>{{ round }}</strong>.<strong>{{ pick_in_round }}</strong></span>
       <span class="text-gray-400">{{ n_available }} available</span>
     </div>
+    {% if is_my_turn %}
+    <span class="animate-pulse bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+      YOUR PICK
+    </span>
+    {% endif %}
     <nav class="flex gap-1 ml-4" id="pos-tabs">
       {% for p in positions %}
       <a href="/draft/board?pos={{ p }}"
@@ -32,8 +38,59 @@
     <span class="ml-auto text-xs text-gray-500">
       Slot #{{ draft_position }} · {{ league_size }}-team league
     </span>
+    <form id="undo-form"
+          hx-post="/draft/undo"
+          hx-target="#board-section"
+          hx-swap="outerHTML"
+          hx-vals='{"pos":"{{ pos_filter }}"}'>
+      <button type="submit"
+              class="text-xs text-yellow-400 hover:text-yellow-300 ml-2 px-2 py-1 rounded
+                     border border-yellow-700 hover:border-yellow-500 transition"
+              title="Undo last pick">
+        ↩ Undo
+      </button>
+    </form>
+    <form id="sync-form"
+          hx-post="/draft/nfl-sync"
+          hx-target="#board-section"
+          hx-swap="outerHTML"
+          hx-vals='{"pos":"{{ pos_filter }}"}'
+          hx-indicator="#sync-spinner">
+      <button type="submit"
+              id="nfl-sync-btn"
+              class="hidden text-xs text-blue-400 hover:text-blue-300 ml-1 px-2 py-1 rounded
+                     border border-blue-700 hover:border-blue-500 transition"
+              title="Sync picks from NFL Fantasy">
+        <span id="sync-spinner" class="htmx-indicator">⟳</span> NFL Sync
+      </button>
+    </form>
     <form action="/draft/reset" method="post" onsubmit="return confirm('Reset draft session?')">
       <button class="text-xs text-red-500 hover:text-red-400 ml-2">Reset</button>
     </form>
   </header>
 </header>
+
+<!-- Update recent picks drawer content without touching collapse state -->
+<span id="picks-count" hx-swap-oob="innerHTML">{{ n_picks }}</span>
+<div id="picks-list" hx-swap-oob="innerHTML">
+  {% for p in recent_picks %}
+  <div class="flex justify-between {% if p.is_mine %}text-green-400{% else %}text-gray-400{% endif %}">
+    <span>#{{ p.pick }} {{ p.player }} ({{ p.position }})</span>
+    <span>{{ p.drafter }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+<script hx-swap-oob="beforeend:body">
+  // Re-check NFL sync availability after each swap (button may have been re-rendered hidden)
+  fetch('/draft/nfl-sync-status')
+    .then(r => r.json())
+    .then(d => {
+      const btn = document.getElementById('nfl-sync-btn');
+      if (btn && d.available) btn.classList.remove('hidden');
+    })
+    .catch(() => {});
+  // Return focus to the player input
+  const inp = document.getElementById('player-input');
+  if (inp) inp.focus();
+</script>

@@ -76,12 +76,20 @@ def _state_to_dict(state: Any) -> dict:
     needs = analyse_roster_needs(state)
     suggestions = suggest_best_available(state, needs=needs, n=5)
 
+    round_num = ((state.current_pick - 1) // state.league_size) + 1
+    pick_in_round = ((state.current_pick - 1) % state.league_size) + 1
+    is_my_turn = (round_num % 2 == 1 and pick_in_round == state.draft_position) or (
+        round_num % 2 == 0
+        and pick_in_round == state.league_size - state.draft_position + 1
+    )
+
     return {
         "current_pick": state.current_pick,
-        "round": ((state.current_pick - 1) // state.league_size) + 1,
-        "pick_in_round": ((state.current_pick - 1) % state.league_size) + 1,
+        "round": round_num,
+        "pick_in_round": pick_in_round,
         "league_size": state.league_size,
         "draft_position": state.draft_position,
+        "is_my_turn": is_my_turn,
         "n_available": len(state.available),
         "n_picks": len(state.picks),
         "my_roster": state.my_roster,
