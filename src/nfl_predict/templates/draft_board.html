@@ -10,13 +10,20 @@
 <body class="bg-gray-950 text-gray-100 h-screen flex flex-col overflow-hidden">
 
   <!-- ── Top bar ─────────────────────────────────────────────────────── -->
-  <header class="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-6 shrink-0">
+  <header class="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-6 shrink-0
+                 {% if is_my_turn %}ring-2 ring-green-500{% endif %}">
     <span class="text-green-400 font-bold text-lg">🏈 Draft</span>
     <div class="flex gap-5 text-sm">
       <span>Pick <strong class="text-green-400" id="hdr-pick">{{ current_pick }}</strong></span>
       <span>Round <strong>{{ round }}</strong>.<strong>{{ pick_in_round }}</strong></span>
       <span class="text-gray-400">{{ n_available }} available</span>
     </div>
+
+    {% if is_my_turn %}
+    <span class="animate-pulse bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+      YOUR PICK
+    </span>
+    {% endif %}
 
     <!-- Position filter tabs -->
     <nav class="flex gap-1 ml-4" id="pos-tabs">
@@ -45,7 +52,7 @@
       <button type="submit"
               class="text-xs text-yellow-400 hover:text-yellow-300 ml-2 px-2 py-1 rounded
                      border border-yellow-700 hover:border-yellow-500 transition"
-              title="Undo last pick">
+              title="Undo last pick (or press Ctrl+Z)">
         ↩ Undo
       </button>
     </form>
@@ -84,7 +91,14 @@
       </div>
 
       <!-- Pick input bar -->
-      <div class="bg-gray-900 border-t border-gray-700 px-4 py-3 shrink-0">
+      <div id="pick-bar"
+           class="bg-gray-900 border-t px-4 py-3 shrink-0 transition-colors
+                  {% if is_my_turn %}border-green-500{% else %}border-gray-700{% endif %}">
+        {% if is_my_turn %}
+        <p class="text-green-400 text-xs font-semibold mb-2 animate-pulse">
+          ↑ It's your pick! Select a player above or type below. Press M to toggle Mine.
+        </p>
+        {% endif %}
         <form id="pick-form"
               hx-post="/draft/pick"
               hx-target="#board-section"
@@ -99,9 +113,10 @@
                  name="player_name"
                  type="text"
                  list="player-suggestions"
-                 placeholder="Player name or substring…"
+                 placeholder="Player name or substring… (M=mine, Esc=clear)"
                  required
                  autocomplete="off"
+                 autofocus
                  hx-get="/draft/autocomplete"
                  hx-trigger="keyup changed delay:150ms"
                  hx-target="#player-suggestions"
@@ -110,7 +125,8 @@
                  class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm
                         focus:outline-none focus:border-green-500 placeholder-gray-500">
 
-          <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-300">
+          <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-300"
+                 title="Shortcut: M key">
             <input type="checkbox" id="mine-check" name="_mine_check" class="hidden peer">
             <span class="peer-checked:hidden flex items-center gap-1">
               <span class="w-3 h-3 rounded-full bg-gray-600 inline-block"></span> Opponent
@@ -169,11 +185,13 @@
 
   <!-- Recent picks drawer (bottom-right, collapsible) -->
   <div class="fixed bottom-0 right-72 bg-gray-900 border border-gray-700 rounded-t-lg
-              text-xs w-80 z-10" x-data="{ open: false }" id="picks-drawer">
+              text-xs w-80 z-10" id="picks-drawer">
     <button onclick="this.parentElement.querySelector('#picks-list').classList.toggle('hidden');
-                     this.textContent = this.textContent.includes('▲') ? '▼ Recent picks' : '▲ Recent picks';"
-            class="w-full text-left px-3 py-2 text-gray-400 hover:text-gray-200 font-medium">
-      ▼ Recent picks ({{ n_picks }} total)
+                     this.querySelector('#picks-chevron').textContent =
+                       this.querySelector('#picks-chevron').textContent === '▼' ? '▲' : '▼';"
+            class="w-full text-left px-3 py-2 text-gray-400 hover:text-gray-200 font-medium flex gap-1">
+      <span id="picks-chevron">▼</span>
+      <span>Recent picks (<span id="picks-count">{{ n_picks }}</span> total)</span>
     </button>
     <div id="picks-list" class="hidden max-h-48 overflow-y-auto px-3 pb-2 space-y-1">
       {% for p in recent_picks %}
@@ -191,6 +209,30 @@
       document.getElementById('drafter-field').value = this.checked ? 'me' : 'other';
     });
 
+    // Keyboard shortcuts on the player input
+    document.getElementById('player-input').addEventListener('keydown', function(e) {
+      // M key toggles Mine (when input is empty or user presses shift+M to avoid interfering with typing)
+      if (e.key === 'm' && !e.shiftKey && !e.ctrlKey && !e.altKey && this.value === '') {
+        e.preventDefault();
+        const cb = document.getElementById('mine-check');
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event('change'));
+      }
+      // Escape clears the input and player_id
+      if (e.key === 'Escape') {
+        this.value = '';
+        document.getElementById('player-id-field').value = '';
+      }
+    });
+
+    // Ctrl+Z triggers undo
+    document.addEventListener('keydown', function(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('undo-form').requestSubmit();
+      }
+    });
+
     // Click a row in the board to pre-fill the input + player_id
     document.addEventListener('click', function(e) {
       const btn = e.target.closest('[data-pick-name]');
@@ -199,8 +241,9 @@
         document.getElementById('player-id-field').value = btn.dataset.playerId || '';
         document.getElementById('player-input').focus();
         if (btn.dataset.pickMine) {
-          document.getElementById('mine-check').checked = true;
-          document.getElementById('drafter-field').value = 'me';
+          const cb = document.getElementById('mine-check');
+          cb.checked = true;
+          cb.dispatchEvent(new Event('change'));
         }
       }
     });
@@ -213,12 +256,17 @@
       document.getElementById('player-id-field').value = opt ? (opt.dataset.pid || '') : '';
     });
 
-    // After htmx pick/undo, update the header pick number
-    document.body.addEventListener('htmx:afterRequest', function(e) {
-      const newPick = document.querySelector('[data-current-pick]');
-      if (newPick) {
-        document.getElementById('hdr-pick').textContent = newPick.dataset.currentPick;
-      }
+    // After htmx pick/undo: re-focus input and re-check NFL sync button visibility
+    document.body.addEventListener('htmx:afterSettle', function() {
+      const inp = document.getElementById('player-input');
+      if (inp) inp.focus();
+      fetch('/draft/nfl-sync-status')
+        .then(r => r.json())
+        .then(d => {
+          const btn = document.getElementById('nfl-sync-btn');
+          if (btn && d.available) btn.classList.remove('hidden');
+        })
+        .catch(() => {});
     });
 
     // Show NFL Sync button only when server says it's available

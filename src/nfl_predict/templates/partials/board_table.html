@@ -19,9 +19,21 @@
     </tr>
   </thead>
   <tbody class="divide-y divide-gray-800">
+    {% set ns = namespace(prev_tier=0) %}
     {% for row in board_rows %}
     {% set vor = row.vor | float %}
     {% set tier = row.tier | int %}
+
+    {# Insert a tier separator row when the tier changes #}
+    {% if tier != ns.prev_tier and ns.prev_tier != 0 %}
+    <tr class="bg-gray-800/60">
+      <td colspan="12" class="px-3 py-1 text-gray-500 font-semibold tracking-wide">
+        — Tier {{ tier }} —
+      </td>
+    </tr>
+    {% endif %}
+    {% set ns.prev_tier = tier %}
+
     <tr class="hover:bg-gray-800/50 transition group
                {% if tier == 1 %}text-gray-100{% elif tier == 2 %}text-gray-200{% elif tier <= 4 %}text-gray-300{% else %}text-gray-400{% endif %}">
       <td class="px-2 py-1.5 text-gray-500">{{ row.overall_rank | int }}</td>
