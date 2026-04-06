@@ -1,0 +1,23 @@
+.git
+.gitignore
+.env
+.venv
+.github
+
+# large data files — mounted as volumes at runtime
+data/
+outputs/
+models/
+catboost_info/
+backtest_results/
+
+# dev/test artifacts
+tests/
+__pycache__/
+*.pyc
+*.pyo
+src/**/__pycache__/
+src/nfl_predict.egg-info/
+
+# docs
+*.md
