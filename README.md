@@ -70,4 +70,26 @@ python -m nfl_predict.predict_week        # run predictions
   - `/models` and `/health` endpoints
   - Containerize the API (Dockerfile + small entrypoint)
 
+**Deployment**:
+
+*Draft day (local, friends on same WiFi):*
+```bash
+cp .env.example .env   # fill in credentials
+docker compose --profile draft up
+# Web UI → http://localhost:8000/draft
+# Friends → http://<your-ip>:8000/draft
+```
+
+*VPS deploy — automatic via GitHub CD:*
+
+1. Push to `master` (or create a version tag `v1.0.0`) — GitHub Actions builds the Docker image and pushes it to `ghcr.io/vinci128/nfl_predict`.
+2. Pull the image on your server:
+```bash
+docker pull ghcr.io/vinci128/nfl_predict:latest
+```
+3. To enable automatic SSH deployment on push, add these in GitHub → Settings → Secrets and variables:
+   - **Variable** `SSH_HOST` — your server IP or hostname
+   - **Variable** `SSH_USER` — SSH login user (default: `deploy`)
+   - **Secret** `SSH_PRIVATE_KEY` — private key whose public key is in `~/.ssh/authorized_keys` on the server
+
 License: (none specified)
