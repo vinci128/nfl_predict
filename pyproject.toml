@@ -12,6 +12,11 @@ dependencies = [
     "typer>=0.20.0",
     "fastapi>=0.95.0",
     "uvicorn[standard]>=0.22.0",
+    # Agent dependencies
+    "anthropic>=0.50.0",
+    "playwright>=1.40.0",
+    "python-dotenv>=1.0.0",
+    "openai>=2.29.0",
 ]
 
 [project.scripts]
