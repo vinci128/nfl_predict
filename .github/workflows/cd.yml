@@ -1,0 +1,89 @@
+name: CD
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*.*.*"]
+
+jobs:
+  # ── 1. Build Docker image and push to GitHub Container Registry ──────────
+  build-push:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write       # needed to push to ghcr.io
+
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # built-in, no setup needed
+
+      - name: Extract image metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            # branch push → ghcr.io/vinci128/nfl_predict:master
+            type=ref,event=branch
+            # tag v1.2.3 → :1.2.3 and :1.2
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            # always tag the short commit SHA for traceability
+            type=sha,prefix=sha-,format=short
+            # tag latest only on master
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions layer cache — subsequent builds skip unchanged layers
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 2. Deploy to VPS (optional — skipped if SSH_HOST var is not set) ─────
+  deploy:
+    name: Deploy to VPS
+    needs: build-push
+    runs-on: ubuntu-latest
+    # Only runs when SSH_HOST repository variable is configured.
+    # To enable: Settings → Secrets and variables → Variables → SSH_HOST
+    if: vars.SSH_HOST != ''
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USER || 'deploy' }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /opt/nfl_predict
+
+            # Pull the new image without stopping the running container
+            docker compose pull web
+
+            # Rolling restart: only the web service, nfl-sync keeps running
+            docker compose up -d --no-deps --wait web
+
+            # Clean up old images to save disk space
+            docker image prune -f
+
+            echo "Deployed $(docker compose images web | tail -1)"

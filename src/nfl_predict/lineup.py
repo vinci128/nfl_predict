@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pandas as pd
 import typer
@@ -11,15 +11,17 @@ OUT_DIR = BASE_DIR / "outputs"
 
 def _find_latest_prediction_files() -> list[Path]:
     """
-    Cerca in OUT_DIR tutti i predictions_*.csv e per ogni posizione
-    sceglie il file con season/week più recenti.
+    Scans OUT_DIR for all predictions_*.csv files and for each position
+    picks the file with the most recent season/week.
 
-    Nome atteso: predictions_<pos>_<season>_week<week>.csv
-    es: predictions_wr_2025_week12.csv
+    Expected name: predictions_<pos>_<season>_week<week>.csv
+    e.g.: predictions_wr_2025_week12.csv
     """
     pred_files = list(OUT_DIR.glob("predictions_*.csv"))
     if not pred_files:
-        raise FileNotFoundError(f"Nessun file di predictions_*.csv trovato in {OUT_DIR}")
+        raise FileNotFoundError(
+            f"No predictions_*.csv files found in {OUT_DIR}"
+        )
 
     pattern = re.compile(
         r"predictions_(?P<position>[A-Za-z]+)_(?P<season>\d{4})_week(?P<week>\d+)\.csv"
@@ -29,7 +31,7 @@ def _find_latest_prediction_files() -> list[Path]:
     for path in pred_files:
         m = pattern.fullmatch(path.name)
         if not m:
-            # ignora file che non rispettano il pattern
+            # skip files that don't match the pattern
             continue
         records.append(
             {
@@ -42,14 +44,14 @@ def _find_latest_prediction_files() -> list[Path]:
 
     if not records:
         raise RuntimeError(
-            f"Trovati file in {OUT_DIR}, ma nessuno con nome del tipo "
+            f"Files found in {OUT_DIR}, but none matching the pattern "
             "'predictions_<pos>_<season>_week<week>.csv'"
         )
 
     df_files = pd.DataFrame(records)
-    # ordina per position, season, week
+    # sort by position, season, week
     df_files = df_files.sort_values(["position", "season", "week"])
-    # prendi l'ultima riga per ogni posizione (season/week max)
+    # take the last row per position (max season/week)
     latest = df_files.groupby("position", as_index=False).tail(1)
 
     return list(latest["path"])
@@ -57,42 +59,42 @@ def _find_latest_prediction_files() -> list[Path]:
 
 @app.command()
 def suggest(
-    roster_path: str = typer.Argument("my_roster.csv", help="CSV con il tuo roster"),
-    top_n: int = typer.Option(20, help="Quanti giocatori mostrare"),
+    roster_path: str = typer.Argument("my_roster.csv", help="CSV with your roster"),
+    top_n: int = typer.Option(20, help="How many players to show"),
 ):
     """
-    Legge tutti i predictions_*.csv più recenti per ogni posizione in outputs/
-    e suggerisce i tuoi giocatori ordinati per expected PPR.
+    Reads the most recent predictions_*.csv for each position in outputs/
+    and shows your players ranked by expected PPR.
     """
-    # --- trova i file di predictions più aggiornati ---
+    # --- find the most up-to-date prediction files ---
     latest_files = _find_latest_prediction_files()
-    typer.echo("Userò i seguenti file di predictions più recenti:")
+    typer.echo("Using the following most recent prediction files:")
     for p in latest_files:
         typer.echo(f"  - {p.name}")
 
-    # --- carica e concatena tutte le predictions ---
+    # --- load and concatenate all predictions ---
     preds_list = []
     for path in latest_files:
         df = pd.read_csv(path)
-        # normalizza posizione
+        # normalize position
         if "position" in df.columns:
             df["position"] = df["position"].str.upper()
         preds_list.append(df)
 
     preds = pd.concat(preds_list, ignore_index=True)
 
-    # --- carica roster ---
+    # --- load roster ---
     roster = pd.read_csv(roster_path)
 
     if "player_name" not in roster.columns or "position" not in roster.columns:
         raise ValueError(
-            "Il roster deve contenere almeno le colonne: 'player_name' e 'position'. "
-            "Opzionale ma consigliato: 'team'."
+            "Roster must contain at least the columns: 'player_name' and 'position'. "
+            "Optional but recommended: 'team'."
         )
 
     roster["position"] = roster["position"].str.upper()
 
-    # --- chiavi di join dinamiche ---
+    # --- dynamic join keys ---
     join_keys = ["player_name", "position"]
     if "team" in preds.columns and "team" in roster.columns:
         join_keys.append("team")
@@ -105,14 +107,18 @@ def suggest(
 
     if merged.empty:
         raise ValueError(
-            "Nessuna corrispondenza tra predictions e roster. "
-            "Controlla che i nomi dei giocatori (e i team, se usati) combacino."
+            "No matches between predictions and roster. "
+            "Check that player names (and teams, if used) align."
         )
 
     merged = merged.sort_values("expected_ppr_points", ascending=False)
 
-    print("\nI TUOI giocatori (ordinati per expected PPR):\n")
-    cols = [c for c in ["player_name", "team", "position", "expected_ppr_points"] if c in merged.columns]
+    print("\nYOUR players (ranked by expected PPR):\n")
+    cols = [
+        c
+        for c in ["player_name", "team", "position", "expected_ppr_points"]
+        if c in merged.columns
+    ]
     print(merged[cols].head(top_n).to_string(index=False))
 
 

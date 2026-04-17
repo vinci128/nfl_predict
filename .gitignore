@@ -1,11 +1,22 @@
+# Secrets — never commit
+.env
+
 # Raw data
 *.parquet
 *.csv
+data/.fetch_manifest.json
+
+# Backtest artifacts (parquet covered above, keep JSON summaries)
+backtest_results/*.parquet
 
 # Model data
 models
 catboost_info
 
+# Draft/prediction outputs (generated artifacts)
+outputs/
+
 # package files
-src/nfl_predict/__pycache__/
+**/__pycache__/
+*.pyc
 src/nfl_predict.egg-info/

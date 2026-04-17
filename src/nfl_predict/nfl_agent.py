@@ -14,7 +14,7 @@ Usage:
 Or via CLI:
     nfl-predict agent
     nfl-predict agent --task "Check and set my lineup for this week"
-    nfl-predict agent --draft   # Run in draft mode
+    nfl-predict agent --draft   # Run in draft mode (requires nfl-sync in another terminal)
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 import anthropic
-import openai
 from dotenv import load_dotenv
 
 from .fantasy_client import NFLFantasyClient
@@ -54,7 +53,6 @@ Your goal is to maximize fantasy points and win the league using data-driven dec
 - Claim waiver wire players (add/drop)
 - Analyze, accept, or decline trade offers
 - Propose trades to other teams
-- Monitor and make picks during the draft
 
 ## Decision guidelines
 
@@ -77,12 +75,6 @@ Your goal is to maximize fantasy points and win the league using data-driven dec
 - Be willing to sell high on players who had outlier weeks
 - Buy low on injured players returning soon with a clear role
 
-### Draft
-- Follow best-available-player (BAP) strategy with a slight preference for your team's needs
-- Prioritize high-floor players early, high-upside players in later rounds
-- Target RBs and WRs early; QB and TE can wait
-- Handcuff your top RBs
-
 ## Workflow
 1. Always gather information first (roster, predictions, waiver wire, matchup, trade offers)
 2. Analyze the data thoroughly
@@ -101,20 +93,26 @@ Always be concise, data-driven, and decisive."""
 
 DRAFT_SYSTEM_PROMPT = """You are an expert NFL Fantasy Football draft assistant operating in real-time during a draft.
 
-You must make fast, optimal pick decisions. You have:
-- ML predictions for every player
-- The current draft board (available players)
-- Knowledge of your team's current roster
+IMPORTANT: You are running alongside `nfl-sync` in a separate terminal.
+- `nfl-sync` is the SOLE process that records picks into draft_state.json.
+- You NEVER record picks yourself. You only READ state and MAKE picks when it's your turn.
+- Always read get_local_draft_state first to see the current board before acting.
+
+## Your workflow each loop
+1. Call get_local_draft_state — see current pick number, my roster, top available players.
+2. Call get_draft_turn_status — check live on NFL.com if it is currently our pick turn.
+3. If NOT our turn: note who was just picked (compare pick count to last loop) and wait.
+4. If OUR TURN: call get_draft_rankings for 1-2 key positions, choose the best pick,
+   explain in 1-2 sentences, then call make_draft_pick.
 
 ## Draft strategy
-- Rounds 1-3: Elite RBs and WRs. Avoid QB/TE/K early.
-- Rounds 4-6: Fill RB/WR depth, consider top TE if Kelce/Andrews/Bowers available
-- Rounds 7-9: QB1, WR depth, TE if not taken
-- Rounds 10-12: Handcuffs for your RBs, upside WRs
-- Rounds 13+: Streamers, upside plays, K, DEF
+- Rounds 1-3: Elite RBs and WRs by VOR. Avoid QB/TE/K.
+- Rounds 4-6: Fill RB/WR depth; top TE (Kelce/Andrews tier) if available.
+- Rounds 7-9: QB1, WR depth, TE if not taken.
+- Rounds 10-12: Handcuffs for your RBs, upside WRs.
+- Rounds 13+: Streamers, K, DEF.
 
-Give fast, clear pick recommendations with a 1-2 sentence rationale.
-When it's the user's turn, immediately recommend the best available player."""
+Be fast and decisive. Give a player name and a one-sentence reason."""
 
 
 # ---------------------------------------------------------------------------
@@ -122,8 +120,8 @@ When it's the user's turn, immediately recommend the best available player."""
 # ---------------------------------------------------------------------------
 
 
-def get_tools() -> list[dict]:
-    return [
+def get_tools(draft_mode: bool = False) -> list[dict]:
+    common_tools = [
         {
             "name": "get_my_roster",
             "description": (
@@ -131,29 +129,6 @@ def get_tools() -> list[dict]:
                 "Returns all players with position, injury status, lineup slot, and projected points."
             ),
             "input_schema": {"type": "object", "properties": {}, "required": []},
-        },
-        {
-            "name": "get_player_predictions",
-            "description": (
-                "Get ML model predictions (PPR points) for players at a specific position "
-                "for the upcoming week. Use this to identify who to start and who to pick up."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "position": {
-                        "type": "string",
-                        "description": "Position to get predictions for",
-                        "enum": ["QB", "RB", "WR", "TE", "K"],
-                    },
-                    "top_n": {
-                        "type": "integer",
-                        "description": "Number of top players to return (default 40)",
-                        "default": 40,
-                    },
-                },
-                "required": ["position"],
-            },
         },
         {
             "name": "get_waiver_wire",
@@ -337,39 +312,116 @@ def get_tools() -> list[dict]:
                 ],
             },
         },
-        {
-            "name": "get_draft_board",
-            "description": "Get the current draft board with available players ranked by ADP.",
-            "input_schema": {"type": "object", "properties": {}, "required": []},
-        },
-        {
-            "name": "get_draft_turn_info",
-            "description": "Check if it's currently our turn to pick in the draft.",
-            "input_schema": {"type": "object", "properties": {}, "required": []},
-        },
-        {
-            "name": "make_draft_pick",
+    ]
+
+    if draft_mode:
+        draft_tools = [
+            {
+                "name": "get_local_draft_state",
+                "description": (
+                    "Read the current draft state from draft_state.json, kept up to date by "
+                    "`nfl-sync` running in another terminal. Returns available players (with "
+                    "VOR/projections), my current roster, pick count, and positional needs. "
+                    "Use this as your primary source of draft board information — do not "
+                    "poll NFL.com for pick history."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "top_n": {
+                            "type": "integer",
+                            "description": "Number of top available players to return (default 50)",
+                            "default": 50,
+                        }
+                    },
+                    "required": [],
+                },
+            },
+            {
+                "name": "get_draft_rankings",
+                "description": (
+                    "Get VOR-based season-total draft rankings for a specific position from the "
+                    "local draft board. Returns overall_rank, tier, proj_p10, proj_p50, proj_p90, "
+                    "vor, pos_rank for available (undrafted) players only. Use for deep position "
+                    "analysis before committing to a pick."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "position": {
+                            "type": "string",
+                            "description": "Position to get rankings for",
+                            "enum": ["QB", "RB", "WR", "TE", "K"],
+                        },
+                        "top_n": {
+                            "type": "integer",
+                            "description": "Number of players to return (default 30)",
+                            "default": 30,
+                        },
+                    },
+                    "required": ["position"],
+                },
+            },
+            {
+                "name": "get_draft_turn_status",
+                "description": (
+                    "Check live on NFL.com whether it is currently our turn to pick. "
+                    "Returns is_my_turn, pick_number, and time_remaining. "
+                    "Only call this to confirm it is our turn before calling make_draft_pick — "
+                    "do not use it to track pick history (use get_local_draft_state instead)."
+                ),
+                "input_schema": {"type": "object", "properties": {}, "required": []},
+            },
+            {
+                "name": "make_draft_pick",
+                "description": (
+                    "DESTRUCTIVE — Draft a specific player on NFL.com. "
+                    "Only call after get_draft_turn_status confirms it is our turn. "
+                    "Requires user confirmation."
+                ),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "player_id": {"type": "string", "description": "Player ID to draft"},
+                        "player_name": {
+                            "type": "string",
+                            "description": "Player name (shown to user for confirmation)",
+                        },
+                        "reasoning": {
+                            "type": "string",
+                            "description": "Why this is the best pick",
+                        },
+                    },
+                    "required": ["player_id", "player_name", "reasoning"],
+                },
+            },
+        ]
+        return draft_tools  # draft mode only needs draft tools, not in-season tools
+    else:
+        weekly_tool = {
+            "name": "get_player_predictions",
             "description": (
-                "DESTRUCTIVE — Draft a specific player. "
-                "Only call when it's confirmed to be our turn. Requires user confirmation."
+                "Get ML model predictions (PPR points) for players at a specific position "
+                "for the upcoming week. Use this to identify who to start and who to pick up."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "player_id": {"type": "string", "description": "Player ID to draft"},
-                    "player_name": {
+                    "position": {
                         "type": "string",
-                        "description": "Player name (shown to user for confirmation)",
+                        "description": "Position to get predictions for",
+                        "enum": ["QB", "RB", "WR", "TE", "K"],
                     },
-                    "reasoning": {
-                        "type": "string",
-                        "description": "Why this is the best pick",
+                    "top_n": {
+                        "type": "integer",
+                        "description": "Number of top players to return (default 40)",
+                        "default": 40,
                     },
                 },
-                "required": ["player_id", "player_name", "reasoning"],
+                "required": ["position"],
             },
-        },
-    ]
+        }
+        return [weekly_tool] + common_tools
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +434,46 @@ async def execute_tool(
 ) -> Any:
     """Dispatch a tool call to the appropriate implementation."""
 
-    # --- Read-only tools ---
+    # --- Draft-mode read tools (read from local state, not NFL.com) ---
+
+    if name == "get_local_draft_state":
+        top_n = int(tool_input.get("top_n", 50))
+        try:
+            from .draft_assistant import analyse_roster_needs, load_state, suggest_best_available
+            state = load_state()
+            needs = analyse_roster_needs(state)
+            top_available = suggest_best_available(state, needs=needs, n=top_n)
+            return {
+                "current_pick": state.current_pick,
+                "picks_made": len(state.picks),
+                "my_roster": state.my_roster,
+                "positional_needs": needs,
+                "top_available": top_available.to_dict(orient="records"),
+            }
+        except FileNotFoundError:
+            return {"error": "No draft_state.json found. Run `nfl-predict draft-start` first."}
+
+    if name == "get_draft_rankings":
+        position = tool_input.get("position", "").upper()
+        top_n = int(tool_input.get("top_n", 30))
+        try:
+            from .draft_assistant import load_state
+            state = load_state()
+            avail = state.available.copy()
+            if position:
+                avail = avail[avail["position"] == position]
+            cols = [c for c in (
+                "overall_rank", "pos_rank", "tier", "player_name", "position",
+                "team", "proj_p10", "proj_p50", "proj_p90", "vor",
+            ) if c in avail.columns]
+            return avail.sort_values("vor", ascending=False).head(top_n)[cols].to_dict(orient="records")
+        except FileNotFoundError:
+            return {"error": "Draft state not found. Run nfl-predict draft-start and nfl-sync first."}
+
+    if name == "get_draft_turn_status":
+        return await nfl_client.get_draft_turn_info()
+
+    # --- In-season read tools ---
 
     if name == "get_my_roster":
         roster = await nfl_client.get_roster()
@@ -416,12 +507,6 @@ async def execute_tool(
 
     if name == "get_league_teams":
         return await nfl_client.get_league_teams()
-
-    if name == "get_draft_board":
-        return await nfl_client.get_draft_board()
-
-    if name == "get_draft_turn_info":
-        return await nfl_client.get_draft_turn_info()
 
     # --- Destructive tools ---
 
@@ -575,7 +660,7 @@ async def _claude_loop(
 
 
 async def _ollama_loop(
-    client: openai.OpenAI,
+    client: Any,
     model: str,
     system: str,
     tools: list[dict],
@@ -586,7 +671,6 @@ async def _ollama_loop(
     draft_mode: bool,
 ) -> None:
     oai_tools = _tools_for_openai(tools)
-    # Prepend system message (OpenAI style)
     full_messages = [{"role": "system", "content": system}] + messages
 
     turn = 0
@@ -604,14 +688,12 @@ async def _ollama_loop(
         if msg.content:
             print(f"\n[Agent]\n{msg.content}\n")
 
-        # Append assistant message (preserve tool_calls if any)
         full_messages.append(msg)
 
         if finish == "stop" or not msg.tool_calls:
             print("[Agent] Task complete.")
             break
 
-        # Process tool calls
         for tc in msg.tool_calls:
             name = tc.function.name
             try:
@@ -676,10 +758,14 @@ async def run_agent(
       LLM_BACKEND=claude   → Claude Opus 4.6 (needs ANTHROPIC_API_KEY)
       LLM_BACKEND=ollama   → local Ollama (needs OLLAMA_MODEL, default: qwen2.5:32b)
 
+    In draft mode, nfl-sync must be running in a separate terminal to keep
+    draft_state.json up to date. The agent reads from that file and only
+    touches NFL.com to confirm pick turns and submit picks.
+
     Args:
         task: What the agent should do. Defaults to full weekly management.
         auto_confirm: Skip confirmation prompts for destructive actions.
-        draft_mode: Run in draft-assistant mode.
+        draft_mode: Run in draft-assistant mode (reads from draft_state.json).
         max_turns: Max agent turns before stopping.
     """
     backend = os.getenv("LLM_BACKEND", "ollama").lower()
@@ -690,7 +776,7 @@ async def run_agent(
     team_id = os.getenv("NFL_TEAM_ID")
 
     missing = [
-        name for name, val in [
+        var for var, val in [
             ("NFL_EMAIL", email), ("NFL_PASSWORD", password),
             ("NFL_LEAGUE_ID", league_id), ("NFL_TEAM_ID", team_id),
         ] if not val
@@ -703,8 +789,10 @@ async def run_agent(
     if task is None:
         if draft_mode:
             task = (
-                "I'm in my fantasy draft. Monitor the draft board, check if it's my turn, "
-                "and recommend or make the best available pick. Keep watching until the draft ends."
+                "I'm in my fantasy draft. nfl-sync is running in another terminal and keeping "
+                "draft_state.json up to date. Use get_local_draft_state to see the board, "
+                "get_draft_turn_status to check if it's my turn, and make_draft_pick when ready. "
+                "Keep watching until the draft ends."
             )
         else:
             task = (
@@ -717,7 +805,7 @@ async def run_agent(
                 "6. Summarize all actions taken and the expected impact"
             )
 
-    tools = get_tools()
+    tools = get_tools(draft_mode=draft_mode)
     system = DRAFT_SYSTEM_PROMPT if draft_mode else SYSTEM_PROMPT
     headless = os.getenv("NFL_BROWSER_HEADLESS", "false").lower() in ("1", "true", "yes")
 
@@ -728,11 +816,18 @@ async def run_agent(
             raise EnvironmentError("ANTHROPIC_API_KEY is not set.")
         llm = anthropic.Anthropic(api_key=api_key)
         model_name = "Claude Opus 4.6"
+        ollama_model = None
     else:
-        # Ollama — OpenAI-compatible API at localhost:11434
+        try:
+            import openai as _openai
+        except ImportError as exc:
+            raise ImportError(
+                "The 'openai' package is required for Ollama support. "
+                "Install it with: uv sync --extra ollama"
+            ) from exc
         ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         ollama_model = os.getenv("OLLAMA_MODEL", "qwen2.5:32b")
-        llm = openai.OpenAI(base_url=f"{ollama_host}/v1", api_key="ollama")
+        llm = _openai.OpenAI(base_url=f"{ollama_host}/v1", api_key="ollama")
         model_name = ollama_model
 
     print("\n" + "=" * 55)
@@ -742,6 +837,8 @@ async def run_agent(
     print(f"  Task: {task[:70]}{'...' if len(task) > 70 else ''}")
     print(f"  Auto-confirm: {auto_confirm}")
     print(f"  Draft mode:   {draft_mode}")
+    if draft_mode:
+        print("  NOTE: Reads from draft_state.json (maintained by nfl-sync)")
     print("=" * 55 + "\n")
 
     async with NFLFantasyClient(
@@ -772,9 +869,15 @@ async def run_agent(
 async def run_draft_agent(auto_confirm: bool = False) -> None:
     """
     Continuously monitor the draft and make picks when it's our turn.
+
+    Requires `nfl-sync` running in a separate terminal to keep draft_state.json
+    current. This agent only reads state and submits picks — it does not record
+    picks independently.
+
     Runs until the draft completes or the user interrupts (Ctrl+C).
     """
-    print("\n[Draft Agent] Starting draft monitor. Press Ctrl+C to stop.")
+    print("\n[Draft Agent] Starting. Ensure `nfl-predict nfl-sync` is running in another terminal.")
+    print("[Draft Agent] Press Ctrl+C to stop.\n")
     try:
         await run_agent(draft_mode=True, auto_confirm=auto_confirm, max_turns=100)
     except KeyboardInterrupt:

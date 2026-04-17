@@ -12,15 +12,18 @@ dependencies = [
     "typer>=0.20.0",
     "fastapi>=0.95.0",
     "uvicorn[standard]>=0.22.0",
-    # Agent dependencies
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.22",
     "anthropic>=0.50.0",
     "playwright>=1.40.0",
     "python-dotenv>=1.0.0",
-    "openai>=2.29.0",
 ]
 
+[project.optional-dependencies]
+ollama = ["openai>=2.29.0"]
+
 [project.scripts]
-nfl-predict = "nfl_predict.cli:app" 
+nfl-predict = "nfl_predict.cli:app"
 suggest = "nfl_predict.lineup:app"
 
 [build-system]
@@ -32,3 +35,25 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "ruff>=0.15.9",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # allow assert in tests
+
+[tool.ty.environment]
+python-version = "3.12"

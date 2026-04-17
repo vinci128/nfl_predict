@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NFL Draft Assistant — Setup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-lg space-y-6">
+
+    <!-- Header -->
+    <div class="text-center">
+      <h1 class="text-3xl font-bold text-green-400">🏈 NFL Draft Assistant</h1>
+      <p class="text-gray-400 mt-1">Powered by CatBoost season projections + VOR</p>
+    </div>
+
+    <!-- Resume banner -->
+    {% if session_active %}
+    <div class="bg-green-900 border border-green-600 rounded-lg p-4 flex items-center justify-between">
+      <span class="text-green-300 font-medium">Active draft session found</span>
+      <a href="/draft/board"
+         class="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded font-semibold transition">
+        Resume →
+      </a>
+    </div>
+    {% endif %}
+
+    <!-- Setup form -->
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 space-y-5">
+      <h2 class="text-lg font-semibold text-gray-200">New Draft Session</h2>
+
+      <form action="/draft/start" method="post" class="space-y-4">
+
+        <!-- Board selection -->
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Draft Board</label>
+          {% if boards %}
+          <select name="board_path"
+                  class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+            {% for b in boards | reverse %}
+            <option value="{{ b }}">{{ b | replace('outputs/', '') }}</option>
+            {% endfor %}
+          </select>
+          <p class="text-xs text-gray-500 mt-1">
+            No board? Run:
+            <code class="bg-gray-800 px-1 rounded">nfl-predict draft-prep && nfl-predict board</code>
+          </p>
+          {% else %}
+          <div class="bg-yellow-900 border border-yellow-600 rounded p-3 text-sm text-yellow-300">
+            No draft boards found. Generate one first:<br>
+            <code class="text-xs">nfl-predict draft-prep && nfl-predict board</code>
+          </div>
+          <input type="hidden" name="board_path" value="">
+          {% endif %}
+        </div>
+
+        <!-- League size -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">League Size</label>
+            <select name="league_size"
+                    class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+              {% for n in [8, 10, 12, 14, 16] %}
+              <option value="{{ n }}" {% if n == 12 %}selected{% endif %}>{{ n }} teams</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">My Draft Position</label>
+            <input type="number" name="draft_position" value="1" min="1" max="16"
+                   class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+          </div>
+        </div>
+
+        <!-- ADP hint (Phase 3) -->
+        <div class="bg-gray-800 rounded p-3 text-xs text-gray-400">
+          <span class="text-blue-400 font-medium">Phase 3 tip:</span>
+          To enable ADP comparison, run
+          <code>nfl-predict board --adp data/adp_current.csv</code>
+          before starting. The board CSV will include ADP columns automatically.
+        </div>
+
+        <!-- LLM status -->
+        {% if llm_available %}
+        <div class="bg-blue-900 border border-blue-700 rounded p-3 text-xs text-blue-300">
+          ✓ <span class="font-medium">AI advisor enabled</span> — Claude will be available during your draft.
+        </div>
+        {% else %}
+        <div class="bg-gray-800 rounded p-3 text-xs text-gray-500">
+          AI advisor: set <code>ANTHROPIC_API_KEY</code> to enable Claude pick recommendations.
+        </div>
+        {% endif %}
+
+        <button type="submit" {% if not boards %}disabled{% endif %}
+                class="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:cursor-not-allowed
+                       text-white font-semibold py-3 rounded-lg transition text-base">
+          Start Draft
+        </button>
+      </form>
+    </div>
+
+    <!-- Footer links -->
+    <div class="text-center text-sm text-gray-600 space-x-4">
+      <a href="/docs" class="hover:text-gray-400">API docs</a>
+      <span>·</span>
+      <a href="/predict" class="hover:text-gray-400">Weekly predictions</a>
+    </div>
+
+  </div>
+</body>
+</html>

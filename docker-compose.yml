@@ -1,0 +1,36 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false   # run without .env if not present (uses shell env)
+    volumes:
+      - ./data:/app/data            # parquet files (read-only at runtime)
+      - ./outputs:/app/outputs      # draft_state.json, board CSVs (read-write)
+      - ./models:/app/models        # model registry + .cbm files (read-write)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Only started with: docker compose --profile draft up
+  # Polls NFL Fantasy every 30 s and records picks into draft_state.json
+  nfl-sync:
+    build: .
+    command: ["nfl-predict", "nfl-sync", "--interval", "30"]
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./outputs:/app/outputs
+      - ./models:/app/models
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: [draft]
