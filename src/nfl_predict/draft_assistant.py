@@ -503,7 +503,7 @@ def get_llm_suggestion(
     anthropic >= 0.20.0  (install with: pip install "nfl-predict[draft]")
     """
     try:
-        import anthropic  # ty: ignore[unresolved-import]
+        import anthropic
     except ImportError as exc:
         raise ImportError(
             "The 'anthropic' package is required for LLM suggestions. "
@@ -551,4 +551,5 @@ def get_llm_suggestion(
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
-    return message.content[0].text
+    block = message.content[0]
+    return str(getattr(block, "text", ""))

@@ -14,7 +14,13 @@ dependencies = [
     "uvicorn[standard]>=0.22.0",
     "jinja2>=3.1.6",
     "python-multipart>=0.0.22",
+    "anthropic>=0.50.0",
+    "playwright>=1.40.0",
+    "python-dotenv>=1.0.0",
 ]
+
+[project.optional-dependencies]
+ollama = ["openai>=2.29.0"]
 
 [project.scripts]
 nfl-predict = "nfl_predict.cli:app"
@@ -51,3 +57,9 @@ ignore = ["E501"]  # line length handled by formatter
 
 [tool.ty.environment]
 python-version = "3.12"
+
+# Suppress type errors in Playwright/agent files — Page | None narrowing and
+# dynamic Anthropic/Ollama API calls require full assert-guards to type-check cleanly.
+[[tool.ty.overrides]]
+include = ["src/nfl_predict/fantasy_client.py", "src/nfl_predict/nfl_agent.py"]
+rules = { unresolved-attribute = "ignore", invalid-argument-type = "ignore", unresolved-import = "ignore" }

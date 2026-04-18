@@ -94,6 +94,27 @@ def backtest(
 
 
 # ---------------------------------------------------------------------------
+# predict: run weekly predictions for a position
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def predict(
+    position: str = typer.Option("WR", help="Position to predict (QB/RB/WR/TE/K)."),
+    season: int | None = typer.Option(
+        None, help="Season year (default: inferred from data)."
+    ),
+    week: int | None = typer.Option(
+        None, help="Week number (default: inferred from data)."
+    ),
+) -> None:
+    """Run weekly fantasy predictions for a position."""
+    from nfl_predict import predict_week
+
+    predict_week.run_predictions(position=position, season=season, week=week)
+
+
+# ---------------------------------------------------------------------------
 # train: train models and register them
 # ---------------------------------------------------------------------------
 
@@ -582,6 +603,71 @@ def nfl_sync_cmd(
             print(f"  Warning: Could not record {pick['player_name']!r}: {e}")
 
     poll_draft(client, on_pick=on_pick, interval=interval, max_rounds=max_rounds)
+
+
+# ---------------------------------------------------------------------------
+# agent: run the NFL Fantasy Claude / Ollama agent
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="agent")
+def agent_cmd(
+    task: str | None = typer.Option(
+        None,
+        "--task",
+        "-t",
+        help="Task for the agent. Defaults to full weekly management.",
+    ),
+    draft: bool = typer.Option(
+        False,
+        "--draft",
+        help=(
+            "Run in draft-assistant mode. Reads board from draft_state.json "
+            "kept current by `nfl-predict nfl-sync` in another terminal."
+        ),
+    ),
+    auto_confirm: bool = typer.Option(
+        False,
+        "--auto-confirm",
+        help="Skip confirmation prompts for destructive actions (use with care).",
+    ),
+    max_turns: int = typer.Option(
+        30,
+        help="Maximum agent turns before stopping.",
+    ),
+) -> None:
+    """
+    Run the NFL Fantasy AI agent (Claude or Ollama).
+
+    Set LLM_BACKEND=claude (default: ollama) and ensure credentials are in .env.
+
+    In-season mode manages lineup, waivers, and trades autonomously.
+
+    Draft mode (--draft) reads the draft board from draft_state.json and makes
+    picks when it's your turn. Run `nfl-predict nfl-sync` in a second terminal
+    first so pick state stays current.
+    """
+    import asyncio
+
+    from nfl_predict.nfl_agent import run_agent, run_draft_agent
+
+    try:
+        if draft:
+            asyncio.run(run_draft_agent(auto_confirm=auto_confirm))
+        else:
+            asyncio.run(
+                run_agent(
+                    task=task,
+                    auto_confirm=auto_confirm,
+                    draft_mode=False,
+                    max_turns=max_turns,
+                )
+            )
+    except OSError as e:
+        print(f"Configuration error: {e}")
+        raise typer.Exit(1) from e
+    except KeyboardInterrupt:
+        print("\nAgent stopped.")
 
 
 if __name__ == "__main__":
