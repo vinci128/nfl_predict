@@ -382,10 +382,6 @@ def export_draft_board(
         if col in export_df.columns:
             export_df[col] = export_df[col].round(1)
 
-    if fmt == "table":
-        # Terminal pretty-print — no file written; caller prints via cli.py
-        return path
-
     if fmt == "csv":
         export_df.to_csv(path, index=False)
     elif fmt == "json":
@@ -405,7 +401,8 @@ def export_draft_board(
         }
         path.write_text(json.dumps(result, indent=2))
     else:
-        raise ValueError(f"Unknown format '{fmt}'. Use 'csv', 'json', or 'table'.")
+        # 'table' is handled by the CLI before calling this function
+        raise ValueError(f"Unknown format '{fmt}'. Use 'csv' or 'json'.")
 
     print(f"  Draft board saved → {path}")
     return path

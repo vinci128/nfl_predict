@@ -102,6 +102,9 @@ class NflFantasyClient:
     password: str
     league_id: str
     team_id: str | None = None
+    # Used as a fallback to derive round numbers when the API response
+    # doesn't include them. Set NFL_FANTASY_LEAGUE_SIZE to match your league.
+    league_size: int = 12
     _token: str | None = None
     _token_expiry: float = 0.0
 
@@ -116,12 +119,13 @@ class NflFantasyClient:
 
         Required: NFL_FANTASY_USERNAME, NFL_FANTASY_PASSWORD,
                   NFL_FANTASY_LEAGUE_ID
-        Optional: NFL_FANTASY_TEAM_ID
+        Optional: NFL_FANTASY_TEAM_ID, NFL_FANTASY_LEAGUE_SIZE (default 12)
         """
         username = os.environ.get("NFL_FANTASY_USERNAME", "")
         password = os.environ.get("NFL_FANTASY_PASSWORD", "")
         league_id = os.environ.get("NFL_FANTASY_LEAGUE_ID", "")
         team_id = os.environ.get("NFL_FANTASY_TEAM_ID")
+        league_size = int(os.environ.get("NFL_FANTASY_LEAGUE_SIZE", "12"))
 
         if not username or not password or not league_id:
             raise NflFantasyError(
@@ -134,6 +138,7 @@ class NflFantasyClient:
             password=password,
             league_id=league_id,
             team_id=team_id,
+            league_size=league_size,
         )
 
     @staticmethod
@@ -312,10 +317,10 @@ class NflFantasyClient:
             picks.append(
                 {
                     "overall_pick": i + 1,
-                    "round": p.get("round", (i // 10) + 1),
+                    "round": p.get("round", (i // self.league_size) + 1),
                     "pick_in_round": p.get("pick")
                     or p.get("pickInRound")
-                    or (i % 10) + 1,
+                    or (i % self.league_size) + 1,
                     "player_name": name,
                     "position": pos,
                     "nfl_team": player.get("nflTeam") or player.get("teamAbbr") or "",
@@ -352,6 +357,7 @@ def poll_draft(
     on_pick: Any,  # callable(pick_dict) -> None
     interval: int = 30,
     max_rounds: int = 20,
+    initial_recorded: int = 0,
 ) -> None:
     """
     Poll for new draft picks every ``interval`` seconds.
@@ -362,8 +368,11 @@ def poll_draft(
     on_pick   : callback called for each new pick dict
     interval  : seconds between polls
     max_rounds: stop after this many rounds (safety limit)
+    initial_recorded : number of picks already recorded locally — pass
+                       len(state.picks) so a restarted poll doesn't replay
+                       picks that are already in the draft state
     """
-    recorded = 0
+    recorded = initial_recorded
     print(f"Polling NFL Fantasy draft (league {client.league_id}) every {interval}s…")
     print("Press Ctrl+C to stop.\n")
 

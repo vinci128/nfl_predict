@@ -102,7 +102,7 @@ Always commit `pyproject.toml` and `uv.lock` together.
 ## Scoring system
 
 The custom scoring (`add_custom_league_points` in `features.py`) uses:
-- **Passing: 0.1 pts/yard** (not the standard 0.04) — this makes QBs 2.5× more valuable than in standard PPR
+- **Passing: 0.1 pts/yard** (not the standard 0.04), 4 pts/TD, -2 pts/INT — the yardage rate makes QBs 2.5× more valuable than in standard PPR
 - Rushing: 0.1 pts/yard, 6 pts/TD
 - Receiving: 1 pt/rec (PPR), 0.1 pts/yard, 6 pts/TD
 - FG: 3/4/5 pts for 0–39/40–49/50+

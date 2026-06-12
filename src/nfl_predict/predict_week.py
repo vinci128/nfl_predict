@@ -14,7 +14,6 @@ DATA_DIR = Path("data")
 PROCESSED_DIR = DATA_DIR / "processed"
 MODEL_DIR = Path("models")
 OUT_DIR = Path("outputs")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # -----------------------------------------------------------
 # Default SEASON & WEEK utilities
@@ -67,7 +66,9 @@ def get_default_season_and_week_from_data(df: pd.DataFrame):
     df_season = df[df["season"] == max_season]
     max_week = int(df_season["week"].max())
 
-    target_week = max_week + 1
+    # Cap at 22 (regular season + playoffs) so a finished season doesn't
+    # produce a nonexistent week 19+ target.
+    target_week = min(max_week + 1, 22)
     return max_season, target_week
 
 
@@ -115,7 +116,7 @@ def build_inference_dataset(
     position: str,
     feature_cols,
     cat_cols,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """
     Uses features from week (target_week - 1) to predict target_week.
     If the feature week is partial (some players don't yet have a row
@@ -177,13 +178,11 @@ def build_inference_dataset(
     # feature columns that weren't listed in meta's `cat_cols` and
     # treat them as categorical to avoid CatBoost trying to convert
     # list-like strings (e.g. '39;54') to floats.
-    import pandas as _pd
-
     inferred_cat_cols = list(cat_cols) if cat_cols is not None else []
     for c in feature_cols:
         if (
             c in X.columns
-            and not _pd.api.types.is_numeric_dtype(X[c])
+            and not pd.api.types.is_numeric_dtype(X[c])
             and c not in inferred_cat_cols
         ):
             inferred_cat_cols.append(c)
@@ -192,11 +191,7 @@ def build_inference_dataset(
         if c in X.columns:
             X[c] = X[c].astype("string").fillna("__NA__")
 
-    # return inferred_cat_cols alongside X if caller needs it? We keep
-    # original signature but the caller (`make_predictions`) will compute
-    # cat indices from X columns where necessary.
-
-    return df_feat, X
+    return df_feat, X, inferred_cat_cols
 
 
 # -----------------------------------------------------------
@@ -269,6 +264,7 @@ def run_predictions(
     season: int | None = None,
     week: int | None = None,
     position: str = "WR",
+    write_csv: bool = True,
 ):
     """
     Core function: runs predictions without depending on Typer.
@@ -299,7 +295,7 @@ def run_predictions(
 
     model, feature_cols, cat_cols, meta = load_model_and_meta(position=position)
 
-    df_feat, X = build_inference_dataset(
+    df_feat, X, inferred_cat_cols = build_inference_dataset(
         df=df,
         season=season,
         target_week=week,
@@ -314,16 +310,18 @@ def run_predictions(
         df_feat=df_feat,
         X=X,
         model=model,
-        cat_cols=cat_cols,
+        cat_cols=inferred_cat_cols,
         season=season,
         target_week=week,
         position=position,
     )
 
-    out_path = OUT_DIR / f"predictions_{position.lower()}_{season}_week{week}.csv"
-    preds.to_csv(out_path, index=False)
+    if write_csv:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        out_path = OUT_DIR / f"predictions_{position.lower()}_{season}_week{week}.csv"
+        preds.to_csv(out_path, index=False)
+        print(f"\nSaved CSV to: {out_path}\n")
 
-    print(f"\nSaved CSV to: {out_path}\n")
     print("Top 10:\n")
     print(
         preds[["player_name", "team", "expected_ppr_points"]]

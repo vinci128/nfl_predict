@@ -7,13 +7,12 @@ Tests verifying the three bug fixes:
 
 import ast
 import datetime
-import sys
 from pathlib import Path
 
 from nfl_predict.predict_week import get_default_season_and_week
 
+# Used by the AST-based tests to read source files directly
 SRC = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(SRC))
 
 
 # ---------------------------------------------------------------------------

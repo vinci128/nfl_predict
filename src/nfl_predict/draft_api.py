@@ -17,6 +17,7 @@ POST /draft/reset             - wipe session and return to setup
 from __future__ import annotations
 
 import glob
+import html
 import os
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ from nfl_predict.draft_assistant import (
     load_state,
     mark_drafted,
     save_state,
+    state_lock,
     suggest_best_available,
     undo_last_pick,
 )
@@ -155,18 +157,20 @@ async def draft_start(
     draft_position: int = Form(1),
 ):
     """Initialise a new draft session from a board CSV."""
-    path = Path(board_path)
-    if not path.exists():
+    # Only accept boards from the known outputs/ glob — the path arrives from
+    # a form field, so don't let it read arbitrary files on the server.
+    if board_path not in _available_boards():
         raise HTTPException(status_code=400, detail=f"Board not found: {board_path}")
 
-    board = pd.read_csv(path)
+    board = pd.read_csv(Path(board_path))
     state = init_draft_state(
         board,
         league_size=league_size,
         draft_position=draft_position,
         state_path=STATE_PATH,
     )
-    save_state(state)
+    with state_lock(STATE_PATH):
+        save_state(state)
     return RedirectResponse(url="/draft/board", status_code=303)
 
 
@@ -251,24 +255,25 @@ async def draft_pick(
     player_id: str = Form(""),
 ):
     """Record a pick and return the refreshed board + roster partials."""
-    state = _load_or_404()
+    with state_lock(STATE_PATH):
+        state = _load_or_404()
 
-    try:
-        state = mark_drafted(
-            state,
-            player_name,
-            drafter=drafter,
-            player_id=player_id or None,
-        )
-    except ValueError as e:
-        # Return an error banner that htmx can swap into #pick-error
-        return HTMLResponse(
-            f'<div id="pick-error" class="bg-red-100 border border-red-400 '
-            f'text-red-700 px-4 py-2 rounded mb-2">{e}</div>',
-            status_code=422,
-        )
+        try:
+            state = mark_drafted(
+                state,
+                player_name,
+                drafter=drafter,
+                player_id=player_id or None,
+            )
+        except ValueError as e:
+            # Return an error banner that htmx can swap into #pick-error
+            return HTMLResponse(
+                f'<div id="pick-error" class="bg-red-100 border border-red-400 '
+                f'text-red-700 px-4 py-2 rounded mb-2">{html.escape(str(e))}</div>',
+                status_code=422,
+            )
 
-    save_state(state)
+        save_state(state)
 
     # Return OOB (out-of-band) swaps for board + roster + suggestions + header
     ctx = _state_to_dict(state)
@@ -331,17 +336,18 @@ async def draft_reset():
 @router.post("/undo", response_class=HTMLResponse)
 async def draft_undo(request: Request, pos: str = Form("ALL")):
     """Reverse the last recorded pick."""
-    state = _load_or_404()
+    with state_lock(STATE_PATH):
+        state = _load_or_404()
 
-    if not state.picks:
-        return HTMLResponse(
-            '<div id="pick-error" class="bg-yellow-100 border border-yellow-400 '
-            'text-yellow-700 px-4 py-2 rounded mb-2">No picks to undo.</div>',
-            status_code=200,
-        )
+        if not state.picks:
+            return HTMLResponse(
+                '<div id="pick-error" class="bg-yellow-100 border border-yellow-400 '
+                'text-yellow-700 px-4 py-2 rounded mb-2">No picks to undo.</div>',
+                status_code=200,
+            )
 
-    state = undo_last_pick(state)
-    save_state(state)
+        state = undo_last_pick(state)
+        save_state(state)
 
     ctx = _state_to_dict(state)
     ctx["board_rows"] = _board_rows(state, pos)
@@ -368,10 +374,14 @@ async def autocomplete(q: str = Query(default="")):
     state = load_state(STATE_PATH)
     avail = state.available
     names = avail["player_name"]
-    matches = avail[names.str.contains(q, case=False, na=False)].head(10)
+    # regex=False: user keystrokes like '(' or '.' must not be treated as regex
+    matches = avail[names.str.contains(q, case=False, na=False, regex=False)].head(10)
     # Each option carries data-player-id so JS can populate the hidden field
     options = "".join(
-        f'<option value="{row["player_name"]}" data-pid="{row.get("player_id", "")}">'
+        '<option value="{name}" data-pid="{pid}">'.format(
+            name=html.escape(str(row["player_name"]), quote=True),
+            pid=html.escape(str(row.get("player_id", "")), quote=True),
+        )
         for _, row in matches.iterrows()
     )
     return HTMLResponse(options)
@@ -403,16 +413,18 @@ async def nfl_sync(request: Request, pos: str = Form("ALL")):
     from nfl_predict.nfl_fantasy import NflFantasyClient, NflFantasyError
 
     state = _load_or_404()
+    n_recorded_at_fetch = len(state.picks)
 
     try:
         client = NflFantasyClient.from_env()
         new_picks = client.fetch_new_picks(
-            already_recorded=len(state.picks),
+            already_recorded=n_recorded_at_fetch,
         )
     except NflFantasyError as e:
         return HTMLResponse(
             f'<div id="pick-error" class="bg-red-100 border border-red-400 '
-            f'text-red-700 px-4 py-2 rounded mb-2">NFL Fantasy sync error: {e}</div>',
+            f'text-red-700 px-4 py-2 rounded mb-2">'
+            f"NFL Fantasy sync error: {html.escape(str(e))}</div>",
             status_code=200,
         )
 
@@ -424,17 +436,24 @@ async def nfl_sync(request: Request, pos: str = Form("ALL")):
         )
 
     errors: list[str] = []
-    for pick in new_picks:
-        try:
-            state = mark_drafted(
-                state,
-                pick["player_name"],
-                drafter="me" if pick.get("is_mine") else "other",
-            )
-        except ValueError as e:
-            errors.append(str(e))
+    with state_lock(STATE_PATH):
+        # Re-load under the lock: nfl-sync (CLI) may have recorded picks between
+        # our fetch and now — skip any that were already applied.
+        state = _load_or_404()
+        already_applied = len(state.picks) - n_recorded_at_fetch
+        if already_applied > 0:
+            new_picks = new_picks[already_applied:]
+        for pick in new_picks:
+            try:
+                state = mark_drafted(
+                    state,
+                    pick["player_name"],
+                    drafter="me" if pick.get("is_mine") else "other",
+                )
+            except ValueError as e:
+                errors.append(str(e))
 
-    save_state(state)
+        save_state(state)
 
     ctx = _state_to_dict(state)
     ctx["board_rows"] = _board_rows(state, pos)

@@ -12,9 +12,9 @@ claiming waiver wire players.
 from __future__ import annotations
 
 import asyncio
-import json
+import contextlib
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
@@ -54,8 +54,8 @@ class WaiverPlayer:
 class TradeOffer:
     trade_id: str
     from_team_name: str
-    players_giving: list[str] = field(default_factory=list)   # players you'd give
-    players_receiving: list[str] = field(default_factory=list) # players you'd get
+    players_giving: list[str] = field(default_factory=list)  # players you'd give
+    players_receiving: list[str] = field(default_factory=list)  # players you'd get
     expires: str = ""
     status: str = "pending"
 
@@ -113,12 +113,11 @@ class NFLFantasyClient:
         self.headless = headless
 
         self._playwright = None
-        self._browser: Optional[Browser] = None
-        self._context: Optional[BrowserContext] = None
-        self._page: Optional[Page] = None
-        self._api_responses: dict[str, Any] = {}
+        self._browser: Browser | None = None
+        self._context: BrowserContext | None = None
+        self._page: Page | None = None
 
-    async def __aenter__(self) -> "NFLFantasyClient":
+    async def __aenter__(self) -> NFLFantasyClient:
         await self.start()
         return self
 
@@ -142,9 +141,6 @@ class NFLFantasyClient:
         )
         self._page = await self._context.new_page()
 
-        # Intercept all JSON API responses so we can read them cleanly
-        self._page.on("response", self._capture_api_response)
-
         await self._login()
 
     async def stop(self) -> None:
@@ -156,19 +152,6 @@ class NFLFantasyClient:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
-    async def _capture_api_response(self, response) -> None:
-        """Store JSON API responses keyed by URL path for later retrieval."""
-        try:
-            if "fantasy.nfl.com" in response.url and response.status == 200:
-                ct = response.headers.get("content-type", "")
-                if "json" in ct:
-                    data = await response.json()
-                    # Use path as key (strip query params)
-                    path = response.url.split("?")[0]
-                    self._api_responses[path] = data
-        except Exception:
-            pass
 
     async def _nav(self, url: str, wait: str = "domcontentloaded") -> None:
         """Navigate and wait for page load.
@@ -259,7 +242,11 @@ class NFLFantasyClient:
         )
         if not pw_visible:
             # Click Next/Continue
-            for sel in ["button[type='submit']", "button:has-text('Next')", "button:has-text('Continue')"]:
+            for sel in [
+                "button[type='submit']",
+                "button:has-text('Next')",
+                "button:has-text('Continue')",
+            ]:
                 try:
                     btn = await self._page.query_selector(sel)
                     if btn:
@@ -270,7 +257,9 @@ class NFLFantasyClient:
                     continue
 
         # 6. Fill password
-        pw_selector = "input[type='password'], input[name='password'], input[id*='password']"
+        pw_selector = (
+            "input[type='password'], input[name='password'], input[id*='password']"
+        )
         try:
             await self._wait_and_fill(pw_selector, self.password)
         except Exception:
@@ -281,7 +270,12 @@ class NFLFantasyClient:
             input("  Press Enter after filling password...")
 
         # 7. Submit
-        for sel in ["button[type='submit']", "button:has-text('Sign In')", "button:has-text('Log In')", "input[type='submit']"]:
+        for sel in [
+            "button[type='submit']",
+            "button:has-text('Sign In')",
+            "button:has-text('Log In')",
+            "input[type='submit']",
+        ]:
             try:
                 btn = await self._page.query_selector(sel)
                 if btn:
@@ -291,12 +285,10 @@ class NFLFantasyClient:
                 continue
 
         # 8. Wait for redirect back to the fantasy site
+        # (suppressed: already there, or manual intervention needed)
         print("[NFLFantasy] Waiting for login to complete...")
-        try:
+        with contextlib.suppress(Exception):
             await self._page.wait_for_url("*fantasy*", timeout=25_000)
-        except Exception:
-            # Already there, or manual intervention needed
-            pass
 
         await asyncio.sleep(3)
         print(f"[NFLFantasy] Login complete. Now at: {self._page.url}")
@@ -372,7 +364,7 @@ class NFLFantasyClient:
 
         players = []
         seen_names = set()
-        for p in (players_raw or []):
+        for p in players_raw or []:
             name = p.get("name", "").strip()
             if not name or name in seen_names:
                 continue
@@ -393,15 +385,19 @@ class NFLFantasyClient:
         return players
 
     async def get_waiver_wire(
-        self, position: Optional[str] = None, limit: int = 40
+        self, position: str | None = None, limit: int = 40
     ) -> list[WaiverPlayer]:
         """Get available players on the waiver wire, optionally filtered by position."""
         url = f"{NFL_FANTASY_BASE}/league/{self.league_id}/players"
         if position:
             # NFL.com position filter values (may vary by league settings)
             pos_map = {
-                "QB": "1", "RB": "2", "WR": "3",
-                "TE": "4", "K": "7", "DEF": "8",
+                "QB": "1",
+                "RB": "2",
+                "WR": "3",
+                "TE": "4",
+                "K": "7",
+                "DEF": "8",
             }
             pos_code = pos_map.get(position.upper(), "")
             if pos_code:
@@ -446,7 +442,7 @@ class NFLFantasyClient:
         """)
 
         players = []
-        for p in (players_raw or []):
+        for p in players_raw or []:
             name = p.get("name", "").strip()
             if not name:
                 continue
@@ -466,12 +462,9 @@ class NFLFantasyClient:
         print(f"[NFLFantasy] Found {len(players)} available waiver wire players.")
         return players
 
-    async def get_matchup(self) -> Optional[Matchup]:
+    async def get_matchup(self) -> Matchup | None:
         """Get current week matchup information."""
-        url = (
-            f"{NFL_FANTASY_BASE}/league/{self.league_id}"
-            f"/team/{self.team_id}/matchup"
-        )
+        url = f"{NFL_FANTASY_BASE}/league/{self.league_id}/team/{self.team_id}/matchup"
         await self._nav(url)
 
         data = await self._page.evaluate("""
@@ -507,10 +500,7 @@ class NFLFantasyClient:
 
     async def get_trade_offers(self) -> list[TradeOffer]:
         """Get all pending incoming trade offers."""
-        url = (
-            f"{NFL_FANTASY_BASE}/league/{self.league_id}"
-            f"/team/{self.team_id}/trades"
-        )
+        url = f"{NFL_FANTASY_BASE}/league/{self.league_id}/team/{self.team_id}/trades"
         await self._nav(url)
 
         offers_raw = await self._page.evaluate("""
@@ -576,11 +566,12 @@ class NFLFantasyClient:
 
     async def set_lineup(self, starter_player_ids: list[str]) -> dict:
         """
-        Set the starting lineup.
+        Set the starting lineup to the *requested* players.
 
-        NFL.com's lineup editor uses drag-and-drop, so this first attempts
-        the "Auto Set Lineup" button, then falls back to direct slot clicks.
-        Returns {'success': bool, 'message': str}.
+        Places each player in ``starter_player_ids`` via slot clicks. NFL.com's
+        own "Auto Set Lineup" button is deliberately NOT used — it applies
+        NFL.com's projections, which would silently override the model's
+        choices. Returns {'success': bool, 'message': str, 'failed_player_ids': [...]}.
         """
         url = (
             f"{NFL_FANTASY_BASE}/league/{self.league_id}"
@@ -588,27 +579,10 @@ class NFLFantasyClient:
         )
         await self._nav(url)
 
-        # Try "Auto Set Lineup" button first
-        auto_btn = await self._page.query_selector(
-            "button:has-text('Auto Set'), button:has-text('Auto-Set'), "
-            "[class*='auto-set'], [class*='autoSet']"
-        )
-        if auto_btn:
-            await auto_btn.click()
-            await asyncio.sleep(2)
-            # Look for confirm/save button
-            save_btn = await self._page.query_selector(
-                "button:has-text('Save'), button:has-text('Submit'), "
-                "button:has-text('Update')"
-            )
-            if save_btn:
-                await save_btn.click()
-                await asyncio.sleep(2)
-                return {"success": True, "message": "Lineup set via Auto Set Lineup."}
-
         # Manual slot-by-slot lineup setting
         # This is site-specific and may need adjustment
         set_count = 0
+        failed: list[str] = []
         for player_id in starter_player_ids:
             try:
                 # Find the player's bench slot and drag to starter slot
@@ -622,8 +596,11 @@ class NFLFantasyClient:
                     await bench_el.click()
                     set_count += 1
                     await asyncio.sleep(0.3)
+                else:
+                    failed.append(player_id)
             except Exception as e:
                 print(f"[NFLFantasy] Warning setting player {player_id}: {e}")
+                failed.append(player_id)
 
         # Save the lineup
         save_btn = await self._page.query_selector(
@@ -634,11 +611,14 @@ class NFLFantasyClient:
             await asyncio.sleep(2)
 
         return {
-            "success": set_count > 0,
-            "message": f"Attempted to set {set_count} players as starters.",
+            "success": set_count == len(starter_player_ids) and set_count > 0,
+            "message": (
+                f"Placed {set_count}/{len(starter_player_ids)} requested starters."
+            ),
+            "failed_player_ids": failed,
             "note": (
-                "NFL.com uses drag-and-drop lineup editing. "
-                "If auto-set wasn't available, manual slot placement may need review."
+                "NFL.com uses drag-and-drop lineup editing — "
+                "verify slot placement on the site."
             ),
         }
 
@@ -666,10 +646,12 @@ class NFLFantasyClient:
         if confirm_btn:
             await confirm_btn.click()
             await asyncio.sleep(2)
-            await asyncio.sleep(1)
             return {
                 "success": True,
-                "message": f"Claimed player {add_player_id}, dropped {drop_player_id}.",
+                "message": (
+                    f"Submitted claim: add {add_player_id}, drop {drop_player_id}. "
+                    "Verify on NFL.com."
+                ),
             }
 
         # Fallback: navigate to waiver wire and find the player
@@ -709,10 +691,7 @@ class NFLFantasyClient:
 
     async def accept_trade(self, trade_id: str) -> dict:
         """Accept a pending trade offer."""
-        url = (
-            f"{NFL_FANTASY_BASE}/league/{self.league_id}"
-            f"/team/{self.team_id}/trades"
-        )
+        url = f"{NFL_FANTASY_BASE}/league/{self.league_id}/team/{self.team_id}/trades"
         await self._nav(url)
 
         try:
@@ -735,10 +714,7 @@ class NFLFantasyClient:
 
     async def decline_trade(self, trade_id: str) -> dict:
         """Decline a pending trade offer."""
-        url = (
-            f"{NFL_FANTASY_BASE}/league/{self.league_id}"
-            f"/team/{self.team_id}/trades"
-        )
+        url = f"{NFL_FANTASY_BASE}/league/{self.league_id}/team/{self.team_id}/trades"
         await self._nav(url)
 
         try:

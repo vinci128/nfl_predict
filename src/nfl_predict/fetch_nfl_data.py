@@ -8,9 +8,9 @@ import nflreadpy as nfl
 import pandas as pd
 
 # === Config base paths ===
-BASE_DIR = Path(__file__).resolve().parents[2]
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+# CWD-relative, matching features.py / train_model.py / predict_week.py —
+# run all commands from the project root (or the container WORKDIR).
+DATA_DIR = Path("data")
 MANIFEST_PATH = DATA_DIR / ".fetch_manifest.json"
 
 # === Validation schemas ===
@@ -119,85 +119,41 @@ def get_seasons(first_season: int = 2015) -> list[int]:
     return seasons
 
 
-SEASONS = get_seasons()
-CURRENT_SEASON: int = nfl.get_current_season()
-
-
 # === Incremental fetch functions ===
+#
+# Seasons are computed lazily in main() (not at import time) so importing
+# this module — e.g. via the CLI — has no side effects and never goes stale
+# in a long-running process.
+
+_LOADERS = {
+    "weekly_stats": nfl.load_player_stats,
+    "rosters": nfl.load_rosters,
+    "snap_counts": nfl.load_snap_counts,
+    "schedules": nfl.load_schedules,
+    "injuries": nfl.load_injuries,
+}
 
 
-def fetch_weekly_stats() -> None:
-    """Weekly player stats (passing, rushing, receiving, fantasy, etc.)."""
-    to_fetch = _seasons_to_fetch("weekly_stats", SEASONS, CURRENT_SEASON)
+def fetch_dataset(name: str, seasons: list[int], current_season: int) -> None:
+    """Fetch one dataset incrementally (missing historicals + current season)."""
+    to_fetch = _seasons_to_fetch(name, seasons, current_season)
     if not to_fetch:
-        print("weekly_stats: all seasons cached — skipping")
+        print(f"{name}: all seasons cached — skipping")
         return
-    print(f"Fetching weekly_stats for seasons: {to_fetch}")
-    df = nfl.load_player_stats(seasons=to_fetch).to_pandas()
-    validate_dataframe(df, "weekly_stats")
-    _merge_and_save("weekly_stats", df)
-    _update_manifest("weekly_stats", to_fetch)
-
-
-def fetch_rosters() -> None:
-    """Seasonal rosters with player-team-position mappings."""
-    to_fetch = _seasons_to_fetch("rosters", SEASONS, CURRENT_SEASON)
-    if not to_fetch:
-        print("rosters: all seasons cached — skipping")
-        return
-    print(f"Fetching rosters for seasons: {to_fetch}")
-    df = nfl.load_rosters(seasons=to_fetch).to_pandas()
-    validate_dataframe(df, "rosters")
-    _merge_and_save("rosters", df)
-    _update_manifest("rosters", to_fetch)
-
-
-def fetch_snap_counts() -> None:
-    """Player snap participation per week."""
-    to_fetch = _seasons_to_fetch("snap_counts", SEASONS, CURRENT_SEASON)
-    if not to_fetch:
-        print("snap_counts: all seasons cached — skipping")
-        return
-    print(f"Fetching snap_counts for seasons: {to_fetch}")
-    df = nfl.load_snap_counts(seasons=to_fetch).to_pandas()
-    validate_dataframe(df, "snap_counts")
-    _merge_and_save("snap_counts", df)
-    _update_manifest("snap_counts", to_fetch)
-
-
-def fetch_team_schedules() -> None:
-    """Game schedules including Vegas lines and weather conditions."""
-    to_fetch = _seasons_to_fetch("schedules", SEASONS, CURRENT_SEASON)
-    if not to_fetch:
-        print("schedules: all seasons cached — skipping")
-        return
-    print(f"Fetching schedules for seasons: {to_fetch}")
-    df = nfl.load_schedules(seasons=to_fetch).to_pandas()
-    validate_dataframe(df, "schedules")
-    _merge_and_save("schedules", df)
-    _update_manifest("schedules", to_fetch)
-
-
-def fetch_injuries() -> None:
-    """Weekly injury reports (report_status, practice_status)."""
-    to_fetch = _seasons_to_fetch("injuries", SEASONS, CURRENT_SEASON)
-    if not to_fetch:
-        print("injuries: all seasons cached — skipping")
-        return
-    print(f"Fetching injuries for seasons: {to_fetch}")
-    df = nfl.load_injuries(seasons=to_fetch).to_pandas()
-    validate_dataframe(df, "injuries")
-    _merge_and_save("injuries", df)
-    _update_manifest("injuries", to_fetch)
+    print(f"Fetching {name} for seasons: {to_fetch}")
+    df = _LOADERS[name](seasons=to_fetch).to_pandas()
+    validate_dataframe(df, name)
+    _merge_and_save(name, df)
+    _update_manifest(name, to_fetch)
 
 
 def main() -> None:
     """Entrypoint used by the CLI (nfl-predict update-all)."""
-    fetch_weekly_stats()
-    fetch_rosters()
-    fetch_snap_counts()
-    fetch_team_schedules()
-    fetch_injuries()
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    seasons = get_seasons()
+    current_season = seasons[-1]
+    for name in _LOADERS:
+        fetch_dataset(name, seasons, current_season)
 
 
 if __name__ == "__main__":

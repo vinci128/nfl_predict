@@ -11,6 +11,7 @@ in the ModelRegistry under position keys like "WR_SEASON_P50".
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -235,10 +236,26 @@ def train_season_model(
         f"n_train={len(y_train)}  n_valid={len(y_valid)}"
     )
 
-    # Always persist to a flat file (primary load path for predict_season)
+    # Always persist to a flat file (primary load path for predict_season),
+    # plus a meta sidecar recording the exact feature set the model was
+    # trained on — predict_season must use this, not a freshly recomputed
+    # feature list, or columns silently misalign after a data update.
     MODEL_DIR.mkdir(exist_ok=True, parents=True)
     flat_path = MODEL_DIR / f"{position.lower()}_season_{label}.cbm"
     model.save_model(str(flat_path))
+    flat_meta_path = MODEL_DIR / f"{position.lower()}_season_{label}_meta.json"
+    flat_meta_path.write_text(
+        json.dumps(
+            {
+                "position": position.upper(),
+                "quantile": quantile,
+                "feature_cols": feature_cols,
+                "valid_mae": mae,
+                "valid_rmse": rmse,
+            },
+            indent=2,
+        )
+    )
 
     if registry is not None:
         reg_key = _season_registry_key(position, quantile)
@@ -329,11 +346,6 @@ def predict_season(
         print(f"  No players found for {position} in season {as_of_season}")
         return pd.DataFrame()
 
-    # Get feature cols aligned with training
-    _, _, feature_cols = build_training_data(position)
-    feature_cols = [c for c in feature_cols if c in inference.columns]
-    X = inference[feature_cols].fillna(0)
-
     # Start result with identifier columns
     id_cols = [
         c
@@ -358,10 +370,14 @@ def predict_season(
 
     projections["projected_season"] = as_of_season + 1
 
-    # Load and apply each quantile model
+    # Load and apply each quantile model, aligning features to the exact
+    # set the model was trained on (from its meta sidecar). Falls back to
+    # recomputing from training data for models saved before sidecars existed.
+    fallback_cols: list[str] | None = None
     for q in quantiles:
         label = _quantile_label(q)
         model_path = MODEL_DIR / f"{position.lower()}_season_{label}.cbm"
+        meta_path = MODEL_DIR / f"{position.lower()}_season_{label}_meta.json"
         col_name = f"proj_p{int(q * 100)}"
 
         if not model_path.exists():
@@ -370,6 +386,26 @@ def predict_season(
             )
             projections[col_name] = float("nan")
             continue
+
+        if meta_path.exists():
+            feature_cols = json.loads(meta_path.read_text())["feature_cols"]
+        else:
+            if fallback_cols is None:
+                print(
+                    f"  No meta sidecar for {model_path.name} — recomputing feature "
+                    "columns from training data (retrain with `nfl-predict draft-prep` "
+                    "to pin them)."
+                )
+                _, _, fallback_cols = build_training_data(position)
+            feature_cols = fallback_cols
+
+        missing = [c for c in feature_cols if c not in inference.columns]
+        if missing:
+            print(
+                f"  WARN: {len(missing)} training features missing from inference "
+                f"data for {model_path.name} (filled with 0): {missing[:5]}"
+            )
+        X = inference.reindex(columns=feature_cols, fill_value=0).fillna(0)
 
         m = CatBoostRegressor()
         m.load_model(str(model_path))

@@ -14,8 +14,13 @@ Claude about which pick to make.  Requires ``anthropic`` to be installed:
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
+import os
+import tempfile
 import textwrap
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -168,10 +173,13 @@ def mark_drafted(
     if not player_id or "player_id" not in avail.columns:
         # 2. Exact name match
         match = avail[avail[name_col].str.lower() == player_name.lower()]
-        # 3. Case-insensitive substring
+        # 3. Case-insensitive substring (regex=False: names typed by users may
+        #    contain regex metacharacters like '.' or '(')
         if match.empty:
             match = avail[
-                avail[name_col].str.lower().str.contains(player_name.lower(), na=False)
+                avail[name_col]
+                .str.lower()
+                .str.contains(player_name.lower(), na=False, regex=False)
             ]
 
     if match.empty:
@@ -210,10 +218,9 @@ def mark_drafted(
         pos = record.position
         state.my_roster.setdefault(pos, []).append(record.player_name)
 
-    # Remove from available board
-    state.available = state.available[
-        state.available[name_col] != row[name_col]
-    ].reset_index(drop=True)
+    # Remove from available board — drop the matched row by index, not by
+    # name, so a second distinct player with the same name is unaffected.
+    state.available = state.available.drop(index=match.index[0]).reset_index(drop=True)
 
     return state
 
@@ -422,9 +429,34 @@ def render_board(
 # ---------------------------------------------------------------------------
 
 
+@contextmanager
+def state_lock(path: Path | str | None = None):
+    """
+    Cross-process exclusive lock for draft-state read-modify-write cycles.
+
+    The web UI, `nfl-sync`, and the agent can all mutate draft_state.json;
+    wrap each load → mutate → save cycle in this lock to avoid lost picks.
+    Uses flock on a sidecar .lock file (POSIX only).
+    """
+    lock_path = Path(path) if path else OUTPUT_DIR / "draft_state.json"
+    lock_path = lock_path.with_suffix(".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
 def save_state(state: DraftState) -> None:
-    """Persist draft state to JSON (board and available stored as CSV strings)."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    """Persist draft state to JSON (board and available stored as CSV strings).
+
+    The write is atomic (temp file + rename) so a crash mid-write can never
+    leave a corrupt draft_state.json behind.
+    """
+    state.state_path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
         "league_size": state.league_size,
         "draft_position": state.draft_position,
@@ -435,7 +467,17 @@ def save_state(state: DraftState) -> None:
         "board_csv": state.board.to_csv(index=False),
         "available_csv": state.available.to_csv(index=False),
     }
-    state.state_path.write_text(json.dumps(payload, indent=2))
+    fd, tmp_path = tempfile.mkstemp(
+        dir=state.state_path.parent, prefix=".draft_state_", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(payload, indent=2))
+        os.replace(tmp_path, state.state_path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp_path)
+        raise
 
 
 def load_state(path: Path | str | None = None) -> DraftState:
@@ -547,9 +589,9 @@ def get_llm_suggestion(
 
     client = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(
-        model="claude-sonnet-4-6",
+        # Cheap one-shot advice — Sonnet by default; override via ANTHROPIC_MODEL.
+        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
-    block = message.content[0]
-    return str(getattr(block, "text", ""))
+    return next((b.text for b in message.content if b.type == "text"), "")

@@ -1,5 +1,5 @@
 """
-NFL Fantasy Agent powered by Claude Opus 4.6.
+NFL Fantasy Agent powered by Claude (default: Claude Opus 4.8).
 
 Manages your NFL.com Fantasy team autonomously:
 - Sets optimal weekly lineups
@@ -24,7 +24,7 @@ import json
 import os
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import anthropic
 from dotenv import load_dotenv
@@ -38,7 +38,22 @@ load_dotenv()
 # Constants
 # ---------------------------------------------------------------------------
 
-DESTRUCTIVE_TOOLS = {"set_lineup", "claim_waiver_player", "accept_trade", "decline_trade", "propose_trade", "make_draft_pick"}
+DESTRUCTIVE_TOOLS = {
+    "set_lineup",
+    "claim_waiver_player",
+    "accept_trade",
+    "decline_trade",
+    "propose_trade",
+    "make_draft_pick",
+}
+
+# Override with the ANTHROPIC_MODEL env var.
+DEFAULT_CLAUDE_MODEL = "claude-opus-4-8"
+
+DRAFT_STATE_PATH = Path("outputs/draft_state.json")
+
+# Stop after this many consecutive API failures (each retried with backoff).
+_MAX_CONSECUTIVE_API_ERRORS = 5
 
 SYSTEM_PROMPT = """You are an expert NFL Fantasy Football manager operating autonomously on behalf of the user.
 
@@ -222,8 +237,11 @@ def get_tools(draft_mode: bool = False) -> list[dict]:
                     },
                 },
                 "required": [
-                    "add_player_id", "add_player_name",
-                    "drop_player_id", "drop_player_name", "reasoning",
+                    "add_player_id",
+                    "add_player_name",
+                    "drop_player_id",
+                    "drop_player_name",
+                    "reasoning",
                 ],
             },
         },
@@ -252,7 +270,10 @@ def get_tools(draft_mode: bool = False) -> list[dict]:
                 "type": "object",
                 "properties": {
                     "trade_id": {"type": "string"},
-                    "reasoning": {"type": "string", "description": "Why declining is correct"},
+                    "reasoning": {
+                        "type": "string",
+                        "description": "Why declining is correct",
+                    },
                 },
                 "required": ["trade_id", "reasoning"],
             },
@@ -305,9 +326,12 @@ def get_tools(draft_mode: bool = False) -> list[dict]:
                     },
                 },
                 "required": [
-                    "target_team_id", "target_team_name",
-                    "offer_player_ids", "offer_player_names",
-                    "request_player_ids", "request_player_names",
+                    "target_team_id",
+                    "target_team_name",
+                    "offer_player_ids",
+                    "offer_player_names",
+                    "request_player_ids",
+                    "request_player_names",
                     "reasoning",
                 ],
             },
@@ -382,7 +406,10 @@ def get_tools(draft_mode: bool = False) -> list[dict]:
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "player_id": {"type": "string", "description": "Player ID to draft"},
+                        "player_id": {
+                            "type": "string",
+                            "description": "Player ID to draft",
+                        },
                         "player_name": {
                             "type": "string",
                             "description": "Player name (shown to user for confirmation)",
@@ -439,7 +466,12 @@ async def execute_tool(
     if name == "get_local_draft_state":
         top_n = int(tool_input.get("top_n", 50))
         try:
-            from .draft_assistant import analyse_roster_needs, load_state, suggest_best_available
+            from .draft_assistant import (
+                analyse_roster_needs,
+                load_state,
+                suggest_best_available,
+            )
+
             state = load_state()
             needs = analyse_roster_needs(state)
             top_available = suggest_best_available(state, needs=needs, n=top_n)
@@ -451,24 +483,45 @@ async def execute_tool(
                 "top_available": top_available.to_dict(orient="records"),
             }
         except FileNotFoundError:
-            return {"error": "No draft_state.json found. Run `nfl-predict draft-start` first."}
+            return {
+                "error": "No draft_state.json found. Run `nfl-predict draft-start` first."
+            }
 
     if name == "get_draft_rankings":
         position = tool_input.get("position", "").upper()
         top_n = int(tool_input.get("top_n", 30))
         try:
             from .draft_assistant import load_state
+
             state = load_state()
             avail = state.available.copy()
             if position:
                 avail = avail[avail["position"] == position]
-            cols = [c for c in (
-                "overall_rank", "pos_rank", "tier", "player_name", "position",
-                "team", "proj_p10", "proj_p50", "proj_p90", "vor",
-            ) if c in avail.columns]
-            return avail.sort_values("vor", ascending=False).head(top_n)[cols].to_dict(orient="records")
+            cols = [
+                c
+                for c in (
+                    "overall_rank",
+                    "pos_rank",
+                    "tier",
+                    "player_name",
+                    "position",
+                    "team",
+                    "proj_p10",
+                    "proj_p50",
+                    "proj_p90",
+                    "vor",
+                )
+                if c in avail.columns
+            ]
+            return (
+                avail.sort_values("vor", ascending=False)
+                .head(top_n)[cols]
+                .to_dict(orient="records")
+            )
         except FileNotFoundError:
-            return {"error": "Draft state not found. Run nfl-predict draft-start and nfl-sync first."}
+            return {
+                "error": "Draft state not found. Run nfl-predict draft-start and nfl-sync first."
+            }
 
     if name == "get_draft_turn_status":
         return await nfl_client.get_draft_turn_info()
@@ -485,7 +538,11 @@ async def execute_tool(
         try:
             df = run_predictions(position=position.lower())
             if df is not None and not df.empty:
-                cols = [c for c in ["player_name", "team", "position", "expected_ppr_points"] if c in df.columns]
+                cols = [
+                    c
+                    for c in ["player_name", "team", "position", "expected_ppr_points"]
+                    if c in df.columns
+                ]
                 return df[cols].head(top_n).to_dict(orient="records")
         except Exception as e:
             return {"error": f"Prediction failed: {e}"}
@@ -556,8 +613,12 @@ def confirm_action(tool_name: str, tool_input: dict) -> bool:
         print(f"  Reason:   {tool_input.get('explanation', '')}")
 
     elif tool_name == "claim_waiver_player":
-        print(f"  ADD:    {tool_input.get('add_player_name', tool_input.get('add_player_id'))}")
-        print(f"  DROP:   {tool_input.get('drop_player_name', tool_input.get('drop_player_id'))}")
+        print(
+            f"  ADD:    {tool_input.get('add_player_name', tool_input.get('add_player_id'))}"
+        )
+        print(
+            f"  DROP:   {tool_input.get('drop_player_name', tool_input.get('drop_player_id'))}"
+        )
         print(f"  Reason: {tool_input.get('reasoning', '')}")
 
     elif tool_name in ("accept_trade", "decline_trade"):
@@ -566,9 +627,15 @@ def confirm_action(tool_name: str, tool_input: dict) -> bool:
         print(f"  Reason: {tool_input.get('reasoning', '')}")
 
     elif tool_name == "propose_trade":
-        print(f"  Target: {tool_input.get('target_team_name', tool_input.get('target_team_id'))}")
-        print(f"  Offering:  {tool_input.get('offer_player_names', tool_input.get('offer_player_ids'))}")
-        print(f"  Requesting:{tool_input.get('request_player_names', tool_input.get('request_player_ids'))}")
+        print(
+            f"  Target: {tool_input.get('target_team_name', tool_input.get('target_team_id'))}"
+        )
+        print(
+            f"  Offering:  {tool_input.get('offer_player_names', tool_input.get('offer_player_ids'))}"
+        )
+        print(
+            f"  Requesting:{tool_input.get('request_player_names', tool_input.get('request_player_ids'))}"
+        )
         print(f"  Reason: {tool_input.get('reasoning', '')}")
 
     elif tool_name == "make_draft_pick":
@@ -597,7 +664,9 @@ def _tools_for_openai(tools: list[dict]) -> list[dict]:
             "function": {
                 "name": t["name"],
                 "description": t.get("description", ""),
-                "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
+                "parameters": t.get(
+                    "input_schema", {"type": "object", "properties": {}}
+                ),
             },
         }
         for t in tools
@@ -609,30 +678,85 @@ def _tools_for_openai(tools: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+async def _wait_for_draft_update(
+    state_path: Path = DRAFT_STATE_PATH,
+    timeout: float = 30.0,
+    poll: float = 2.0,
+) -> None:
+    """
+    Between draft turns, wait until draft_state.json changes (nfl-sync recorded
+    a new pick) or the timeout elapses, instead of re-invoking the model on a
+    fixed short interval. Saves tokens and turns while nothing is happening.
+    """
+    try:
+        last_mtime = state_path.stat().st_mtime
+    except FileNotFoundError:
+        await asyncio.sleep(poll)
+        return
+
+    waited = 0.0
+    while waited < timeout:
+        await asyncio.sleep(poll)
+        waited += poll
+        try:
+            if state_path.stat().st_mtime != last_mtime:
+                return
+        except FileNotFoundError:
+            return
+
+
 async def _claude_loop(
-    client: anthropic.Anthropic,
+    client: anthropic.AsyncAnthropic,
+    model: str,
     system: str,
     tools: list[dict],
     messages: list[dict],
-    nfl_client: "NFLFantasyClient",
+    nfl_client: NFLFantasyClient,
     auto_confirm: bool,
     max_turns: int,
     draft_mode: bool,
 ) -> None:
+    consecutive_errors = 0
     turn = 0
     while turn < max_turns:
         turn += 1
-        response = client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=16_000,
-            thinking={"type": "adaptive"},
-            system=system,
-            tools=tools,
-            messages=messages,
-        )
+        try:
+            response = await client.messages.create(
+                model=model,
+                max_tokens=16_000,
+                thinking={"type": "adaptive"},
+                # cache_control on the system block caches tools + system
+                # together — they are byte-identical every turn of the loop.
+                system=[
+                    {
+                        "type": "text",
+                        "text": system,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                tools=tools,
+                messages=messages,
+            )
+            consecutive_errors = 0
+        except anthropic.APIError as e:
+            # The SDK already retries 429/5xx internally; this catches what
+            # slips through so a transient blip can't kill a live draft.
+            consecutive_errors += 1
+            if consecutive_errors >= _MAX_CONSECUTIVE_API_ERRORS:
+                print(
+                    f"[Agent] Giving up after {consecutive_errors} consecutive API errors: {e}"
+                )
+                return
+            wait = min(2**consecutive_errors * 2, 60)
+            print(
+                f"[Agent] API error ({e.__class__.__name__}: {e}). Retrying in {wait}s..."
+            )
+            turn -= 1  # failed calls don't consume the turn budget
+            await asyncio.sleep(wait)
+            continue
 
         for block in response.content:
-            if hasattr(block, "text") and block.text:
+            if block.type == "text" and block.text:
                 print(f"\n[Agent]\n{block.text}\n")
 
         if response.stop_reason == "end_turn":
@@ -647,15 +771,18 @@ async def _claude_loop(
 
         tool_results = []
         for tb in tool_blocks:
-            result = await _handle_tool_call(tb.name, tb.input, tb.id, nfl_client, auto_confirm)
-            tool_results.append({"type": "tool_result", "tool_use_id": tb.id, "content": result})
+            result = await _handle_tool_call(
+                tb.name, tb.input, tb.id, nfl_client, auto_confirm
+            )
+            tool_results.append(
+                {"type": "tool_result", "tool_use_id": tb.id, "content": result}
+            )
 
         messages.append({"role": "user", "content": tool_results})
 
         if draft_mode:
-            await asyncio.sleep(5)
-
-    if turn >= max_turns:
+            await _wait_for_draft_update()
+    else:
         print(f"[Agent] Reached max turns ({max_turns}).")
 
 
@@ -665,7 +792,7 @@ async def _ollama_loop(
     system: str,
     tools: list[dict],
     messages: list[dict],
-    nfl_client: "NFLFantasyClient",
+    nfl_client: NFLFantasyClient,
     auto_confirm: bool,
     max_turns: int,
     draft_mode: bool,
@@ -703,16 +830,17 @@ async def _ollama_loop(
 
             result = await _handle_tool_call(name, inp, tc.id, nfl_client, auto_confirm)
 
-            full_messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": result,
-            })
+            full_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                }
+            )
 
         if draft_mode:
-            await asyncio.sleep(5)
-
-    if turn >= max_turns:
+            await _wait_for_draft_update()
+    else:
         print(f"[Agent] Reached max turns ({max_turns}).")
 
 
@@ -720,15 +848,14 @@ async def _handle_tool_call(
     name: str,
     inp: dict,
     call_id: str,
-    nfl_client: "NFLFantasyClient",
+    nfl_client: NFLFantasyClient,
     auto_confirm: bool,
 ) -> str:
     """Execute a single tool call, with confirmation for destructive ones. Returns JSON string."""
     print(f"[Tool → {name}] {json.dumps(inp, indent=2)[:300]}")
 
-    if name in DESTRUCTIVE_TOOLS and not auto_confirm:
-        if not confirm_action(name, inp):
-            return json.dumps({"status": "cancelled", "message": "User cancelled."})
+    if name in DESTRUCTIVE_TOOLS and not auto_confirm and not confirm_action(name, inp):
+        return json.dumps({"status": "cancelled", "message": "User cancelled."})
 
     try:
         result = await execute_tool(name, inp, nfl_client)
@@ -746,7 +873,7 @@ async def _handle_tool_call(
 
 
 async def run_agent(
-    task: Optional[str] = None,
+    task: str | None = None,
     auto_confirm: bool = False,
     draft_mode: bool = False,
     max_turns: int = 30,
@@ -755,7 +882,8 @@ async def run_agent(
     Run the NFL Fantasy agent.
 
     Backend is selected via LLM_BACKEND env var:
-      LLM_BACKEND=claude   → Claude Opus 4.6 (needs ANTHROPIC_API_KEY)
+      LLM_BACKEND=claude   → Claude (needs ANTHROPIC_API_KEY; model via
+                             ANTHROPIC_MODEL, default: claude-opus-4-8)
       LLM_BACKEND=ollama   → local Ollama (needs OLLAMA_MODEL, default: qwen2.5:32b)
 
     In draft mode, nfl-sync must be running in a separate terminal to keep
@@ -776,13 +904,17 @@ async def run_agent(
     team_id = os.getenv("NFL_TEAM_ID")
 
     missing = [
-        var for var, val in [
-            ("NFL_EMAIL", email), ("NFL_PASSWORD", password),
-            ("NFL_LEAGUE_ID", league_id), ("NFL_TEAM_ID", team_id),
-        ] if not val
+        var
+        for var, val in [
+            ("NFL_EMAIL", email),
+            ("NFL_PASSWORD", password),
+            ("NFL_LEAGUE_ID", league_id),
+            ("NFL_TEAM_ID", team_id),
+        ]
+        if not val
     ]
     if missing:
-        raise EnvironmentError(
+        raise OSError(
             f"Missing environment variables: {', '.join(missing)}. Check your .env file."
         )
 
@@ -807,15 +939,22 @@ async def run_agent(
 
     tools = get_tools(draft_mode=draft_mode)
     system = DRAFT_SYSTEM_PROMPT if draft_mode else SYSTEM_PROMPT
-    headless = os.getenv("NFL_BROWSER_HEADLESS", "false").lower() in ("1", "true", "yes")
+    headless = os.getenv("NFL_BROWSER_HEADLESS", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
     # --- Build LLM client ---
     if backend == "claude":
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
-            raise EnvironmentError("ANTHROPIC_API_KEY is not set.")
-        llm = anthropic.Anthropic(api_key=api_key)
-        model_name = "Claude Opus 4.6"
+            raise OSError("ANTHROPIC_API_KEY is not set.")
+        # Async client: messages.create is awaited so it doesn't block the
+        # event loop that Playwright (NFLFantasyClient) shares.
+        llm = anthropic.AsyncAnthropic(api_key=api_key)
+        claude_model = os.getenv("ANTHROPIC_MODEL", DEFAULT_CLAUDE_MODEL)
+        model_name = claude_model
         ollama_model = None
     else:
         try:
@@ -842,22 +981,35 @@ async def run_agent(
     print("=" * 55 + "\n")
 
     async with NFLFantasyClient(
-        email=email, password=password,
-        league_id=league_id, team_id=team_id,
+        email=email,
+        password=password,
+        league_id=league_id,
+        team_id=team_id,
         headless=headless,
     ) as nfl_client:
-
         if backend == "claude":
             await _claude_loop(
-                llm, system, tools,
+                llm,
+                claude_model,
+                system,
+                tools,
                 [{"role": "user", "content": task}],
-                nfl_client, auto_confirm, max_turns, draft_mode,
+                nfl_client,
+                auto_confirm,
+                max_turns,
+                draft_mode,
             )
         else:
             await _ollama_loop(
-                llm, ollama_model, system, tools,
+                llm,
+                ollama_model,
+                system,
+                tools,
                 [{"role": "user", "content": task}],
-                nfl_client, auto_confirm, max_turns, draft_mode,
+                nfl_client,
+                auto_confirm,
+                max_turns,
+                draft_mode,
             )
 
 
@@ -876,7 +1028,9 @@ async def run_draft_agent(auto_confirm: bool = False) -> None:
 
     Runs until the draft completes or the user interrupts (Ctrl+C).
     """
-    print("\n[Draft Agent] Starting. Ensure `nfl-predict nfl-sync` is running in another terminal.")
+    print(
+        "\n[Draft Agent] Starting. Ensure `nfl-predict nfl-sync` is running in another terminal."
+    )
     print("[Draft Agent] Press Ctrl+C to stop.\n")
     try:
         await run_agent(draft_mode=True, auto_confirm=auto_confirm, max_turns=100)

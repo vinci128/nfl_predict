@@ -41,11 +41,22 @@ def predict(req: PredictRequest):
     """
 
     try:
+        # write_csv=False: API requests shouldn't leave CSV files behind.
         df = run_predictions(
-            season=req.season, week=req.week, position=req.position or "WR"
+            season=req.season,
+            week=req.week,
+            position=req.position or "WR",
+            write_csv=False,
         )
+    except FileNotFoundError as exc:
+        # Missing model / feature parquet — a setup problem, not a server bug
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        # Don't leak internals to the client; log server-side instead.
+        import logging
+
+        logging.getLogger(__name__).exception("Prediction failed")
+        raise HTTPException(status_code=500, detail="Prediction failed.") from exc
 
     # convert DataFrame to JSON-serializable list of records
     try:

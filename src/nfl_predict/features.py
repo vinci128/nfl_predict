@@ -4,7 +4,6 @@ import pandas as pd
 
 DATA_DIR = Path("data")
 OUT_DIR = DATA_DIR / "processed"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Rolling windows (in games)
 ROLLING_WINDOWS = [3, 5, 8]
@@ -701,6 +700,7 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
     validate_features(df)
 
     if save:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
         out_path = OUT_DIR / "player_week_features.parquet"
         df.to_parquet(out_path, index=False)
         print(f"Saved: {out_path} (shape={df.shape})")

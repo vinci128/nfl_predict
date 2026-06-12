@@ -150,7 +150,9 @@ def _get_feature_cols(df: pd.DataFrame, position: str) -> list[str]:
     stat_patterns = _POSITION_PATTERNS.get(pos, [])
     all_patterns = stat_patterns + _CONTEXT_PATTERNS
 
-    exclude_id_prefixes = {"name", "id", "gsis", "pfr", "espn", "yahoo", "sleeper"}
+    # Matched against underscore-separated segments of the column name, so
+    # "player_id" is excluded but e.g. "valid_flag" or "midfield_x" are not.
+    exclude_id_tokens = {"name", "id", "gsis", "pfr", "espn", "yahoo", "sleeper"}
 
     chosen: set[str] = set()
     for c in df.columns:
@@ -161,10 +163,7 @@ def _get_feature_cols(df: pd.DataFrame, position: str) -> list[str]:
             continue
         lower = c.lower()
         # Skip obvious identifier columns
-        if (
-            any(token in lower for token in exclude_id_prefixes)
-            and c not in _ALWAYS_ALLOW
-        ):
+        if set(lower.split("_")) & exclude_id_tokens:
             continue
         for p in all_patterns:
             if p in lower:
@@ -257,7 +256,11 @@ def train_position_model(
 
     pred_valid = model.predict(valid_pool)
     valid_mae = float((abs(pred_valid - y_valid)).mean())
-    print(f"  Validation MAE: {valid_mae:.4f} PPR points")
+    # NOTE: the validation season also drives early stopping, so this MAE is
+    # optimistically biased. Use `nfl-predict backtest` for an unbiased estimate.
+    print(
+        f"  Validation MAE: {valid_mae:.4f} PPR points (early-stopping set — see backtest for unbiased eval)"
+    )
 
     meta = {
         "position": position,

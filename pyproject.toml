@@ -1,7 +1,7 @@
 [project]
 name = "nfl-predict"
 version = "0.1.0"
-description = "Add your description here"
+description = "NFL fantasy football pipeline: CatBoost weekly predictions, season projections, VOR draft board, live draft UI, and an autonomous Claude/Ollama team-management agent"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

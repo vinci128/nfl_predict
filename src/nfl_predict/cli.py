@@ -571,7 +571,12 @@ def nfl_sync_cmd(
     Run this in a separate terminal while the UI is open — it updates
     the same draft_state.json that the web UI reads.
     """
-    from nfl_predict.draft_assistant import load_state, mark_drafted, save_state
+    from nfl_predict.draft_assistant import (
+        load_state,
+        mark_drafted,
+        save_state,
+        state_lock,
+    )
     from nfl_predict.nfl_fantasy import NflFantasyClient, NflFantasyError, poll_draft
 
     try:
@@ -585,24 +590,37 @@ def nfl_sync_cmd(
         print("No active draft session. Run `nfl-predict draft-start` first.")
         raise typer.Exit(1)
 
-    def on_pick(pick: dict) -> None:
-        state = load_state(state_path)
-        try:
-            updated = mark_drafted(
-                state,
-                pick["player_name"],
-                drafter="me" if pick.get("is_mine") else "other",
-            )
-            save_state(updated)
-            marker = " ← MINE" if pick.get("is_mine") else ""
-            print(
-                f"  #{pick['overall_pick']:>3}  {pick['player_name']:<28} "
-                f"{pick.get('position', '')}{marker}"
-            )
-        except ValueError as e:
-            print(f"  Warning: Could not record {pick['player_name']!r}: {e}")
+    # Picks already in the local state — don't replay them on restart.
+    already_recorded = len(load_state(state_path).picks)
+    if already_recorded:
+        print(f"Resuming: {already_recorded} picks already recorded locally.")
 
-    poll_draft(client, on_pick=on_pick, interval=interval, max_rounds=max_rounds)
+    def on_pick(pick: dict) -> None:
+        # Lock the read-modify-write cycle: the web UI mutates the same file.
+        with state_lock(state_path):
+            state = load_state(state_path)
+            try:
+                updated = mark_drafted(
+                    state,
+                    pick["player_name"],
+                    drafter="me" if pick.get("is_mine") else "other",
+                )
+                save_state(updated)
+                marker = " ← MINE" if pick.get("is_mine") else ""
+                print(
+                    f"  #{pick['overall_pick']:>3}  {pick['player_name']:<28} "
+                    f"{pick.get('position', '')}{marker}"
+                )
+            except ValueError as e:
+                print(f"  Warning: Could not record {pick['player_name']!r}: {e}")
+
+    poll_draft(
+        client,
+        on_pick=on_pick,
+        interval=interval,
+        max_rounds=max_rounds,
+        initial_recorded=already_recorded,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -663,7 +681,7 @@ def agent_cmd(
                     max_turns=max_turns,
                 )
             )
-    except OSError as e:
+    except (OSError, ImportError) as e:
         print(f"Configuration error: {e}")
         raise typer.Exit(1) from e
     except KeyboardInterrupt:

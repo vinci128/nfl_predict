@@ -32,10 +32,12 @@ Custom league scoring (not standard PPR):
 | Stat | Points |
 |---|---|
 | Passing yard | 0.1 |
-| Passing TD | 6 |
+| Passing TD | 4 |
+| Interception | -2 |
 | Rush/Rec yard | 0.1 |
 | Rush/Rec TD | 6 |
 | Reception | 1 (PPR) |
+| Fumble lost | -2 |
 | FG 0–39 yd | 3 |
 | FG 40–49 yd | 4 |
 | FG 50+ yd | 5 |

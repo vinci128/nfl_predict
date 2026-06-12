@@ -5,8 +5,9 @@ import pandas as pd
 import typer
 
 app = typer.Typer()
-BASE_DIR = Path(__file__).resolve().parents[2]
-OUT_DIR = BASE_DIR / "outputs"
+# CWD-relative, consistent with the rest of the pipeline — run from the
+# project root (the __file__-relative path breaks when pip-installed).
+OUT_DIR = Path("outputs")
 
 
 def _find_latest_prediction_files() -> list[Path]:
