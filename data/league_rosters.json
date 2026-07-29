@@ -1,0 +1,29 @@
+{
+  "_comment": "Placeholder rosters for the /weekly beta UI. Replace with your real league's team names and rosters after your draft (export from the NFL Fantasy app, or copy from outputs/draft_state.json once the draft is done). player_name + position must match the format used in outputs/predictions_*.csv; team is the player's NFL team abbreviation (used as a secondary join key, optional).",
+  "teams": {
+    "Sample Team A": [
+      {"player_name": "Josh Allen", "position": "QB", "team": "BUF"},
+      {"player_name": "Bijan Robinson", "position": "RB", "team": "ATL"},
+      {"player_name": "Jahmyr Gibbs", "position": "RB", "team": "DET"},
+      {"player_name": "Justin Jefferson", "position": "WR", "team": "MIN"},
+      {"player_name": "Amon-Ra St. Brown", "position": "WR", "team": "DET"},
+      {"player_name": "Sam LaPorta", "position": "TE", "team": "DET"},
+      {"player_name": "Harrison Butker", "position": "K", "team": "KC"},
+      {"player_name": "James Cook", "position": "RB", "team": "BUF"},
+      {"player_name": "Chris Olave", "position": "WR", "team": "NO"},
+      {"player_name": "Rome Odunze", "position": "WR", "team": "CHI"}
+    ],
+    "Sample Team B": [
+      {"player_name": "Lamar Jackson", "position": "QB", "team": "BAL"},
+      {"player_name": "Saquon Barkley", "position": "RB", "team": "PHI"},
+      {"player_name": "De'Von Achane", "position": "RB", "team": "MIA"},
+      {"player_name": "CeeDee Lamb", "position": "WR", "team": "DAL"},
+      {"player_name": "Puka Nacua", "position": "WR", "team": "LAR"},
+      {"player_name": "Trey McBride", "position": "TE", "team": "ARI"},
+      {"player_name": "Brandon Aubrey", "position": "K", "team": "DAL"},
+      {"player_name": "Kyren Williams", "position": "RB", "team": "LAR"},
+      {"player_name": "Tee Higgins", "position": "WR", "team": "CIN"},
+      {"player_name": "Jayden Reed", "position": "WR", "team": "GB"}
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ team_name }} — Week {{ week }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen p-6">
+  <div class="max-w-3xl mx-auto space-y-6">
+
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-green-400">{{ team_name }}</h1>
+        <p class="text-gray-400 text-sm">Season {{ season }} · Week {{ week }}</p>
+      </div>
+      <a href="/weekly" class="text-sm text-gray-400 hover:text-gray-200">← switch team</a>
+    </div>
+
+    {% if no_predictions %}
+    <div class="bg-yellow-900 border border-yellow-600 rounded-lg p-4 text-sm text-yellow-300">
+      No predictions found yet in <code class="bg-gray-800 px-1 rounded">outputs/</code>.
+      Run the weekly pipeline first:
+      <pre class="bg-gray-800 rounded p-2 mt-2 text-xs overflow-x-auto">uv run nfl-predict update-all
+uv run nfl-predict predict --position QB
+uv run nfl-predict predict --position RB
+uv run nfl-predict predict --position WR
+uv run nfl-predict predict --position TE
+uv run nfl-predict predict --position K</pre>
+      then refresh this page.
+    </div>
+    {% else %}
+
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-5">
+      <div class="flex items-baseline justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-200">Starting lineup</h2>
+        <span class="text-green-400 font-bold text-xl">{{ total }} pts</span>
+      </div>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-gray-500 text-left border-b border-gray-700">
+            <th class="py-1 pr-2">Slot</th>
+            <th class="py-1 pr-2">Player</th>
+            <th class="py-1 pr-2">Team</th>
+            <th class="py-1 text-right">Proj. pts</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in starters %}
+          <tr class="border-b border-gray-800">
+            <td class="py-1 pr-2 text-green-400 font-medium">{{ p.slot }}</td>
+            <td class="py-1 pr-2">{{ p.player_name }}</td>
+            <td class="py-1 pr-2 text-gray-400">{{ p.team }}</td>
+            <td class="py-1 text-right">{{ "%.1f"|format(p.expected_ppr_points) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if bench %}
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-5">
+      <h2 class="text-lg font-semibold text-gray-200 mb-3">Bench</h2>
+      <table class="w-full text-sm">
+        <tbody>
+          {% for p in bench %}
+          <tr class="border-b border-gray-800">
+            <td class="py-1 pr-2 text-gray-500">{{ p.position }}</td>
+            <td class="py-1 pr-2">{{ p.player_name }}</td>
+            <td class="py-1 pr-2 text-gray-400">{{ p.team }}</td>
+            <td class="py-1 text-right">{{ "%.1f"|format(p.expected_ppr_points) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if unmatched %}
+    <div class="bg-gray-900 border border-gray-700 rounded-lg p-4 text-xs text-gray-500">
+      No prediction found for: {{ unmatched | join(", ") }}
+      (name/team mismatch, or that position hasn't been predicted this week yet).
+    </div>
+    {% endif %}
+
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NFL Weekly — Pick your team</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-lg space-y-6">
+
+    <div class="text-center">
+      <h1 class="text-3xl font-bold text-green-400">🏈 Weekly Lineup</h1>
+      <p class="text-gray-400 mt-1">Season {{ season }} · Week {{ week }}</p>
+    </div>
+
+    <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 space-y-5">
+      {% if has_rosters %}
+      <h2 class="text-lg font-semibold text-gray-200">Choose your team</h2>
+      <div class="grid gap-3">
+        {% for name in team_names %}
+        <a href="/weekly/team/{{ name | urlencode }}"
+           class="block bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 transition">
+          {{ name }}
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="bg-yellow-900 border border-yellow-600 rounded p-3 text-sm text-yellow-300">
+        No rosters found. Add teams to <code class="bg-gray-800 px-1 rounded">data/league_rosters.json</code>
+        (see the placeholder file for the expected format).
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="text-center text-sm text-gray-600 space-x-4">
+      <a href="/draft" class="hover:text-gray-400">Draft board</a>
+      <span>·</span>
+      <a href="/docs" class="hover:text-gray-400">API docs</a>
+    </div>
+
+  </div>
+</body>
+</html>

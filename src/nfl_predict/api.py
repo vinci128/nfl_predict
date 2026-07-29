@@ -7,11 +7,15 @@ from pydantic import BaseModel
 
 from nfl_predict.draft_api import router as draft_router
 from nfl_predict.predict_week import run_predictions
+from nfl_predict.weekly_api import router as weekly_router
 
 app = FastAPI(title="nfl-predict API", version="0.1.0")
 
 # Draft UI router
 app.include_router(draft_router)
+
+# Season-long weekly lineup UI router
+app.include_router(weekly_router)
 
 # Serve a small single-page app from `static/`
 static_dir = Path(__file__).resolve().parent / "static"
