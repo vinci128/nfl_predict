@@ -23,6 +23,7 @@ from nfl_predict.season_features import (
     build_all_inference_rows,
     build_season_snapshot,
     load_features,
+    load_injuries,
     load_rosters,
 )
 
@@ -407,6 +408,7 @@ def predict_season(
         as_of_season=as_of_season,
         position=position,
         rosters=rosters,
+        injuries=load_injuries(),
     )
 
     if inference.empty:
@@ -423,6 +425,11 @@ def predict_season(
             "recent_team",
             "position",
             "season",
+            # Injury-report summary from the source season — carried through
+            # for display on the draft board, not used by any model.
+            "inj_weeks_out",
+            "inj_weeks_on_report",
+            "inj_primary",
         )
         if c in inference.columns
     ]

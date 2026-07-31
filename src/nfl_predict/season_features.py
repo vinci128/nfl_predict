@@ -38,6 +38,31 @@ TARGET_COLS = (
     "season_ppg_next",
 )
 
+# Injury-report summary columns. Reporting only — see
+# build_injury_season_features for why they are not model features.
+_INJURY_COLS = (
+    "inj_weeks_out",
+    "inj_weeks_on_report",
+    "inj_weeks_dnp",
+    "inj_primary",
+)
+
+# Injury-report status -> severity. Higher means less likely to play.
+_REPORT_STATUS_SEVERITY = {
+    "Out": 3.0,
+    "Doubtful": 2.0,
+    "Questionable": 1.0,
+    "Probable": 0.5,
+}
+_PRACTICE_SEVERITY = {
+    "Did Not Participate In Practice": 3.0,
+    "Out (Definitely Will Not Play)": 3.0,
+    "Limited Participation in Practice": 2.0,
+    "Full Participation in Practice": 1.0,
+}
+_OUT_SEVERITY = 3.0
+_DNP_SEVERITY = 3.0
+
 
 # ---------------------------------------------------------------------------
 # Public helpers
@@ -62,10 +87,95 @@ def load_rosters() -> pd.DataFrame | None:
     return pd.read_parquet(path)
 
 
+def load_injuries() -> pd.DataFrame | None:
+    """Load the weekly injury report. Returns None if missing."""
+    path = DATA_DIR / "injuries.parquet"
+    if not path.exists():
+        return None
+    return pd.read_parquet(path)
+
+
+def build_injury_season_features(injuries: pd.DataFrame) -> pd.DataFrame:
+    """
+    Summarise the weekly injury report into one row per (player_id, season).
+
+    These are **reporting columns, not model features**. Walk-forward testing
+    (2019-2024) found no incremental predictive value from injury history on
+    any of the three season targets — deltas within +/-1.3% MAE, mostly
+    slightly worse, and unchanged when restricted to established starters.
+    `games_played_season` is already in the feature set and is itself the
+    strong injury proxy; the report detail adds nothing on top of it. They are
+    surfaced on the draft board so a human can apply the judgement the model
+    demonstrably cannot — an Achilles at 30 reads differently from a hamstring
+    at 24, and neither is legible to the model.
+
+    Aggregating the report directly (rather than reading the weekly feature
+    table) is essential: the weekly merge attaches injury status to games the
+    player *played*, so it never sees a week he was Out — 0% of `Out` rows
+    have a weekly stat line. Anything derived from the weekly path measures
+    "played while listed", not "missed time".
+    """
+    inj = injuries.copy()
+
+    if "game_type" in inj.columns:
+        inj = inj[inj["game_type"] == "REG"]
+    if inj.empty:
+        return pd.DataFrame(columns=["player_id", "season", *_INJURY_COLS])
+
+    inj = inj.dropna(subset=["gsis_id", "season", "week"])
+    inj["season"] = inj["season"].astype(int)
+    inj["week"] = inj["week"].astype(int)
+    inj["_severity"] = inj["report_status"].map(_REPORT_STATUS_SEVERITY).fillna(0.0)
+    inj["_dnp"] = (
+        inj["practice_status"].map(_PRACTICE_SEVERITY).fillna(0.0) >= _DNP_SEVERITY
+    )
+
+    # One row per player-week, keeping the worst status reported that week.
+    inj = (
+        inj.sort_values("_severity")
+        .groupby(["gsis_id", "season", "week"], as_index=False)
+        .last()
+    )
+
+    agg = (
+        inj.groupby(["gsis_id", "season"])
+        .agg(
+            inj_weeks_out=("_severity", lambda s: int((s >= _OUT_SEVERITY).sum())),
+            inj_weeks_on_report=("week", "nunique"),
+            inj_weeks_dnp=("_dnp", "sum"),
+        )
+        .reset_index()
+    )
+    agg["inj_weeks_dnp"] = agg["inj_weeks_dnp"].astype(int)
+
+    # Most frequent body part among weeks the player was actually held out;
+    # fall back to the overall most frequent when he never missed a week.
+    def _primary(group: pd.DataFrame) -> str | None:
+        held_out = group[group["_severity"] >= _OUT_SEVERITY]
+        source = held_out if not held_out.empty else group
+        parts = source["report_primary_injury"].dropna()
+        if parts.empty:
+            parts = source["practice_primary_injury"].dropna()
+        return parts.mode().iloc[0] if not parts.empty else None
+
+    primary = (
+        inj.groupby(["gsis_id", "season"])[
+            ["_severity", "report_primary_injury", "practice_primary_injury"]
+        ]
+        .apply(_primary)
+        .rename("inj_primary")
+        .reset_index()
+    )
+
+    out = agg.merge(primary, on=["gsis_id", "season"], how="left")
+    return out.rename(columns={"gsis_id": "player_id"})
+
+
 def build_season_snapshot(
     df: pd.DataFrame,
     rosters: pd.DataFrame | None = None,
     regular_season_only: bool = True,
+    injuries: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Convert player-week features into player-season snapshots.
@@ -78,10 +188,12 @@ def build_season_snapshot(
     - games_played_next        : games played in season + 1
     - season_ppg_next          : points per game in season + 1
 
-    The model targets ``season_ppg_next`` (talent) and ``games_played_next``
-    (availability) separately; their product reconstructs the season total.
-    Predicting the total directly conflates the two, which systematically
-    under-projects players who missed time — see season_model.py.
+    All three are modelled independently. The total is *not* derived as
+    ppg x games — the median of a product is not the product of the medians,
+    and multiplying component medians measurably worsened accuracy. The rate
+    and availability targets exist to explain a projection, not to build it:
+    a player who missed time reads as "elite rate, low games" rather than one
+    deflated total. See season_model.py.
 
     Rows with no next-season target (the most recent season in the data) are
     kept — they are used for draft-time inference.
@@ -95,6 +207,9 @@ def build_season_snapshot(
                           otherwise inflate totals for players on deep runs —
                           a team-quality artifact that has nothing to do with
                           the player's own scoring rate.
+    injuries            : optional weekly injury report. Adds the reporting
+                          columns in ``_INJURY_COLS`` — displayed on the draft
+                          board, never used as model features.
 
     Returns
     -------
@@ -215,6 +330,19 @@ def build_season_snapshot(
         "games_played_next"
     ].where(snapshot["games_played_next"] > 0)
 
+    # ------------------------------------------------------------------ #
+    # 5. Injury-report summary (display only)                              #
+    # ------------------------------------------------------------------ #
+    if injuries is not None:
+        inj_season = build_injury_season_features(injuries)
+        if not inj_season.empty:
+            snapshot = snapshot.merge(
+                inj_season, on=["player_id", "season"], how="left"
+            )
+            for col in ("inj_weeks_out", "inj_weeks_on_report", "inj_weeks_dnp"):
+                # No injury rows means the player was never on the report.
+                snapshot[col] = snapshot[col].fillna(0).astype(int)
+
     return snapshot
 
 
@@ -223,6 +351,7 @@ def build_all_inference_rows(
     as_of_season: int,
     position: str,
     rosters: pd.DataFrame | None = None,
+    injuries: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Build inference feature rows for all active players of a position.
@@ -240,7 +369,7 @@ def build_all_inference_rows(
     -------
     One row per player; targets are absent (they don't exist yet).
     """
-    snapshot = build_season_snapshot(df, rosters=rosters)
+    snapshot = build_season_snapshot(df, rosters=rosters, injuries=injuries)
     mask = (snapshot["season"] == as_of_season) & (
         snapshot["position"] == position.upper()
     )

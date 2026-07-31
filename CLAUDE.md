@@ -62,7 +62,7 @@ models/
 
 tests/
   test_bugs.py            Regression tests
-  test_draft_phase1.py    season_features, season_model, draft_board (55 tests)
+  test_draft_phase1.py    season_features, season_model, draft_board (60 tests)
   test_draft_phase2.py    draft_assistant (34 tests)
   test_draft_phase3.py    adp_fetch, CLI (25 tests)
 ```
@@ -80,7 +80,7 @@ tests/
 ```bash
 uv run pytest tests/ -x -q
 ```
-All 123 tests must pass before committing.
+All 128 tests must pass before committing.
 
 ### Pre-commit hooks (run automatically on commit)
 - `ruff --fix` — lint and auto-fix
@@ -202,6 +202,13 @@ A player who missed time now reads as "elite rate, low games" rather than one de
 **These columns do not multiply back to `proj_p50`.** The product overstates the total in ~80% of rows (median ~10%): the rate model answers "when he plays", and players who miss time also score less while hurt. The total is modelled directly rather than derived, because the median of a product is not the product of the medians — multiplying component medians measurably worsened QB MAE.
 
 The rate model is trained with `sample_weight = games_played_next`, since a rate observed over 2 games is far noisier than one over 17.
+
+### Injury data is reported, not modelled
+`injuries.parquet` is summarised per player-season by `build_injury_season_features` into `inj_weeks_out`, `inj_weeks_on_report`, `inj_weeks_dnp`, and `inj_primary` (body part). These reach the board CSV and the `G` column tooltip — **they are deliberately excluded from every model.**
+
+Walk-forward 2019–2024 found no incremental predictive value on any of the three targets: deltas within ±1.3% MAE, mostly slightly *worse*, and unchanged when restricted to established starters (≥10 games). `games_played_season` is already a feature and is itself the strong injury proxy; the report detail adds nothing on top. Multi-season durability history (lagged games played, career injury burden) was also tested and added nothing.
+
+Aggregate the report **directly**, never via the weekly feature table. The weekly merge in `features.py` attaches injury status to games the player *played*, so it structurally cannot see a week he was Out — 0% of `Out` rows have a weekly stat line, and only 50% of report rows are visible at all. `injury_status_season_cum` therefore means "played while listed", not "missed time". That weekly usage is still legitimate for the *weekly* model, where playing hurt predicts lower output.
 
 The draft UI shows `Rate` and `G` columns on the board table (gated on the columns being present, so sessions started from an older board CSV still render), with `G` amber under 13 games and red under 11. The Best Available panel is too narrow for both, so it shows a games badge only when the projection is under 13. **Low games does not imply injury** — it also covers committee roles and backups; the model predicts games, not the reason.
 

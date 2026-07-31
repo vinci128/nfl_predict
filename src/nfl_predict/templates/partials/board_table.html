@@ -75,12 +75,17 @@
         {{ "%.1f" | format(row.proj_ppg_p50 | float) if row.get('proj_ppg_p50') is not none else '—' }}
       </td>
       {% set games = row.proj_games_p50 | float if row.get('proj_games_p50') is not none else 0 %}
+      {% set missed = row.inj_weeks_out | int if row.get('inj_weeks_out') is not none else 0 %}
+      {# Tooltip reports last season's actual injury record alongside the
+         projection. The record is not a model input — it has no measured
+         predictive value — but the body part and the count are exactly the
+         context a drafter can weigh and the model cannot. #}
       <td class="px-2 py-1.5 text-right
                  {% if games and games < 11 %}text-red-400 font-semibold
                  {% elif games and games < 13 %}text-amber-400
                  {% else %}text-gray-500{% endif %}"
-          {% if games and games < 13 %}title="Limited availability — injury history, a shared role, or backup duty"{% endif %}>
-        {{ "%.1f" | format(games) if games else '—' }}
+          title="Projected {{ "%.1f" | format(games) }} of 17 games{% if missed %} · last season: {{ missed }} game{{ 's' if missed != 1 }} out{% if row.get('inj_primary') %} ({{ row.inj_primary }}){% endif %}{% elif games and games < 13 %} · limited role rather than injury history{% endif %}">
+        {{ "%.1f" | format(games) if games else '—' }}{% if missed %}<span class="text-red-500" aria-hidden="true">*</span>{% endif %}
       </td>
       {% endif %}
       <td class="px-2 py-1.5 text-right font-semibold

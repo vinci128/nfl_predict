@@ -19,6 +19,7 @@ from nfl_predict.draft_board import (
 from nfl_predict.season_features import (
     TARGET_COLS,
     build_all_inference_rows,
+    build_injury_season_features,
     build_season_snapshot,
 )
 from nfl_predict.season_model import _get_season_feature_cols, build_training_data
@@ -262,6 +263,92 @@ class TestSeasonSnapshotRateAndAvailability:
         inference = build_all_inference_rows(df, as_of_season=2022, position="WR")
         for target in TARGET_COLS:
             assert target not in inference.columns
+
+
+def _make_injuries_df() -> pd.DataFrame:
+    """Weekly injury report rows mirroring injuries.parquet."""
+    return pd.DataFrame(
+        [
+            # P00: out weeks 1-2 with a knee, questionable week 3
+            {
+                "gsis_id": "P00",
+                "season": 2021,
+                "week": 1,
+                "game_type": "REG",
+                "report_status": "Out",
+                "practice_status": "Did Not Participate In Practice",
+                "report_primary_injury": "Knee",
+                "practice_primary_injury": "Knee",
+            },
+            {
+                "gsis_id": "P00",
+                "season": 2021,
+                "week": 2,
+                "game_type": "REG",
+                "report_status": "Out",
+                "practice_status": "Did Not Participate In Practice",
+                "report_primary_injury": "Knee",
+                "practice_primary_injury": "Knee",
+            },
+            {
+                "gsis_id": "P00",
+                "season": 2021,
+                "week": 3,
+                "game_type": "REG",
+                "report_status": "Questionable",
+                "practice_status": "Limited Participation in Practice",
+                "report_primary_injury": "Ankle",
+                "practice_primary_injury": "Ankle",
+            },
+            # Postseason row must be ignored
+            {
+                "gsis_id": "P00",
+                "season": 2021,
+                "week": 20,
+                "game_type": "WC",
+                "report_status": "Out",
+                "practice_status": "Did Not Participate In Practice",
+                "report_primary_injury": "Hamstring",
+                "practice_primary_injury": "Hamstring",
+            },
+        ]
+    )
+
+
+class TestInjurySeasonFeatures:
+    def test_counts_weeks_out_and_on_report(self) -> None:
+        agg = build_injury_season_features(_make_injuries_df())
+        row = agg[(agg.player_id == "P00") & (agg.season == 2021)].iloc[0]
+        assert row["inj_weeks_out"] == 2
+        assert row["inj_weeks_on_report"] == 3  # postseason row excluded
+        assert row["inj_weeks_dnp"] == 2
+
+    def test_primary_injury_prefers_weeks_held_out(self) -> None:
+        """The ankle appears too, but only the knee actually cost games."""
+        agg = build_injury_season_features(_make_injuries_df())
+        assert agg.iloc[0]["inj_primary"] == "Knee"
+
+    def test_merged_onto_snapshot_with_zero_fill(self) -> None:
+        df = _make_weekly_df(n_players=2, seasons=[2021], position="WR")
+        snap = build_season_snapshot(df, injuries=_make_injuries_df())
+        p0 = snap[snap.player_id == "P00"].iloc[0]
+        p1 = snap[snap.player_id == "P01"].iloc[0]
+        assert p0["inj_weeks_out"] == 2
+        # A player who never appeared on the report was healthy, not unknown.
+        assert p1["inj_weeks_out"] == 0
+
+    def test_injury_columns_are_not_model_features(self) -> None:
+        """Reporting only — they have no measured predictive value and must
+        never reach the feature set."""
+        df = _make_weekly_df(n_players=6, seasons=[2021, 2022], position="WR")
+        snap = build_season_snapshot(df, injuries=_make_injuries_df())
+        cols = _get_season_feature_cols(snap, "WR")
+        assert not [c for c in cols if c.startswith("inj_")]
+
+    def test_snapshot_unchanged_when_injuries_absent(self) -> None:
+        df = _make_weekly_df(n_players=2, seasons=[2021])
+        snap = build_season_snapshot(df, injuries=None)
+        assert "inj_weeks_out" not in snap.columns
 
 
 # ---------------------------------------------------------------------------

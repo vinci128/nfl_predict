@@ -382,6 +382,13 @@ def export_draft_board(
     optional_cols = [
         "proj_ppg_p50",
         "proj_games_p50",
+        # Last season's injury report. Display only — it has no measured
+        # predictive value (see season_features.build_injury_season_features),
+        # but it lets a drafter weigh what the model can't read: a torn
+        # Achilles at 30 is not a hamstring at 24.
+        "inj_weeks_out",
+        "inj_weeks_on_report",
+        "inj_primary",
         "adp",
         "adp_rank",
         "value_vs_adp",
