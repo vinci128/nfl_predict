@@ -148,3 +148,37 @@ def test_metadata_position_uses_variable():
         "In train_position_model(), meta['position'] is hardcoded to 'WR' "
         "instead of using the `position` variable."
     )
+
+
+class TestBoardRecordsNaNHandling:
+    """NaN is truthy in Jinja and renders as the literal string 'nan', so a
+    missing value would slip past an `{% if row.col %}` guard in the draft
+    templates instead of falling back to a placeholder."""
+
+    def test_nan_becomes_none(self) -> None:
+        import pandas as pd
+
+        from nfl_predict.draft_api import _records
+
+        df = pd.DataFrame(
+            {
+                "player_name": ["A", "B"],
+                "proj_games_p50": [14.0, float("nan")],
+                "adp": [float("nan"), 3.0],
+            }
+        )
+        records = _records(df)
+        assert records[1]["proj_games_p50"] is None
+        assert records[0]["adp"] is None
+        # Present values must survive untouched.
+        assert records[0]["proj_games_p50"] == 14.0
+        assert records[1]["adp"] == 3.0
+
+    def test_no_nan_survives_any_column(self) -> None:
+        import pandas as pd
+
+        from nfl_predict.draft_api import _records
+
+        df = pd.DataFrame({"a": [float("nan")], "b": [None], "c": ["x"]})
+        for value in _records(df)[0].values():
+            assert value is None or value == "x"

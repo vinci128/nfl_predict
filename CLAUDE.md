@@ -63,7 +63,7 @@ models/
 tests/
   test_bugs.py            Regression tests
   test_draft_phase1.py    season_features, season_model, draft_board (55 tests)
-  test_draft_phase2.py    draft_assistant (32 tests)
+  test_draft_phase2.py    draft_assistant (34 tests)
   test_draft_phase3.py    adp_fetch, CLI (25 tests)
 ```
 
@@ -80,7 +80,7 @@ tests/
 ```bash
 uv run pytest tests/ -x -q
 ```
-All 119 tests must pass before committing.
+All 123 tests must pass before committing.
 
 ### Pre-commit hooks (run automatically on commit)
 - `ruff --fix` — lint and auto-fix
@@ -202,6 +202,8 @@ A player who missed time now reads as "elite rate, low games" rather than one de
 **These columns do not multiply back to `proj_p50`.** The product overstates the total in ~80% of rows (median ~10%): the rate model answers "when he plays", and players who miss time also score less while hurt. The total is modelled directly rather than derived, because the median of a product is not the product of the medians — multiplying component medians measurably worsened QB MAE.
 
 The rate model is trained with `sample_weight = games_played_next`, since a rate observed over 2 games is far noisier than one over 17.
+
+The draft UI shows `Rate` and `G` columns on the board table (gated on the columns being present, so sessions started from an older board CSV still render), with `G` amber under 13 games and red under 11. The Best Available panel is too narrow for both, so it shows a games badge only when the projection is under 13. **Low games does not imply injury** — it also covers committee roles and backups; the model predicts games, not the reason.
 
 **Measured bias.** Walk-forward 2019–2024, mean residual for players with <12 games vs ≥12 games in the prior season: QB **+36 pts**, RB −2, WR +4, TE −4. The bias is essentially QB-only — passing at 0.1 pts/yard puts QBs at 30–45 ppg, so a missed game costs a QB ~3× what it costs a WR. Availability is also the dominant error term: substituting true games played into the projection cuts QB MAE from ~125 to ~57, while substituting the true rate only reaches ~84.
 

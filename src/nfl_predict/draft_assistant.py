@@ -294,6 +294,8 @@ def suggest_best_available(
             "proj_p10",
             "proj_p50",
             "proj_p90",
+            "proj_ppg_p50",
+            "proj_games_p50",
             "vor",
             "pos_rank",
         )

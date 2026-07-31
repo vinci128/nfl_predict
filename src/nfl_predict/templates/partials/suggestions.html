@@ -22,6 +22,17 @@
              {% else %}text-gray-500{% endif %}">
         {{ s.position }}
       </span>
+      {# Only flag availability here — the panel is narrow, and a full games
+         column would crowd out the name. A full-season projection needs no badge.
+         Low games can mean injury history, a committee role, or backup duty;
+         the model predicts the games, not the reason. #}
+      {% set games = s.proj_games_p50 | float if s.get('proj_games_p50') is not none else 0 %}
+      {% if games and games < 13 %}
+      <span class="text-xs shrink-0 {% if games < 11 %}text-red-400{% else %}text-amber-400{% endif %}"
+            title="Projected {{ "%.1f" | format(games) }} of 17 games — limited availability">
+        {{ "%.0f" | format(games) }}g
+      </span>
+      {% endif %}
       <span class="text-xs font-semibold shrink-0
              {% if vor > 50 %}text-green-400{% elif vor > 0 %}text-green-600{% else %}text-red-500{% endif %}">
         {{ "%.0f" | format(vor) }}

@@ -10,6 +10,10 @@
       <th class="px-2 py-2 w-14 text-right">Floor</th>
       <th class="px-2 py-2 w-14 text-right">Median</th>
       <th class="px-2 py-2 w-14 text-right">Ceil</th>
+      {% if board_rows and board_rows[0] is defined and 'proj_ppg_p50' in board_rows[0] %}
+      <th class="px-2 py-2 w-14 text-right" title="Projected points per game played — talent, independent of availability">Rate</th>
+      <th class="px-2 py-2 w-12 text-right" title="Projected games played next season">G</th>
+      {% endif %}
       <th class="px-2 py-2 w-14 text-right">VOR</th>
       {% if board_rows and board_rows[0] is defined and 'adp' in board_rows[0] %}
       <th class="px-2 py-2 w-12 text-right">ADP</th>
@@ -27,7 +31,7 @@
     {# Insert a tier separator row when the tier changes #}
     {% if tier != ns.prev_tier and ns.prev_tier != 0 %}
     <tr class="bg-gray-800/60">
-      <td colspan="12" class="px-3 py-1 text-gray-500 font-semibold tracking-wide">
+      <td colspan="14" class="px-3 py-1 text-gray-500 font-semibold tracking-wide">
         — Tier {{ tier }} —
       </td>
     </tr>
@@ -61,6 +65,24 @@
       <td class="px-2 py-1.5 text-right text-gray-500">{{ "%.0f" | format(row.proj_p10 | float) }}</td>
       <td class="px-2 py-1.5 text-right font-medium">{{ "%.0f" | format(row.proj_p50 | float) }}</td>
       <td class="px-2 py-1.5 text-right text-gray-500">{{ "%.0f" | format(row.proj_p90 | float) }}</td>
+      {% if 'proj_ppg_p50' in row %}
+      {# Rate and games split the median: an elite rate over few games reads
+         very differently from a mediocre rate over a full season, though both
+         can produce the same total. Note they do not multiply back to Median —
+         the rate is "when he plays", and players who miss time also score less
+         while hurt. #}
+      <td class="px-2 py-1.5 text-right text-gray-300">
+        {{ "%.1f" | format(row.proj_ppg_p50 | float) if row.get('proj_ppg_p50') is not none else '—' }}
+      </td>
+      {% set games = row.proj_games_p50 | float if row.get('proj_games_p50') is not none else 0 %}
+      <td class="px-2 py-1.5 text-right
+                 {% if games and games < 11 %}text-red-400 font-semibold
+                 {% elif games and games < 13 %}text-amber-400
+                 {% else %}text-gray-500{% endif %}"
+          {% if games and games < 13 %}title="Limited availability — injury history, a shared role, or backup duty"{% endif %}>
+        {{ "%.1f" | format(games) if games else '—' }}
+      </td>
+      {% endif %}
       <td class="px-2 py-1.5 text-right font-semibold
                  {% if vor > 50 %}text-green-400{% elif vor > 0 %}text-green-600{% else %}text-red-500{% endif %}">
         {{ "%.1f" | format(vor) }}
@@ -90,7 +112,7 @@
     </tr>
     {% else %}
     <tr>
-      <td colspan="12" class="text-center py-8 text-gray-500">No players available</td>
+      <td colspan="14" class="text-center py-8 text-gray-500">No players available</td>
     </tr>
     {% endfor %}
   </tbody>

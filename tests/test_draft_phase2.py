@@ -203,6 +203,26 @@ class TestSuggestBestAvailable:
         suggestions = suggest_best_available(state, n=5)
         assert len(suggestions) <= 5
 
+    def test_carries_rate_and_games_when_board_has_them(self, tmp_path: Path) -> None:
+        """The suggestions panel flags low availability, so the columns must
+        survive the display-column filter."""
+        board = _make_board()
+        board["proj_ppg_p50"] = 20.0
+        board["proj_games_p50"] = 14.0
+        state = init_draft_state(board, state_path=tmp_path / "s.json")
+        suggestions = suggest_best_available(state, n=5)
+        assert "proj_ppg_p50" in suggestions.columns
+        assert "proj_games_p50" in suggestions.columns
+
+    def test_omits_rate_and_games_on_older_board(self, tmp_path: Path) -> None:
+        """Boards built before the rate/availability split have neither
+        column; suggestions must still work."""
+        board = _make_board()
+        state = init_draft_state(board, state_path=tmp_path / "s.json")
+        suggestions = suggest_best_available(state, n=5)
+        assert "proj_games_p50" not in suggestions.columns
+        assert len(suggestions) == 5
+
     def test_sorted_by_vor_without_needs(self, tmp_path: Path) -> None:
         board = _make_board()
         state = init_draft_state(board, state_path=tmp_path / "s.json")

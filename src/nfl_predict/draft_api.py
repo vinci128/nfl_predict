@@ -103,10 +103,19 @@ def _state_to_dict(state: Any) -> dict:
             }
             for p in reversed(state.picks[-15:])
         ],
-        "suggestions": suggestions.to_dict(orient="records")
-        if not suggestions.empty
-        else [],
+        "suggestions": _records(suggestions) if not suggestions.empty else [],
     }
+
+
+def _records(df: pd.DataFrame) -> list[dict]:
+    """
+    DataFrame -> template-ready dicts, with NaN replaced by None.
+
+    `to_dict` leaves NaN in place, and NaN is truthy in Jinja — so a missing
+    value passes an `{% if row.col %}` guard and then renders as the literal
+    string "nan". None fails the guard and hits the intended fallback.
+    """
+    return df.astype(object).where(pd.notna(df), None).to_dict(orient="records")
 
 
 def _board_rows(state: Any, position_filter: str = "ALL") -> list[dict]:
@@ -115,7 +124,7 @@ def _board_rows(state: Any, position_filter: str = "ALL") -> list[dict]:
     if position_filter and position_filter != "ALL":
         avail = avail[avail["position"] == position_filter]
     avail = avail.sort_values("vor", ascending=False).head(150)
-    return avail.to_dict(orient="records")
+    return _records(avail)
 
 
 # ---------------------------------------------------------------------------
@@ -225,9 +234,7 @@ async def suggest_partial(request: Request):
         "partials/suggestions.html",
         {
             "request": request,
-            "suggestions": suggestions.to_dict(orient="records")
-            if not suggestions.empty
-            else [],
+            "suggestions": _records(suggestions) if not suggestions.empty else [],
             "needs": needs,
         },
     )
