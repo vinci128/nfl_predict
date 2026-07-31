@@ -160,26 +160,6 @@
         {% include "partials/roster_panel.html" %}
       </div>
 
-      <!-- Claude advisor (Phase 3) -->
-      {% if llm_available %}
-      <div class="p-3 border-t border-gray-700 shrink-0">
-        <button hx-post="/draft/llm-suggest"
-                hx-target="#llm-panel"
-                hx-swap="innerHTML"
-                hx-indicator="#llm-spinner"
-                class="w-full bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium
-                       py-2 rounded-lg transition flex items-center justify-center gap-2">
-          <span id="llm-spinner" class="htmx-indicator animate-spin">⟳</span>
-          Ask Claude
-        </button>
-        <div id="llm-panel" class="mt-2 text-xs text-gray-400"></div>
-      </div>
-      {% else %}
-      <div class="p-3 border-t border-gray-700 text-xs text-gray-600 shrink-0">
-        Set <code>ANTHROPIC_API_KEY</code> to enable AI advisor
-      </div>
-      {% endif %}
-
     </aside>
   </div>
 

@@ -81,17 +81,6 @@
           before starting. The board CSV will include ADP columns automatically.
         </div>
 
-        <!-- LLM status -->
-        {% if llm_available %}
-        <div class="bg-blue-900 border border-blue-700 rounded p-3 text-xs text-blue-300">
-          ✓ <span class="font-medium">AI advisor enabled</span> — Claude will be available during your draft.
-        </div>
-        {% else %}
-        <div class="bg-gray-800 rounded p-3 text-xs text-gray-500">
-          AI advisor: set <code>ANTHROPIC_API_KEY</code> to enable Claude pick recommendations.
-        </div>
-        {% endif %}
-
         <button type="submit" {% if not boards %}disabled{% endif %}
                 class="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:cursor-not-allowed
                        text-white font-semibold py-3 rounded-lg transition text-base">

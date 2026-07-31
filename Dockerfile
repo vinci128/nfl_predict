@@ -18,9 +18,5 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# NOTE: this image serves the FastAPI app only. The Playwright-based agent
-# (nfl-predict agent) needs browser binaries — to run it in a container, add:
-#   RUN playwright install --with-deps chromium
-
 # data/, outputs/, and models/ are mounted as volumes at runtime — not baked in
 CMD ["uvicorn", "nfl_predict.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

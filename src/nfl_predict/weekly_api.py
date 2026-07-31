@@ -197,9 +197,9 @@ async def weekly_team(request: Request, team_name: str):
 
     merged = preds.merge(roster, on=join_keys, how="inner")
 
-    unmatched = roster[
-        ~roster["player_name"].isin(merged["player_name"])
-    ]["player_name"].tolist()
+    unmatched = roster[~roster["player_name"].isin(merged["player_name"])][
+        "player_name"
+    ].tolist()
 
     starters, bench, total = _build_lineup(merged) if not merged.empty else ([], [], 0)
 

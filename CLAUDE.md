@@ -41,7 +41,6 @@ src/nfl_predict/
     partials/pick_response.html OOB swap after each pick (board+roster+header)
     partials/roster_panel.html  My roster sidebar
     partials/suggestions.html   Best-available panel
-    partials/llm_advice.html    Claude advisor response
 
 data/
   weekly_stats.parquet    Raw NFL weekly player stats
@@ -65,7 +64,7 @@ tests/
   test_bugs.py            Regression tests
   test_draft_phase1.py    season_features, season_model, draft_board (48 tests)
   test_draft_phase2.py    draft_assistant (32 tests)
-  test_draft_phase3.py    adp_fetch, LLM endpoint, CLI (27 tests)
+  test_draft_phase3.py    adp_fetch, CLI (25 tests)
 ```
 
 ---
@@ -81,7 +80,7 @@ tests/
 ```bash
 uv run pytest tests/ -x -q
 ```
-All 114 tests must pass before committing.
+All 112 tests must pass before committing.
 
 ### Pre-commit hooks (run automatically on commit)
 - `ruff --fix` — lint and auto-fix
@@ -156,7 +155,6 @@ uv run nfl-predict board --league-size 12 --adp data/adp_current.csv
 
 ### At the venue
 ```bash
-export ANTHROPIC_API_KEY=sk-...          # optional — enables "Ask Claude" button
 export NFL_FANTASY_USERNAME=you@email.com
 export NFL_FANTASY_PASSWORD=yourpassword
 export NFL_FANTASY_LEAGUE_ID=12345678
@@ -176,7 +174,6 @@ uv run nfl-predict nfl-sync --interval 30
 - Click a row's **Fill** or **Mine** button to pre-fill the input (also sets player_id for exact match)
 - Click **↩ Undo** to reverse the last pick (any miskey)
 - Use position filter tabs (QB / RB / WR / TE / K) to narrow the board
-- Click **Ask Claude** for AI pick advice (requires `ANTHROPIC_API_KEY`)
 - **NFL Sync** button appears when NFL Fantasy credentials are set — pulls picks automatically
 
 ---

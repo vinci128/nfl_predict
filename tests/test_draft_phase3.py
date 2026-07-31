@@ -1,18 +1,15 @@
 """
-Phase 3 integration tests: ADP fetch + LLM endpoint.
+Phase 3 integration tests: ADP fetch.
 
 Tests cover:
 - normalise_name (suffix stripping, case, whitespace)
 - generate_synthetic_adp (shape, columns, determinism, clamping)
 - fetch_adp routing (synthetic direct, fallback on failure)
 - save_adp_csv (writes correct file, returns Path)
-- Draft API: no-key LLM endpoint returns expected message
-- Draft API: LLM endpoint with mocked anthropic client
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -262,80 +259,6 @@ class TestSaveAdpCsv:
         nested = tmp_path / "sub" / "dir" / "adp.csv"
         save_adp_csv(df, path=nested)
         assert nested.exists()
-
-
-# ---------------------------------------------------------------------------
-# Draft API — LLM endpoint
-# ---------------------------------------------------------------------------
-
-
-def _build_state_json(tmp_path: Path) -> Path:
-    """Write a minimal draft state JSON for API tests (matches load_state schema)."""
-    import json
-
-    board = _make_board_csv(tmp_path, n=20)
-    board_df = pd.read_csv(board)
-
-    state = {
-        "board_csv": board_df.to_csv(index=False),
-        "available_csv": board_df.to_csv(index=False),
-        "picks": [],
-        "my_picks": [],
-        "my_roster": {"QB": [], "RB": [], "WR": [], "TE": [], "K": [], "FLEX": []},
-        "league_size": 10,
-        "draft_position": 5,
-        "current_pick": 1,
-    }
-    p = tmp_path / "draft_state.json"
-    p.write_text(json.dumps(state))
-    return p
-
-
-class TestDraftApiLlm:
-    """Test the /draft/llm-suggest endpoint via FastAPI TestClient."""
-
-    @pytest.fixture()
-    def client_and_state(self, tmp_path: Path):
-        """Return a TestClient with STATE_PATH patched to tmp_path."""
-        from fastapi.testclient import TestClient
-
-        import nfl_predict.draft_api as draft_api_mod
-        from nfl_predict.api import app
-
-        state_path = _build_state_json(tmp_path)
-        original = draft_api_mod.STATE_PATH
-        draft_api_mod.STATE_PATH = state_path
-        try:
-            with TestClient(app) as client:
-                yield client, state_path
-        finally:
-            draft_api_mod.STATE_PATH = original
-
-    def test_no_key_returns_message(self, client_and_state):
-        """Without ANTHROPIC_API_KEY, endpoint returns the no-key message."""
-        client, _ = client_and_state
-        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
-        with patch.dict(os.environ, env, clear=True):
-            resp = client.post("/draft/llm-suggest")
-        assert resp.status_code == 200
-        assert "ANTHROPIC_API_KEY" in resp.text
-
-    def test_with_mocked_anthropic(self, client_and_state):
-        """With key set, mock get_llm_suggestion to verify the endpoint renders advice."""
-        client, _ = client_and_state
-
-        with (
-            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test-fake"}),
-            patch(
-                "nfl_predict.draft_assistant.get_llm_suggestion",
-                return_value="Take Bijan Robinson at pick 3.",
-            ),
-            patch("nfl_predict.draft_api._llm_available", return_value=True),
-        ):
-            resp = client.post("/draft/llm-suggest")
-
-        assert resp.status_code == 200
-        assert "Bijan Robinson" in resp.text
 
 
 # ---------------------------------------------------------------------------

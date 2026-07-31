@@ -10,7 +10,6 @@ POST /draft/pick              - record a pick; returns updated partials
 GET  /draft/partials/board    - available-players table fragment (htmx)
 GET  /draft/partials/roster   - my-roster sidebar fragment (htmx)
 GET  /draft/partials/suggest  - best-available suggestions fragment (htmx)
-POST /draft/llm-suggest       - Claude pick recommendation (Phase 3)
 POST /draft/reset             - wipe session and return to setup
 """
 
@@ -18,7 +17,6 @@ from __future__ import annotations
 
 import glob
 import html
-import os
 from pathlib import Path
 from typing import Any
 
@@ -69,10 +67,6 @@ def _available_boards() -> list[str]:
     return sorted(glob.glob(BOARDS_GLOB))
 
 
-def _llm_available() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
-
-
 def _state_to_dict(state: Any) -> dict:
     """Serialize key state info for templates."""
     needs = analyse_roster_needs(state)
@@ -112,7 +106,6 @@ def _state_to_dict(state: Any) -> dict:
         "suggestions": suggestions.to_dict(orient="records")
         if not suggestions.empty
         else [],
-        "llm_available": _llm_available(),
     }
 
 
@@ -140,7 +133,6 @@ async def draft_setup(request: Request):
             "request": request,
             "boards": boards,
             "session_active": _state_exists(),
-            "llm_available": _llm_available(),
         },
     )
 
@@ -283,37 +275,6 @@ async def draft_pick(
     ctx["request"] = request
 
     return templates.TemplateResponse("partials/pick_response.html", ctx)
-
-
-# ---------------------------------------------------------------------------
-# LLM suggestion (Phase 3)
-# ---------------------------------------------------------------------------
-
-
-@router.post("/llm-suggest", response_class=HTMLResponse)
-async def llm_suggest(request: Request):
-    """Ask Claude for a pick recommendation (requires ANTHROPIC_API_KEY)."""
-    if not _llm_available():
-        return HTMLResponse(
-            '<p class="text-gray-500">Set ANTHROPIC_API_KEY to enable AI advice.</p>'
-        )
-
-    state = _load_or_404()
-    needs = analyse_roster_needs(state)
-
-    try:
-        from nfl_predict.draft_assistant import get_llm_suggestion
-
-        advice = get_llm_suggestion(state, needs=needs, n_context=20)
-    except ImportError:
-        advice = "Install the 'anthropic' package to enable AI suggestions."
-    except Exception as e:
-        advice = f"Error: {e}"
-
-    return templates.TemplateResponse(
-        "partials/llm_advice.html",
-        {"request": request, "advice": advice, "needs": needs},
-    )
 
 
 # ---------------------------------------------------------------------------

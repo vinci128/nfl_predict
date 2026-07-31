@@ -440,16 +440,12 @@ def draft_pick(
     state_path: str | None = typer.Option(
         None, help="Draft state JSON path (default: outputs/draft_state.json)."
     ),
-    llm: bool = typer.Option(
-        False, help="Ask Claude for a natural-language pick recommendation."
-    ),
 ) -> None:
     """Record a draft pick and show best-available suggestions."""
     from pathlib import Path as _Path
 
     from nfl_predict.draft_assistant import (
         analyse_roster_needs,
-        get_llm_suggestion,
         load_state,
         mark_drafted,
         render_board,
@@ -494,17 +490,6 @@ def draft_pick(
             if c in suggestions.columns
         ]
         print(suggestions[cols].to_string(index=False))
-
-    # Optional LLM advice
-    if llm:
-        print("\nAsking Claude for a recommendation...")
-        try:
-            advice = get_llm_suggestion(state, needs=need_list)
-            print(f"\n{advice}")
-        except ImportError as e:
-            print(f"LLM unavailable: {e}")
-        except Exception as e:
-            print(f"LLM error: {e}")
 
     if show_board:
         print()
@@ -621,71 +606,6 @@ def nfl_sync_cmd(
         max_rounds=max_rounds,
         initial_recorded=already_recorded,
     )
-
-
-# ---------------------------------------------------------------------------
-# agent: run the NFL Fantasy Claude / Ollama agent
-# ---------------------------------------------------------------------------
-
-
-@app.command(name="agent")
-def agent_cmd(
-    task: str | None = typer.Option(
-        None,
-        "--task",
-        "-t",
-        help="Task for the agent. Defaults to full weekly management.",
-    ),
-    draft: bool = typer.Option(
-        False,
-        "--draft",
-        help=(
-            "Run in draft-assistant mode. Reads board from draft_state.json "
-            "kept current by `nfl-predict nfl-sync` in another terminal."
-        ),
-    ),
-    auto_confirm: bool = typer.Option(
-        False,
-        "--auto-confirm",
-        help="Skip confirmation prompts for destructive actions (use with care).",
-    ),
-    max_turns: int = typer.Option(
-        30,
-        help="Maximum agent turns before stopping.",
-    ),
-) -> None:
-    """
-    Run the NFL Fantasy AI agent (Claude or Ollama).
-
-    Set LLM_BACKEND=claude (default: ollama) and ensure credentials are in .env.
-
-    In-season mode manages lineup, waivers, and trades autonomously.
-
-    Draft mode (--draft) reads the draft board from draft_state.json and makes
-    picks when it's your turn. Run `nfl-predict nfl-sync` in a second terminal
-    first so pick state stays current.
-    """
-    import asyncio
-
-    from nfl_predict.nfl_agent import run_agent, run_draft_agent
-
-    try:
-        if draft:
-            asyncio.run(run_draft_agent(auto_confirm=auto_confirm))
-        else:
-            asyncio.run(
-                run_agent(
-                    task=task,
-                    auto_confirm=auto_confirm,
-                    draft_mode=False,
-                    max_turns=max_turns,
-                )
-            )
-    except (OSError, ImportError) as e:
-        print(f"Configuration error: {e}")
-        raise typer.Exit(1) from e
-    except KeyboardInterrupt:
-        print("\nAgent stopped.")
 
 
 if __name__ == "__main__":

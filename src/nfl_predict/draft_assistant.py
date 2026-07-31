@@ -4,12 +4,6 @@ Live draft assistant for fantasy football.
 Tracks the state of an in-progress snake or auction draft, marks players
 as drafted, and suggests best-available players based on VOR and roster
 needs.  State is persisted to JSON so a session can survive restarts.
-
-Optional LLM advisor: pass ``--llm`` on the CLI (or call
-``get_llm_suggestion`` directly) to get natural-language reasoning from
-Claude about which pick to make.  Requires ``anthropic`` to be installed:
-
-    pip install "nfl-predict[draft]"
 """
 
 from __future__ import annotations
@@ -19,7 +13,6 @@ import fcntl
 import json
 import os
 import tempfile
-import textwrap
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -514,84 +507,3 @@ def load_state(path: Path | str | None = None) -> DraftState:
         state_path=path,
     )
     return state
-
-
-# ---------------------------------------------------------------------------
-# Optional LLM advisor (requires `pip install anthropic`)
-# ---------------------------------------------------------------------------
-
-
-def get_llm_suggestion(
-    state: DraftState,
-    needs: list[str] | None = None,
-    n_context: int = 25,
-    api_key: str | None = None,
-) -> str:
-    """
-    Ask Claude for a natural-language draft recommendation.
-
-    Serialises the draft state into a structured prompt and calls the
-    Anthropic API.  Returns a text explanation of the recommended pick.
-
-    Parameters
-    ----------
-    state     : Current DraftState
-    needs     : Positional needs (auto-detected if None)
-    n_context : Number of top-available players to include in prompt
-    api_key   : Anthropic API key (falls back to ANTHROPIC_API_KEY env var)
-
-    Requires
-    --------
-    anthropic >= 0.20.0  (install with: pip install "nfl-predict[draft]")
-    """
-    try:
-        import anthropic
-    except ImportError as exc:
-        raise ImportError(
-            "The 'anthropic' package is required for LLM suggestions. "
-            "Install it with: pip install anthropic"
-        ) from exc
-
-    if needs is None:
-        needs = analyse_roster_needs(state)
-
-    top_available = suggest_best_available(state, n=n_context)
-    my_picks_summary = [
-        f"{p.player_name} ({p.position}, round {p.round})" for p in state.my_picks
-    ]
-
-    pick = state.current_pick
-    rnd = ((pick - 1) // state.league_size) + 1
-
-    prompt = textwrap.dedent(f"""
-        You are an expert fantasy football draft advisor.
-
-        DRAFT CONTEXT:
-        - Overall pick: #{pick}, Round {rnd}
-        - League size: {state.league_size} teams
-        - My draft position: #{state.draft_position}
-        - Positional needs (most urgent first): {needs or "balanced"}
-
-        MY CURRENT ROSTER:
-        {json.dumps(state.my_roster, indent=2)}
-
-        MY PICKS SO FAR:
-        {chr(10).join(f"  - {p}" for p in my_picks_summary) or "  (none yet)"}
-
-        TOP {n_context} AVAILABLE PLAYERS (sorted by VOR — Value Over Replacement):
-        {top_available.to_string(index=False)}
-
-        Based on this context, recommend the single best pick I should make right
-        now and explain why in 2-3 sentences.  Consider roster construction,
-        positional scarcity, upside vs. floor, and Value Over Replacement.
-        Be direct — give me a name and a reason.
-    """).strip()
-
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        # Cheap one-shot advice — Sonnet by default; override via ANTHROPIC_MODEL.
-        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return next((b.text for b in message.content if b.type == "text"), "")
