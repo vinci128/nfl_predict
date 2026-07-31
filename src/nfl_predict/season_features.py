@@ -28,6 +28,16 @@ _GAMES_PLAYED_COLS = ["games_played_roll3", "games_played_roll5", "games_played_
 _ID_COLS = ["player_id", "position", "season"]
 _DISPLAY_COLS = ["player_display_name", "player_name", "recent_team"]
 
+# Outcome columns. Never features — `games_played_next` in particular would
+# otherwise be picked up by the season model's "games_played" pattern match
+# and leak the availability target straight into the feature set.
+TARGET_COLS = (
+    "season_total_pts_current",
+    "season_total_pts_next",
+    "games_played_next",
+    "season_ppg_next",
+)
+
 
 # ---------------------------------------------------------------------------
 # Public helpers
@@ -55,29 +65,45 @@ def load_rosters() -> pd.DataFrame | None:
 def build_season_snapshot(
     df: pd.DataFrame,
     rosters: pd.DataFrame | None = None,
+    regular_season_only: bool = True,
 ) -> pd.DataFrame:
     """
     Convert player-week features into player-season snapshots.
 
     For each (player_id, season) takes the LAST week's feature row (which
-    carries season-cumulative and roll-8 stats) and attaches two targets:
+    carries season-cumulative and roll-8 stats) and attaches the targets:
 
     - season_total_pts_current : fantasy_points_custom summed over this season
-    - season_total_pts_next    : same sum for season + 1  ← **training target**
+    - season_total_pts_next    : same sum for season + 1
+    - games_played_next        : games played in season + 1
+    - season_ppg_next          : points per game in season + 1
+
+    The model targets ``season_ppg_next`` (talent) and ``games_played_next``
+    (availability) separately; their product reconstructs the season total.
+    Predicting the total directly conflates the two, which systematically
+    under-projects players who missed time — see season_model.py.
 
     Rows with no next-season target (the most recent season in the data) are
     kept — they are used for draft-time inference.
 
     Parameters
     ----------
-    df      : player_week_features DataFrame
-    rosters : optional rosters DataFrame containing birth_date / years_exp
+    df                  : player_week_features DataFrame
+    rosters             : optional rosters DataFrame with birth_date / years_exp
+    regular_season_only : drop postseason rows before aggregating. Fantasy
+                          seasons are regular-season only, and playoff games
+                          otherwise inflate totals for players on deep runs —
+                          a team-quality artifact that has nothing to do with
+                          the player's own scoring rate.
 
     Returns
     -------
     One row per (player_id, season) with snapshot features + targets.
     """
     df = df.copy()
+
+    if regular_season_only and "season_type" in df.columns:
+        df = df[df["season_type"] == "REG"]
 
     # ------------------------------------------------------------------ #
     # 1. Season totals (used as targets)                                   #
@@ -89,10 +115,12 @@ def build_season_snapshot(
         .reset_index()
     )
 
-    # Games with any fantasy scoring
+    # Games played = games the player appeared in. Counting only games with
+    # positive fantasy points undercounts availability: a QB with two picks
+    # and no TDs scores <= 0, and a kicker with no attempts scores 0, yet both
+    # played. That undercount inflates any per-game rate derived from it.
     games_played = (
-        df[df["fantasy_points_custom"] > 0]
-        .groupby(["player_id", "season"])
+        df.groupby(["player_id", "season"])
         .size()
         .rename("games_played_season")
         .reset_index()
@@ -168,13 +196,24 @@ def build_season_snapshot(
         how="left",
     )
 
-    # Next season total (the training target)
-    next_totals = season_totals.copy()
-    next_totals["season"] = next_totals["season"] - 1  # shift: features@S → target@S+1
-    next_totals = next_totals.rename(
-        columns={"season_total_pts": "season_total_pts_next"}
+    # Next-season targets: total points, games played, and their ratio.
+    # Shift season by -1 so features@S line up with outcomes@S+1.
+    next_targets = season_totals.merge(
+        games_played, on=["player_id", "season"], how="left"
     )
-    snapshot = snapshot.merge(next_totals, on=["player_id", "season"], how="left")
+    next_targets["season"] = next_targets["season"] - 1
+    next_targets = next_targets.rename(
+        columns={
+            "season_total_pts": "season_total_pts_next",
+            "games_played_season": "games_played_next",
+        }
+    )
+    snapshot = snapshot.merge(next_targets, on=["player_id", "season"], how="left")
+
+    # Per-game scoring rate next season. Undefined with no games played.
+    snapshot["season_ppg_next"] = snapshot["season_total_pts_next"] / snapshot[
+        "games_played_next"
+    ].where(snapshot["games_played_next"] > 0)
 
     return snapshot
 
@@ -207,11 +246,7 @@ def build_all_inference_rows(
     )
     inference = snapshot[mask].copy()
     inference.drop(
-        columns=[
-            c
-            for c in ("season_total_pts_next", "season_total_pts_current")
-            if c in inference.columns
-        ],
+        columns=[c for c in TARGET_COLS if c in inference.columns],
         inplace=True,
     )
     return inference

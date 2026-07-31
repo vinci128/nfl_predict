@@ -374,13 +374,26 @@ def export_draft_board(
         "replacement_baseline",
         "projected_season",
     ]
-    optional_cols = ["adp", "adp_rank", "value_vs_adp"]
+    # Rate and availability split out of the season total. NOTE: these do not
+    # multiply back to proj_p50 — proj_ppg is the rate in games the player
+    # actually plays, and players who miss time also score less while hurt, so
+    # the product overstates the total (median ~10%). They answer different
+    # questions: "how good is he" vs "how much of him do you get".
+    optional_cols = [
+        "proj_ppg_p50",
+        "proj_games_p50",
+        "adp",
+        "adp_rank",
+        "value_vs_adp",
+    ]
     cols = display_cols + [c for c in optional_cols if c in board.columns]
     export_df = board[[c for c in cols if c in board.columns]].copy()
 
-    for col in ("proj_p10", "proj_p50", "proj_p90", "vor"):
+    for col in ("proj_p10", "proj_p50", "proj_p90", "vor", "proj_games_p50"):
         if col in export_df.columns:
             export_df[col] = export_df[col].round(1)
+    if "proj_ppg_p50" in export_df.columns:
+        export_df["proj_ppg_p50"] = export_df["proj_ppg_p50"].round(2)
 
     if fmt == "csv":
         export_df.to_csv(path, index=False)

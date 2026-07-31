@@ -16,7 +16,11 @@ from nfl_predict.draft_board import (
     assign_tiers,
     compute_vor,
 )
-from nfl_predict.season_features import build_all_inference_rows, build_season_snapshot
+from nfl_predict.season_features import (
+    TARGET_COLS,
+    build_all_inference_rows,
+    build_season_snapshot,
+)
 from nfl_predict.season_model import _get_season_feature_cols, build_training_data
 
 # ---------------------------------------------------------------------------
@@ -183,6 +187,81 @@ class TestBuildSeasonSnapshot:
         snap = build_season_snapshot(df)
         # 'week' should not be a feature column (it's the groupby key consumed by .last())
         assert "week" not in snap.columns
+
+
+class TestSeasonSnapshotRateAndAvailability:
+    """Regular-season scoping, games-played counting, and the rate targets."""
+
+    def test_postseason_excluded_from_totals_and_games(self) -> None:
+        df = _make_weekly_df(n_players=1, seasons=[2021], n_weeks=3)
+        df["season_type"] = "REG"
+        post = df.iloc[[-1]].copy()
+        post["week"] = 99
+        post["season_type"] = "POST"
+        post["fantasy_points_custom"] = 100.0
+        combined = pd.concat([df, post], ignore_index=True)
+
+        snap = build_season_snapshot(combined)
+        row = snap.iloc[0]
+        # Playoff points must not inflate the season total, and the playoff
+        # game must not count towards games played.
+        assert (
+            abs(row["season_total_pts_current"] - df.fantasy_points_custom.sum()) < 1e-6
+        )
+        assert row["games_played_season"] == 3
+
+    def test_postseason_kept_when_flag_disabled(self) -> None:
+        df = _make_weekly_df(n_players=1, seasons=[2021], n_weeks=3)
+        df["season_type"] = "REG"
+        post = df.iloc[[-1]].copy()
+        post["week"] = 99
+        post["season_type"] = "POST"
+        combined = pd.concat([df, post], ignore_index=True)
+
+        snap = build_season_snapshot(combined, regular_season_only=False)
+        assert snap.iloc[0]["games_played_season"] == 4
+
+    def test_games_played_counts_appearances_not_scoring_games(self) -> None:
+        """A player who appeared but scored <= 0 still played that game."""
+        df = _make_weekly_df(n_players=1, seasons=[2021], n_weeks=4)
+        df.loc[df.week == 2, "fantasy_points_custom"] = 0.0
+        df.loc[df.week == 3, "fantasy_points_custom"] = -2.0  # QB with two picks
+
+        snap = build_season_snapshot(df)
+        assert snap.iloc[0]["games_played_season"] == 4
+
+    def test_next_season_rate_targets(self) -> None:
+        df = _make_weekly_df(n_players=1, seasons=[2021, 2022], n_weeks=5)
+        snap = build_season_snapshot(df)
+        row = snap[snap.season == 2021].iloc[0]
+
+        nxt = df[df.season == 2022]
+        assert row["games_played_next"] == 5
+        assert (
+            abs(row["season_total_pts_next"] - nxt.fantasy_points_custom.sum()) < 1e-6
+        )
+        assert abs(row["season_ppg_next"] - nxt.fantasy_points_custom.sum() / 5) < 1e-6
+
+    def test_ppg_is_null_when_no_games_next_season(self) -> None:
+        df = _make_weekly_df(n_players=1, seasons=[2021])
+        snap = build_season_snapshot(df)
+        # 2021 is the last season, so there is no next-season target at all.
+        assert pd.isna(snap.iloc[0]["season_ppg_next"])
+
+    def test_targets_never_become_features(self) -> None:
+        """games_played_next matches the 'games_played' universal pattern and
+        would otherwise leak the availability target into the feature set."""
+        df = _make_weekly_df(n_players=6, seasons=[2021, 2022], position="WR")
+        snap = build_season_snapshot(df)
+        cols = _get_season_feature_cols(snap, "WR")
+        for target in TARGET_COLS:
+            assert target not in cols
+
+    def test_inference_rows_drop_every_target(self) -> None:
+        df = _make_weekly_df(n_players=3, seasons=[2021, 2022], position="WR")
+        inference = build_all_inference_rows(df, as_of_season=2022, position="WR")
+        for target in TARGET_COLS:
+            assert target not in inference.columns
 
 
 # ---------------------------------------------------------------------------

@@ -62,7 +62,7 @@ models/
 
 tests/
   test_bugs.py            Regression tests
-  test_draft_phase1.py    season_features, season_model, draft_board (48 tests)
+  test_draft_phase1.py    season_features, season_model, draft_board (55 tests)
   test_draft_phase2.py    draft_assistant (32 tests)
   test_draft_phase3.py    adp_fetch, CLI (25 tests)
 ```
@@ -80,7 +80,7 @@ tests/
 ```bash
 uv run pytest tests/ -x -q
 ```
-All 112 tests must pass before committing.
+All 119 tests must pass before committing.
 
 ### Pre-commit hooks (run automatically on commit)
 - `ruff --fix` — lint and auto-fix
@@ -188,8 +188,22 @@ Built by `season_features.build_season_snapshot()`. Takes the **last week** of e
 - `games_played_season` — games played in that season (important for injury-affected players)
 - `age_at_season_start`, `years_exp` — career stage signals
 
-### Known model limitation
-The season model predicts **season totals**, so a player who missed games due to injury (e.g. Burrow: 8 games, 30 pts/game) gets a deflated projection (262 pts) rather than rate-adjusted. The fix (per-game rate target × predicted games played) is planned as a medium-complexity improvement.
+### Rate vs availability
+A season total conflates *how good a player is* with *how much of him you get*. The season model reports both, as three independent CatBoost families per position (p10/p50/p90 each):
+
+| Target | Column | Question |
+|---|---|---|
+| `season_total_pts_next` | `proj_p50` | expected season points (VOR ranks on this) |
+| `season_ppg_next` | `proj_ppg_p50` | scoring rate in games actually played |
+| `games_played_next` | `proj_games_p50` | availability |
+
+A player who missed time now reads as "elite rate, low games" rather than one deflated number — e.g. Dak Prescott (8 games in 2024) projects 29.6 ppg over 11.7 games.
+
+**These columns do not multiply back to `proj_p50`.** The product overstates the total in ~80% of rows (median ~10%): the rate model answers "when he plays", and players who miss time also score less while hurt. The total is modelled directly rather than derived, because the median of a product is not the product of the medians — multiplying component medians measurably worsened QB MAE.
+
+The rate model is trained with `sample_weight = games_played_next`, since a rate observed over 2 games is far noisier than one over 17.
+
+**Measured bias.** Walk-forward 2019–2024, mean residual for players with <12 games vs ≥12 games in the prior season: QB **+36 pts**, RB −2, WR +4, TE −4. The bias is essentially QB-only — passing at 0.1 pts/yard puts QBs at 30–45 ppg, so a missed game costs a QB ~3× what it costs a WR. Availability is also the dominant error term: substituting true games played into the projection cuts QB MAE from ~125 to ~57, while substituting the true rate only reaches ~84.
 
 ### Player name format
 Raw feature data uses abbreviated names (`J.Allen`, `B.Robinson`). Roster data uses full names (`Josh Allen`, `Bijan Robinson`). The join between them is on `player_id` / `gsis_id` — never on name alone. Two players with the same abbreviated name (e.g. Brian Robinson and Bijan Robinson both appear as `B.Robinson`) are correctly separated by their distinct `player_id`.

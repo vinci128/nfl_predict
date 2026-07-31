@@ -19,6 +19,7 @@ from catboost import CatBoostRegressor, Pool
 
 from nfl_predict.model_registry import ModelRegistry
 from nfl_predict.season_features import (
+    TARGET_COLS,
     build_all_inference_rows,
     build_season_snapshot,
     load_features,
@@ -29,6 +30,19 @@ MODEL_DIR = Path("models")
 
 POSITIONS = ["QB", "RB", "WR", "TE", "K"]
 QUANTILES = [0.1, 0.5, 0.9]
+
+# Season total, plus the two halves it decomposes into: scoring rate and
+# availability. The total is modelled directly rather than as ppg x games —
+# the median of a product is not the product of the medians, so multiplying
+# the component medians is a biased estimator (measurably worse MAE for QB).
+# The component models exist to report *why* a projection is what it is:
+# an elite rate paired with a low games estimate reads very differently on a
+# draft board than a mediocre rate over a full season, though both can
+# produce the same total.
+TOTAL_TARGET = "season_total_pts_next"
+PPG_TARGET = "season_ppg_next"
+GAMES_TARGET = "games_played_next"
+TARGETS = (TOTAL_TARGET, PPG_TARGET, GAMES_TARGET)
 
 # Position-specific column patterns for feature selection
 _POS_PATTERNS: dict[str, list[str]] = {
@@ -66,9 +80,13 @@ _DROP_EXACT = {
     "team",
     "position",
     "season",
-    "season_total_pts_next",
-    "season_total_pts_current",
+    *TARGET_COLS,
 }
+
+# Maximum regular-season games a player can be projected for. 17 in the modern
+# schedule; a mid-season trade between teams with different bye weeks can push
+# the observed count to 18, so clip predictions rather than observations.
+MAX_GAMES = 17
 
 
 # ---------------------------------------------------------------------------
@@ -76,15 +94,41 @@ _DROP_EXACT = {
 # ---------------------------------------------------------------------------
 
 
-def _season_registry_key(position: str, quantile: float | None = None) -> str:
-    """Registry key for a season model, e.g. 'WR_SEASON_P50'."""
+_TARGET_SLUGS = {
+    TOTAL_TARGET: "total",
+    PPG_TARGET: "ppg",
+    GAMES_TARGET: "games",
+}
+
+
+def _target_slug(target: str) -> str:
+    """Short name used in model filenames and registry keys."""
+    try:
+        return _TARGET_SLUGS[target]
+    except KeyError:
+        raise ValueError(
+            f"target must be one of {sorted(_TARGET_SLUGS)}, got {target!r}"
+        ) from None
+
+
+def _season_registry_key(
+    position: str, quantile: float | None = None, target: str = PPG_TARGET
+) -> str:
+    """Registry key for a season model, e.g. 'WR_SEASON_PPG_P50'."""
+    base = f"{position.upper()}_SEASON_{_target_slug(target).upper()}"
     if quantile is None:
-        return f"{position.upper()}_SEASON"
-    return f"{position.upper()}_SEASON_P{int(quantile * 100)}"
+        return base
+    return f"{base}_P{int(quantile * 100)}"
 
 
 def _quantile_label(quantile: float | None) -> str:
     return f"p{int(quantile * 100)}" if quantile is not None else "rmse"
+
+
+def _model_paths(position: str, target: str, label: str) -> tuple[Path, Path]:
+    """Return (model_path, meta_path) for a position/target/quantile."""
+    stem = f"{position.lower()}_season_{_target_slug(target)}_{label}"
+    return MODEL_DIR / f"{stem}.cbm", MODEL_DIR / f"{stem}_meta.json"
 
 
 def _get_season_feature_cols(df: pd.DataFrame, position: str) -> list[str]:
@@ -140,7 +184,8 @@ def build_training_data(
     Build train / validation DataFrames for the season model.
 
     Split: train = all seasons before max_season, valid = max_season.
-    Only rows with a valid (> 0) next-season target are included.
+    Only rows with a valid (> 0) next-season target and at least one game
+    played next season are included — per-game rate is undefined otherwise.
 
     Returns
     -------
@@ -154,6 +199,7 @@ def build_training_data(
         (snapshot["position"] == position.upper())
         & snapshot["season_total_pts_next"].notna()
         & (snapshot["season_total_pts_next"] > 0)
+        & (snapshot["games_played_next"] > 0)
     ].copy()
 
     if len(pos_snap) < 50:
@@ -183,9 +229,14 @@ def train_season_model(
     registry: ModelRegistry | None = None,
     iterations: int = 500,
     depth: int = 4,
+    target: str = PPG_TARGET,
 ) -> str | None:
     """
-    Train a CatBoost season-total model for a position.
+    Train a CatBoost season model for a position.
+
+    Three targets are modelled independently: the season total (the number
+    the draft board ranks on), the scoring rate, and games played. See the
+    TARGETS comment for why the total is not derived from the other two.
 
     Parameters
     ----------
@@ -194,18 +245,26 @@ def train_season_model(
     registry  : if provided, version and register the model
     iterations: CatBoost max iterations
     depth     : tree depth (shallow = less overfitting on small datasets)
+    target    : one of ``TARGETS``
 
     Returns
     -------
     version_id if registered, else None
     """
+    _target_slug(target)  # validates
+
     df_train, df_valid, feature_cols = build_training_data(position)
 
-    target = "season_total_pts_next"
     X_train = df_train[feature_cols].fillna(0)
     y_train = df_train[target]
     X_valid = df_valid[feature_cols].fillna(0)
     y_valid = df_valid[target]
+
+    # A rate observed over 2 games is far noisier than one over 17. Weighting
+    # by games played is the variance-correct fix (var of a mean scales 1/n)
+    # and keeps the short seasons in the data, unlike a minimum-games cutoff.
+    w_train = df_train[GAMES_TARGET] if target == PPG_TARGET else None
+    w_valid = df_valid[GAMES_TARGET] if target == PPG_TARGET else None
 
     loss_function = f"Quantile:alpha={quantile}" if quantile is not None else "RMSE"
 
@@ -221,8 +280,8 @@ def train_season_model(
     )
 
     model.fit(
-        Pool(X_train, label=y_train),
-        eval_set=Pool(X_valid, label=y_valid),
+        Pool(X_train, label=y_train, weight=w_train),
+        eval_set=Pool(X_valid, label=y_valid, weight=w_valid),
     )
 
     preds = model.predict(X_valid)
@@ -230,9 +289,10 @@ def train_season_model(
     rmse = float(((preds - y_valid) ** 2).mean() ** 0.5)
 
     label = _quantile_label(quantile)
+    kind = _target_slug(target)
     print(
-        f"  [{position}] season ({label}) — "
-        f"val MAE={mae:.1f}  RMSE={rmse:.1f}  "
+        f"  [{position}] season {kind} ({label}) — "
+        f"val MAE={mae:.2f}  RMSE={rmse:.2f}  "
         f"n_train={len(y_train)}  n_valid={len(y_valid)}"
     )
 
@@ -241,14 +301,14 @@ def train_season_model(
     # trained on — predict_season must use this, not a freshly recomputed
     # feature list, or columns silently misalign after a data update.
     MODEL_DIR.mkdir(exist_ok=True, parents=True)
-    flat_path = MODEL_DIR / f"{position.lower()}_season_{label}.cbm"
+    flat_path, flat_meta_path = _model_paths(position, target, label)
     model.save_model(str(flat_path))
-    flat_meta_path = MODEL_DIR / f"{position.lower()}_season_{label}_meta.json"
     flat_meta_path.write_text(
         json.dumps(
             {
                 "position": position.upper(),
                 "quantile": quantile,
+                "target": target,
                 "feature_cols": feature_cols,
                 "valid_mae": mae,
                 "valid_rmse": rmse,
@@ -258,9 +318,10 @@ def train_season_model(
     )
 
     if registry is not None:
-        reg_key = _season_registry_key(position, quantile)
+        reg_key = _season_registry_key(position, quantile, target)
         meta = {
-            "model_type": "season",
+            "model_type": f"season_{_target_slug(target)}",
+            "target": target,
             "feature_cols": feature_cols,
             "cat_cols": [],
             "train_seasons": sorted(int(s) for s in df_train["season"].unique()),
@@ -288,18 +349,24 @@ def train_all_quantiles(
     iterations: int = 500,
 ) -> dict[str, str | None]:
     """
-    Train p10, p50, and p90 models for a single position.
+    Train p10/p50/p90 rate and availability models for a single position.
 
-    Returns a dict mapping label → version_id (None when no registry).
+    Returns a dict mapping "{target_slug}_{label}" → version_id
+    (None when no registry).
     """
     results: dict[str, str | None] = {}
-    for q in QUANTILES:
-        label = _quantile_label(q)
-        print(f"\nTraining {position} season model ({label})...")
-        version_id = train_season_model(
-            position, quantile=q, registry=registry, iterations=iterations
-        )
-        results[label] = version_id
+    for target in TARGETS:
+        kind = _target_slug(target)
+        for q in QUANTILES:
+            label = _quantile_label(q)
+            print(f"\nTraining {position} season {kind} model ({label})...")
+            results[f"{kind}_{label}"] = train_season_model(
+                position,
+                quantile=q,
+                registry=registry,
+                iterations=iterations,
+                target=target,
+            )
     return results
 
 
@@ -374,18 +441,17 @@ def predict_season(
     # set the model was trained on (from its meta sidecar). Falls back to
     # recomputing from training data for models saved before sidecars existed.
     fallback_cols: list[str] | None = None
-    for q in quantiles:
+
+    def _apply(target: str, q: float) -> pd.Series | None:
+        nonlocal fallback_cols
         label = _quantile_label(q)
-        model_path = MODEL_DIR / f"{position.lower()}_season_{label}.cbm"
-        meta_path = MODEL_DIR / f"{position.lower()}_season_{label}_meta.json"
-        col_name = f"proj_p{int(q * 100)}"
+        model_path, meta_path = _model_paths(position, target, label)
 
         if not model_path.exists():
             print(
                 f"  Model not found: {model_path}. Run `nfl-predict draft-prep` first."
             )
-            projections[col_name] = float("nan")
-            continue
+            return None
 
         if meta_path.exists():
             feature_cols = json.loads(meta_path.read_text())["feature_cols"]
@@ -409,7 +475,27 @@ def predict_season(
 
         m = CatBoostRegressor()
         m.load_model(str(model_path))
-        projections[col_name] = m.predict(X).clip(min=0).round(1)
+        return pd.Series(m.predict(X), index=inference.index)
+
+    for q in quantiles:
+        pct = int(q * 100)
+
+        total = _apply(TOTAL_TARGET, q)
+        projections[f"proj_p{pct}"] = (
+            float("nan") if total is None else total.clip(lower=0).round(1).to_numpy()
+        )
+
+        ppg = _apply(PPG_TARGET, q)
+        projections[f"proj_ppg_p{pct}"] = (
+            float("nan") if ppg is None else ppg.clip(lower=0).round(2).to_numpy()
+        )
+
+        games = _apply(GAMES_TARGET, q)
+        projections[f"proj_games_p{pct}"] = (
+            float("nan")
+            if games is None
+            else games.clip(lower=0, upper=MAX_GAMES).round(1).to_numpy()
+        )
 
     return projections
 
