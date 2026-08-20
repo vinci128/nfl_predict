@@ -98,7 +98,16 @@ All 128 tests must pass before committing.
 If pre-commit modifies files, **re-stage** the modified files and commit again. Never use `--no-verify`.
 
 ### CI (`.github/workflows/ci.yml`)
-Runs on push to `dev`/`master` and on PRs: `ruff check` → `ruff format --check` → `ty check` → `pytest`. Same four gates as the hooks, so a green local `uv run ty check` and `uv run pytest` means CI will pass.
+Runs on push to `dev`/`master` and on PRs: `pre-commit run --all-files` → `pytest`.
+
+CI runs the **same** `.pre-commit-config.yaml`, so the hook set is the single definition of the lint/format/type gates and is enforced whether or not a contributor installed the hooks. Reproduce a CI failure locally with:
+
+```bash
+uv run pre-commit run --all-files
+uv run pytest tests/ -x -q
+```
+
+Note pre-commit lints *every* Python file, including `scripts/`, while the old CI step only covered `src/` and `tests/`.
 
 ### Adding dependencies
 ```bash

@@ -23,14 +23,21 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev --frozen
 
-      - name: Ruff lint
-        run: uv run ruff check src/ tests/
+      # Hook environments are cloned and built on first use; cache them or
+      # every run pays ~40s rebuilding the same pinned repos.
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: pre-commit-${{ runner.os }}-
 
-      - name: Ruff format check
-        run: uv run ruff format --check src/ tests/
-
-      - name: Type check
-        run: uv run ty check
+      # Runs every hook in .pre-commit-config.yaml — ruff, ruff-format and ty,
+      # plus the whitespace/EOF/large-file/debug-statement/merge-conflict
+      # checks that had no CI equivalent. One definition, enforced whether or
+      # not a contributor ran `pre-commit install` locally.
+      - name: Pre-commit (lint, format, type check)
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
       - name: Tests
         run: uv run pytest tests/ -x -q --tb=short
