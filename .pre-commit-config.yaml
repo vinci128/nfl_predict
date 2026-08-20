@@ -22,7 +22,11 @@ repos:
     hooks:
       - id: ty
         name: ty (type check)
-        entry: ty check
+        # `uv run` resolves ty from the project venv. A bare `ty check` needs
+        # .venv/bin on PATH, which it is not under uv's normal usage (you run
+        # `uv run ...` rather than activating), so the hook failed on every
+        # commit with "Executable `ty` not found".
+        entry: uv run ty check
         language: system
         types: [python]
         pass_filenames: false
