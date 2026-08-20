@@ -12,6 +12,7 @@ form.  Birth-date / experience data are merged in from the rosters file.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -120,7 +121,7 @@ def build_injury_season_features(injuries: pd.DataFrame) -> pd.DataFrame:
     if "game_type" in inj.columns:
         inj = inj[inj["game_type"] == "REG"]
     if inj.empty:
-        return pd.DataFrame(columns=["player_id", "season", *_INJURY_COLS])
+        return pd.DataFrame(columns=pd.Index(["player_id", "season", *_INJURY_COLS]))
 
     inj = inj.dropna(subset=["gsis_id", "season", "week"])
     inj["season"] = inj["season"].astype(int)
@@ -158,14 +159,13 @@ def build_injury_season_features(injuries: pd.DataFrame) -> pd.DataFrame:
             parts = source["practice_primary_injury"].dropna()
         return parts.mode().iloc[0] if not parts.empty else None
 
-    primary = (
+    primary_per_season = cast(
+        "pd.Series",
         inj.groupby(["gsis_id", "season"])[
             ["_severity", "report_primary_injury", "practice_primary_injury"]
-        ]
-        .apply(_primary)
-        .rename("inj_primary")
-        .reset_index()
+        ].apply(_primary),
     )
+    primary = primary_per_season.rename("inj_primary").reset_index()
 
     out = agg.merge(primary, on=["gsis_id", "season"], how="left")
     return out.rename(columns={"gsis_id": "player_id"})
@@ -234,12 +234,8 @@ def build_season_snapshot(
     # positive fantasy points undercounts availability: a QB with two picks
     # and no TDs scores <= 0, and a kicker with no attempts scores 0, yet both
     # played. That undercount inflates any per-game rate derived from it.
-    games_played = (
-        df.groupby(["player_id", "season"])
-        .size()
-        .rename("games_played_season")
-        .reset_index()
-    )
+    games_counts = cast("pd.Series", df.groupby(["player_id", "season"]).size())
+    games_played = games_counts.rename("games_played_season").reset_index()
 
     # ------------------------------------------------------------------ #
     # 2. End-of-season snapshot (last week per player-season)              #

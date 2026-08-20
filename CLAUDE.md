@@ -88,12 +88,17 @@ uv run pytest tests/ -x -q
 ```
 All 128 tests must pass before committing.
 
-### Pre-commit hooks (run automatically on commit)
+### Pre-commit hooks
 - `ruff --fix` — lint and auto-fix
 - `ruff format` — format
 - `ty check` — type checking
 
+**Hooks are not installed by default** — a fresh clone has an empty `.git/hooks/`, so nothing runs on commit until you run `uv run pre-commit install`. Until then the config is inert and CI is the only gate.
+
 If pre-commit modifies files, **re-stage** the modified files and commit again. Never use `--no-verify`.
+
+### CI (`.github/workflows/ci.yml`)
+Runs on push to `dev`/`master` and on PRs: `ruff check` → `ruff format --check` → `ty check` → `pytest`. Same four gates as the hooks, so a green local `uv run ty check` and `uv run pytest` means CI will pass.
 
 ### Adding dependencies
 ```bash
