@@ -23,15 +23,19 @@ src/nfl_predict/
   predict_week.py      Week-level prediction pipeline
   model_registry.py    Versioned model registry (JSON), champion tracking
   backtest.py          Walk-forward backtest vs baselines
+  metrics.py           MAE, RMSE, R2, Spearman, top-N precision
 
-  season_features.py   Player-season snapshots from weekly data (last-week cumulative)
-  season_model.py      CatBoost quantile regression (p10/p50/p90) for season totals
+  season_features.py   Player-season snapshots + injury-report summary per season
+  season_model.py      CatBoost quantile regression — 3 targets (total / ppg / games)
+                       x 3 quantiles = 9 models per position
   draft_board.py       VOR calculation, tier assignment, CSV/JSON export
   draft_assistant.py   Live draft state — mark_drafted, undo, suggest, save/load JSON
   adp_fetch.py         ADP from Sleeper / FantasyPros / synthetic fallback
   nfl_fantasy.py       NFL.com OAuth2 client — live draft pick polling
   draft_api.py         FastAPI router (/draft/*) with htmx partials
-  api.py               Main FastAPI app (mounts draft router)
+  weekly_api.py        FastAPI router (/weekly/*) — season-long league beta
+  lineup.py            Standalone `suggest` CLI — optimal lineup from predictions
+  api.py               Main FastAPI app (mounts draft + weekly routers)
   cli.py               Typer CLI entry point (nfl-predict)
 
   templates/
@@ -41,6 +45,8 @@ src/nfl_predict/
     partials/pick_response.html OOB swap after each pick (board+roster+header)
     partials/roster_panel.html  My roster sidebar
     partials/suggestions.html   Best-available panel
+    weekly_setup.html          /weekly team picker
+    weekly_team.html           /weekly per-team lineup view
 
 data/
   weekly_stats.parquet    Raw NFL weekly player stats
@@ -55,13 +61,13 @@ data/
 outputs/
   draft_board_YYYY.csv    Current draft board (rebuilt each year)
   draft_state.json        Live draft session state (persisted per pick)
-  models/                 Trained .cbm model files
 
 models/
   model_registry.json     Version registry
+  {pos}_season_{target}_{q}.cbm       Trained season models + _meta.json sidecars
 
 tests/
-  test_bugs.py            Regression tests
+  test_bugs.py            Regression tests (9 tests)
   test_draft_phase1.py    season_features, season_model, draft_board (60 tests)
   test_draft_phase2.py    draft_assistant (34 tests)
   test_draft_phase3.py    adp_fetch, CLI (25 tests)
@@ -117,7 +123,7 @@ Consequence: elite QB season totals of 500–750 pts are correct for this system
 uv run nfl-predict update-all
 
 # Draft preparation (run once per season)
-uv run nfl-predict draft-prep                          # train p10/p50/p90 models
+uv run nfl-predict draft-prep                          # train season models
 uv run nfl-predict fetch-adp --source sleeper          # pull ADP
 uv run nfl-predict board --league-size 12 \
        --adp data/adp_current.csv --fmt csv            # build board
@@ -184,9 +190,14 @@ uv run nfl-predict nfl-sync --interval 30
 Built by `season_features.build_season_snapshot()`. Takes the **last week** of each player-season (which carries `season_cum` and `roll8` aggregates). Key columns used as features:
 
 - `fantasy_points_custom_season_cum` — season total points so far
-- `fantasy_points_custom_roll8_mean` — rolling 8-week average (per-game rate proxy)
-- `games_played_season` — games played in that season (important for injury-affected players)
+- `fantasy_points_custom_roll8` — rolling 8-week average (per-game rate proxy)
+- `fantasy_points_custom_season_mean` — per-game rate over the season to date
+- `games_played_season` — regular-season games the player appeared in
 - `age_at_season_start`, `years_exp` — career stage signals
+
+**Regular-season scope.** The snapshot drops postseason rows before aggregating (`regular_season_only=True`). Fantasy seasons are regular-season only, and playoff appearances track team quality rather than the player — leaving them in inflated 7.6% of player-season totals by a mean of +19 pts.
+
+**`games_played_season` counts appearances, not scoring games.** A player who took the field but scored <= 0 — a QB with two picks and no TDs, a kicker with no attempts — still played. Counting only positive-scoring games undercounted 21% of QB seasons by up to 8 games and corrupts any per-game rate derived from it.
 
 ### Rate vs availability
 A season total conflates *how good a player is* with *how much of him you get*. The season model reports both, as three independent CatBoost families per position (p10/p50/p90 each):
@@ -203,16 +214,16 @@ A player who missed time now reads as "elite rate, low games" rather than one de
 
 The rate model is trained with `sample_weight = games_played_next`, since a rate observed over 2 games is far noisier than one over 17.
 
+The draft UI shows `Rate` and `G` columns on the board table (gated on the columns being present, so sessions started from an older board CSV still render), with `G` amber under 13 games and red under 11. The Best Available panel is too narrow for both, so it shows a games badge only when the projection is under 13. **Low games does not imply injury** — it also covers committee roles and backups; the model predicts games, not the reason.
+
+**Measured bias.** Walk-forward 2019–2024, mean residual for players with <12 games vs ≥12 games in the prior season: QB **+36 pts**, RB −2, WR +4, TE −4. The bias is essentially QB-only — passing at 0.1 pts/yard puts QBs at 30–45 ppg, so a missed game costs a QB ~3× what it costs a WR. Availability is also the dominant error term: substituting true games played into the projection cuts QB MAE from ~125 to ~57, while substituting the true rate only reaches ~84.
+
 ### Injury data is reported, not modelled
 `injuries.parquet` is summarised per player-season by `build_injury_season_features` into `inj_weeks_out`, `inj_weeks_on_report`, `inj_weeks_dnp`, and `inj_primary` (body part). These reach the board CSV and the `G` column tooltip — **they are deliberately excluded from every model.**
 
 Walk-forward 2019–2024 found no incremental predictive value on any of the three targets: deltas within ±1.3% MAE, mostly slightly *worse*, and unchanged when restricted to established starters (≥10 games). `games_played_season` is already a feature and is itself the strong injury proxy; the report detail adds nothing on top. Multi-season durability history (lagged games played, career injury burden) was also tested and added nothing.
 
 Aggregate the report **directly**, never via the weekly feature table. The weekly merge in `features.py` attaches injury status to games the player *played*, so it structurally cannot see a week he was Out — 0% of `Out` rows have a weekly stat line, and only 50% of report rows are visible at all. `injury_status_season_cum` therefore means "played while listed", not "missed time". That weekly usage is still legitimate for the *weekly* model, where playing hurt predicts lower output.
-
-The draft UI shows `Rate` and `G` columns on the board table (gated on the columns being present, so sessions started from an older board CSV still render), with `G` amber under 13 games and red under 11. The Best Available panel is too narrow for both, so it shows a games badge only when the projection is under 13. **Low games does not imply injury** — it also covers committee roles and backups; the model predicts games, not the reason.
-
-**Measured bias.** Walk-forward 2019–2024, mean residual for players with <12 games vs ≥12 games in the prior season: QB **+36 pts**, RB −2, WR +4, TE −4. The bias is essentially QB-only — passing at 0.1 pts/yard puts QBs at 30–45 ppg, so a missed game costs a QB ~3× what it costs a WR. Availability is also the dominant error term: substituting true games played into the projection cuts QB MAE from ~125 to ~57, while substituting the true rate only reaches ~84.
 
 ### Player name format
 Raw feature data uses abbreviated names (`J.Allen`, `B.Robinson`). Roster data uses full names (`Josh Allen`, `Bijan Robinson`). The join between them is on `player_id` / `gsis_id` — never on name alone. Two players with the same abbreviated name (e.g. Brian Robinson and Bijan Robinson both appear as `B.Robinson`) are correctly separated by their distinct `player_id`.
