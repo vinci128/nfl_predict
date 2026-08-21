@@ -118,6 +118,44 @@ def _records(df: pd.DataFrame) -> list[dict]:
     return df.astype(object).where(pd.notna(df), None).to_dict(orient="records")
 
 
+_BANNER_TONES = {
+    "error": "bg-red-100 border-red-400 text-red-700",
+    "warn": "bg-yellow-100 border-yellow-400 text-yellow-700",
+    "info": "bg-blue-100 border-blue-400 text-blue-700",
+}
+
+
+def _banner_response(
+    request: Request,
+    state: Any,
+    pos: str,
+    message: str,
+    tone: str = "error",
+) -> HTMLResponse:
+    """
+    Return a message banner *and* the re-rendered board.
+
+    The forms that produce these messages target #board-section with
+    hx-swap="outerHTML", so a response containing only a banner replaces the
+    whole table and the board disappears mid-draft. The banner therefore
+    rides along out-of-band while the swap payload stays the board itself.
+
+    Status must be 2xx: htmx does not swap non-2xx responses, so returning
+    4xx here would silently discard the message and leave the user with no
+    feedback at all.
+    """
+    banner = (
+        f'<div id="pick-error" hx-swap-oob="true" class="border px-4 py-2 '
+        f'rounded mb-2 {_BANNER_TONES[tone]}">{html.escape(message)}</div>'
+    )
+    board = templates.get_template("partials/board_table.html").render(
+        request=request,
+        board_rows=_board_rows(state, pos),
+        pos_filter=pos,
+    )
+    return HTMLResponse(banner + board)
+
+
 def _board_rows(state: Any, position_filter: str = "ALL") -> list[dict]:
     """Return available players as a list of dicts, optionally filtered."""
     avail = state.available.copy()
@@ -265,12 +303,7 @@ async def draft_pick(
                 player_id=player_id or None,
             )
         except ValueError as e:
-            # Return an error banner that htmx can swap into #pick-error
-            return HTMLResponse(
-                f'<div id="pick-error" class="bg-red-100 border border-red-400 '
-                f'text-red-700 px-4 py-2 rounded mb-2">{html.escape(str(e))}</div>',
-                status_code=422,
-            )
+            return _banner_response(request, state, pos, str(e))
 
         save_state(state)
 
@@ -308,10 +341,8 @@ async def draft_undo(request: Request, pos: str = Form("ALL")):
         state = _load_or_404()
 
         if not state.picks:
-            return HTMLResponse(
-                '<div id="pick-error" class="bg-yellow-100 border border-yellow-400 '
-                'text-yellow-700 px-4 py-2 rounded mb-2">No picks to undo.</div>',
-                status_code=200,
+            return _banner_response(
+                request, state, pos, "No picks to undo.", tone="warn"
             )
 
         state = undo_last_pick(state)
@@ -390,18 +421,11 @@ async def nfl_sync(request: Request, pos: str = Form("ALL")):
             already_recorded=n_recorded_at_fetch,
         )
     except (DraftSyncError, EspnFantasyError) as e:
-        return HTMLResponse(
-            f'<div id="pick-error" class="bg-red-100 border border-red-400 '
-            f'text-red-700 px-4 py-2 rounded mb-2">'
-            f"Draft sync error: {html.escape(str(e))}</div>",
-            status_code=200,
-        )
+        return _banner_response(request, state, pos, f"Draft sync error: {e}")
 
     if not new_picks:
-        return HTMLResponse(
-            '<div id="pick-error" class="bg-blue-100 border border-blue-400 '
-            'text-blue-700 px-4 py-2 rounded mb-2">No new picks since last sync.</div>',
-            status_code=200,
+        return _banner_response(
+            request, state, pos, "No new picks since last sync.", tone="info"
         )
 
     errors: list[str] = []
