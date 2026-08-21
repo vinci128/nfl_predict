@@ -56,7 +56,7 @@
         ↩ Undo
       </button>
     </form>
-    <!-- NFL Fantasy sync (shown only when configured) -->
+    <!-- ESPN Fantasy sync (shown only when configured) -->
     <form id="sync-form"
           hx-post="/draft/nfl-sync"
           hx-target="#board-section"
@@ -67,8 +67,8 @@
               id="nfl-sync-btn"
               class="hidden text-xs text-blue-400 hover:text-blue-300 ml-1 px-2 py-1 rounded
                      border border-blue-700 hover:border-blue-500 transition"
-              title="Sync picks from NFL Fantasy">
-        <span id="sync-spinner" class="htmx-indicator">⟳</span> NFL Sync
+              title="Sync picks from your ESPN Fantasy league">
+        <span id="sync-spinner" class="htmx-indicator">⟳</span> Sync Draft
       </button>
     </form>
     <form action="/draft/reset" method="post" onsubmit="return confirm('Reset draft session?')">

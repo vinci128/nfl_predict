@@ -545,13 +545,17 @@ def nfl_sync_cmd(
     max_rounds: int = typer.Option(
         20, help="Stop polling after this many draft rounds."
     ),
+    provider: str = typer.Option(
+        "auto",
+        help="Draft provider: 'espn' or 'auto'.",
+    ),
 ) -> None:
     """
-    Poll the NFL Fantasy draft and auto-record picks into the local state.
+    Poll the live draft and auto-record picks into the local state.
 
-    Requires NFL_FANTASY_USERNAME, NFL_FANTASY_PASSWORD, and
-    NFL_FANTASY_LEAGUE_ID environment variables.  Optionally set
-    NFL_FANTASY_TEAM_ID to identify your picks as 'mine'.
+    ESPN (the only supported provider — NFL.com Fantasy moved to ESPN):
+      ESPN_LEAGUE_ID, plus ESPN_S2 and ESPN_SWID for a private league.
+      Optionally ESPN_TEAM_ID to identify your own picks as 'mine'.
 
     Run this in a separate terminal while the UI is open — it updates
     the same draft_state.json that the web UI reads.
@@ -562,11 +566,11 @@ def nfl_sync_cmd(
         save_state,
         state_lock,
     )
-    from nfl_predict.nfl_fantasy import NflFantasyClient, NflFantasyError, poll_draft
+    from nfl_predict.draft_sync import DraftSyncError, make_client, poll_draft
 
     try:
-        client = NflFantasyClient.from_env()
-    except NflFantasyError as e:
+        client = make_client(provider)
+    except DraftSyncError as e:
         print(f"Error: {e}")
         raise typer.Exit(1) from e
 
@@ -589,6 +593,7 @@ def nfl_sync_cmd(
                     state,
                     pick["player_name"],
                     drafter="me" if pick.get("is_mine") else "other",
+                    player_id=pick.get("player_id") or None,
                 )
                 save_state(updated)
                 marker = " ← MINE" if pick.get("is_mine") else ""

@@ -19,7 +19,7 @@ services:
       start_period: 10s
 
   # Only started with: docker compose --profile draft up
-  # Polls NFL Fantasy every 30 s and records picks into draft_state.json
+  # Polls ESPN Fantasy every 30 s and records picks into draft_state.json
   nfl-sync:
     build: .
     command: ["nfl-predict", "nfl-sync", "--interval", "30"]

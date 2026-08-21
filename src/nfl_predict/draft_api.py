@@ -362,37 +362,38 @@ async def autocomplete(q: str = Query(default="")):
 
 @router.get("/nfl-sync-status")
 async def nfl_sync_status():
-    """Check whether NFL Fantasy sync is configured."""
-    from nfl_predict.nfl_fantasy import NflFantasyClient
+    """Check whether live draft sync is configured, and by which provider."""
+    from nfl_predict.draft_sync import available_providers
 
-    creds_ok = NflFantasyClient.credentials_available()
-    return JSONResponse({"available": creds_ok})
+    providers = available_providers()
+    return JSONResponse({"available": bool(providers), "providers": providers})
 
 
 @router.post("/nfl-sync", response_class=HTMLResponse)
 async def nfl_sync(request: Request, pos: str = Form("ALL")):
     """
-    Pull the latest picks from NFL Fantasy and record any new ones.
+    Pull the latest picks from ESPN Fantasy and record any new ones.
 
-    Requires NFL_FANTASY_USERNAME and NFL_FANTASY_PASSWORD env vars, plus
-    NFL_FANTASY_LEAGUE_ID.  Returns the same OOB swap as /draft/pick so the
+    Uses the ESPN provider (ESPN_LEAGUE_ID, plus ESPN_S2/ESPN_SWID for
+    a private league). Returns the same OOB swap as /draft/pick so the
     board refreshes automatically.
     """
-    from nfl_predict.nfl_fantasy import NflFantasyClient, NflFantasyError
+    from nfl_predict.draft_sync import DraftSyncError, make_client
+    from nfl_predict.espn_fantasy import EspnFantasyError
 
     state = _load_or_404()
     n_recorded_at_fetch = len(state.picks)
 
     try:
-        client = NflFantasyClient.from_env()
+        client = make_client()
         new_picks = client.fetch_new_picks(
             already_recorded=n_recorded_at_fetch,
         )
-    except NflFantasyError as e:
+    except (DraftSyncError, EspnFantasyError) as e:
         return HTMLResponse(
             f'<div id="pick-error" class="bg-red-100 border border-red-400 '
             f'text-red-700 px-4 py-2 rounded mb-2">'
-            f"NFL Fantasy sync error: {html.escape(str(e))}</div>",
+            f"Draft sync error: {html.escape(str(e))}</div>",
             status_code=200,
         )
 
@@ -417,6 +418,7 @@ async def nfl_sync(request: Request, pos: str = Form("ALL")):
                     state,
                     pick["player_name"],
                     drafter="me" if pick.get("is_mine") else "other",
+                    player_id=pick.get("player_id") or None,
                 )
             except ValueError as e:
                 errors.append(str(e))

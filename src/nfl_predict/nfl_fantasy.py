@@ -1,54 +1,31 @@
 """
-NFL Fantasy API connector.
+NFL Fantasy API connector — DEPRECATED.
 
-Authenticates to NFL.com and polls the live draft picks endpoint so the
-draft UI can auto-record picks without manual typing.
+.. deprecated::
+    NFL.com Fantasy has been folded into ESPN Fantasy for the 2026 season.
+    The NFL Fantasy API (``api.fantasy.nfl.com``) and its OAuth2 endpoint
+    are no longer functional.  Use ``espn_fantasy.EspnFantasyClient``
+    instead.
 
-Authentication notes
---------------------
-This module uses the NFL Fantasy **mobile app's internal OAuth2 endpoint**
-(``https://id.nfl.com/account/login``) with the hardcoded client_id
-``"fantasy-football"``.  This is reverse-engineered from the NFL Fantasy
-iOS app (v25.x) and is **not officially documented**.
-
-Known risks:
-  - NFL rotated its identity infrastructure in late 2024; the endpoint has
-    been intermittently unreliable.  If auth returns HTTP 4xx or a body
-    with no ``access_token``, the most likely cause is a backend change.
-  - There is no public Gigya Site ID available, so the officially
-    documented Gigya-based flow is not available for personal use.
-  - ``client_id`` may be rotated without notice.
-  - Token refresh (``/account/token``) is unverified — this module always
-    re-authenticates from scratch when the cached token expires, which is
-    the safe fallback.
-
-Configuration (environment variables)
---------------------------------------
-    NFL_FANTASY_USERNAME   your NFL.com email
-    NFL_FANTASY_PASSWORD   your NFL.com password
-    NFL_FANTASY_LEAGUE_ID  the numeric league ID from your league URL
-    NFL_FANTASY_TEAM_ID    your team ID in the league (1-based, optional)
-
-Usage
------
-    from nfl_predict.nfl_fantasy import NflFantasyClient
-
-    client = NflFantasyClient.from_env()
-    new_picks = client.fetch_new_picks(already_recorded=5)
-    for pick in new_picks:
-        print(pick["overall_pick"], pick["player_name"], pick["is_mine"])
-
-CLI
----
-    nfl-predict nfl-sync --interval 30      # poll every 30 seconds
+    This module is retained only for backward compatibility with existing
+    scripts that import ``NflFantasyClient``.  It emits a deprecation
+    warning on import and on client construction.
 """
 
 from __future__ import annotations
 
 import os
 import time
+import warnings
 from dataclasses import dataclass
 from typing import Any
+
+warnings.warn(
+    "nfl_predict.nfl_fantasy is deprecated: NFL.com Fantasy has moved to "
+    "ESPN for the 2026 season.  Use nfl_predict.espn_fantasy instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -117,10 +94,21 @@ class NflFantasyClient:
         """
         Create a client from environment variables.
 
+        .. deprecated::
+            NFL.com Fantasy has moved to ESPN.  This client will likely
+            fail to authenticate.  Use ``EspnFantasyClient.from_env()``.
+
         Required: NFL_FANTASY_USERNAME, NFL_FANTASY_PASSWORD,
                   NFL_FANTASY_LEAGUE_ID
         Optional: NFL_FANTASY_TEAM_ID, NFL_FANTASY_LEAGUE_SIZE (default 12)
         """
+        warnings.warn(
+            "NflFantasyClient is deprecated: NFL.com Fantasy has moved to "
+            "ESPN for the 2026 season.  The NFL.com API is no longer "
+            "functional.  Use EspnFantasyClient instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         username = os.environ.get("NFL_FANTASY_USERNAME", "")
         password = os.environ.get("NFL_FANTASY_PASSWORD", "")
         league_id = os.environ.get("NFL_FANTASY_LEAGUE_ID", "")
