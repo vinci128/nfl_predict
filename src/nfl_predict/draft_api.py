@@ -191,6 +191,7 @@ async def draft_setup(request: Request):
         "draft_setup.html",
         {
             "request": request,
+            "active_tab": "Draft",
             "boards": boards,
             "session_active": _state_exists(),
         },
@@ -239,7 +240,9 @@ async def draft_board_page(request: Request, pos: str = "ALL"):
     ctx["board_rows"] = _board_rows(state, pos)
     ctx["pos_filter"] = pos
     ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
-    return templates.TemplateResponse("draft_board.html", {"request": request, **ctx})
+    return templates.TemplateResponse(
+        "draft_board.html", {"request": request, "active_tab": "Draft", **ctx}
+    )
 
 
 # ---------------------------------------------------------------------------

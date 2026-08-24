@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NFL Draft Assistant — Setup</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center p-6">
+{% extends "base.html" %}
+
+{% block title %}NFL Draft Assistant — Setup{% endblock %}
+{% block body_class %}min-h-screen flex flex-col{% endblock %}
+
+{% block content %}
+<main class="flex-1 flex items-center justify-center p-6">
   <div class="w-full max-w-lg space-y-6">
 
     <!-- Header -->
@@ -90,12 +88,6 @@
     </div>
 
     <!-- Footer links -->
-    <div class="text-center text-sm text-gray-600 space-x-4">
-      <a href="/docs" class="hover:text-gray-400">API docs</a>
-      <span>·</span>
-      <a href="/weekly" class="hover:text-gray-400">Weekly lineups</a>
-    </div>
-
   </div>
-</body>
-</html>
+</main>
+{% endblock %}

@@ -1,12 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ team_name }} — Week {{ week }}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-950 text-gray-100 min-h-screen p-6">
+{% extends "base.html" %}
+
+{% block title %}{{ team_name }} — Week {{ week }}{% endblock %}
+
+{% block content %}
+<main class="flex-1 p-6">
   <div class="max-w-3xl mx-auto space-y-6">
 
     <div class="flex items-center justify-between">
@@ -85,5 +82,5 @@ uv run nfl-predict predict --position K</pre>
 
     {% endif %}
   </div>
-</body>
-</html>
+</main>
+{% endblock %}

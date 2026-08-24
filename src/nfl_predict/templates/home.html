@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}nfl-predict{% endblock %}
+
+{% block content %}
+<main class="flex-1 flex items-center justify-center p-6">
+  <div class="w-full max-w-2xl space-y-6">
+
+    <div class="text-center">
+      <h1 class="text-3xl font-bold text-green-400">🏈 nfl-predict</h1>
+      <p class="text-gray-400 mt-1">CatBoost projections for draft day and for every week after it</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+
+      <!-- Draft assistant -->
+      <a href="/draft"
+         class="group bg-gray-900 border border-gray-700 hover:border-green-600 rounded-xl p-5 space-y-3 transition">
+        <div class="flex items-baseline justify-between">
+          <h2 class="text-lg font-semibold text-gray-100 group-hover:text-green-400 transition">Draft</h2>
+          {% if session_active %}
+          <span class="text-xs bg-green-900 text-green-300 border border-green-700 rounded-full px-2 py-0.5">
+            in progress
+          </span>
+          {% endif %}
+        </div>
+        <p class="text-sm text-gray-400">
+          Season-total projections, VOR board and tiers, live pick tracking with ESPN sync.
+        </p>
+        <p class="text-xs text-gray-500">
+          {% if n_boards %}
+            {{ n_boards }} board{{ '' if n_boards == 1 else 's' }} ready
+            {%- if session_active %} · resume at pick {{ current_pick }}{% endif %}
+          {% else %}
+            No board yet — run <code class="bg-gray-800 px-1 rounded">nfl-predict board</code>
+          {% endif %}
+        </p>
+      </a>
+
+      <!-- Weekly lineups -->
+      <a href="/weekly"
+         class="group bg-gray-900 border border-gray-700 hover:border-green-600 rounded-xl p-5 space-y-3 transition">
+        <div class="flex items-baseline justify-between">
+          <h2 class="text-lg font-semibold text-gray-100 group-hover:text-green-400 transition">Weekly</h2>
+          {% if week %}
+          <span class="text-xs bg-gray-800 text-gray-300 border border-gray-600 rounded-full px-2 py-0.5">
+            week {{ week }}
+          </span>
+          {% endif %}
+        </div>
+        <p class="text-sm text-gray-400">
+          Optimal lineup and bench for each team in the league, from the weekly point forecasts.
+        </p>
+        <p class="text-xs text-gray-500">
+          {% if n_teams %}
+            {{ n_teams }} team{{ '' if n_teams == 1 else 's' }} configured
+            {%- if not has_predictions %} · no predictions yet{% endif %}
+          {% else %}
+            No rosters yet — add teams to <code class="bg-gray-800 px-1 rounded">data/league_rosters.json</code>
+          {% endif %}
+        </p>
+      </a>
+
+    </div>
+
+    <p class="text-center text-xs text-gray-600">
+      JSON endpoints and schema at <a href="/docs" class="hover:text-gray-400 underline">/docs</a>
+    </p>
+
+  </div>
+</main>
+{% endblock %}

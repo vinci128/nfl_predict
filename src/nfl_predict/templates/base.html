@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}nfl-predict{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="bg-gray-950 text-gray-100 {% block body_class %}min-h-screen flex flex-col{% endblock %}">
+
+  {#
+    Global navigation. Deliberately a <nav>, never a <header>: the draft board
+    swaps its own pick counter with hx-swap-oob="outerHTML:header", which
+    matches the first <header> in the document. A <header> here would be that
+    element, and every pick would replace the site nav with the board header.
+  #}
+  <nav id="app-nav"
+       class="bg-gray-900 border-b border-gray-800 px-4 py-1.5 flex items-center gap-1 text-sm shrink-0">
+    <a href="/" class="font-bold text-green-400 mr-3 hover:text-green-300 transition">🏈 nfl-predict</a>
+    {% set nav_items = [("/draft", "Draft"), ("/weekly", "Weekly"), ("/docs", "API")] %}
+    {% for href, label in nav_items %}
+    <a href="{{ href }}"
+       class="px-2.5 py-1 rounded transition
+              {% if active_tab == label %}bg-gray-800 text-green-400 font-medium{% else %}text-gray-400 hover:text-gray-200 hover:bg-gray-800{% endif %}">
+      {{ label }}
+    </a>
+    {% endfor %}
+    <span class="ml-auto text-xs text-gray-600">{% block nav_status %}{% endblock %}</span>
+  </nav>
+
+  {% block content %}{% endblock %}
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

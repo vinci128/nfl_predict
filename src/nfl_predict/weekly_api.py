@@ -156,6 +156,7 @@ async def weekly_setup(request: Request):
         "weekly_setup.html",
         {
             "request": request,
+            "active_tab": "Weekly",
             "team_names": sorted(rosters.keys()),
             "season": season,
             "week": week,
@@ -180,6 +181,7 @@ async def weekly_team(request: Request, team_name: str):
             "weekly_team.html",
             {
                 "request": request,
+                "active_tab": "Weekly",
                 "team_name": team_name,
                 "team_names": sorted(rosters.keys()),
                 "season": season,
@@ -207,6 +209,7 @@ async def weekly_team(request: Request, team_name: str):
         "weekly_team.html",
         {
             "request": request,
+            "active_tab": "Weekly",
             "team_name": team_name,
             "team_names": sorted(rosters.keys()),
             "season": season,
