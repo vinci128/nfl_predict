@@ -199,11 +199,71 @@ def assign_tiers(
 # ---------------------------------------------------------------------------
 
 
+def normalise_player_name(s: str) -> str:
+    """Lowercase, trim, and drop a generational suffix so names join reliably."""
+    import re
+
+    return re.sub(r"\s+(jr|sr|ii|iii|iv)\.?$", "", str(s).lower().strip())
+
+
+def load_exclusions(path: str | Path) -> list[str]:
+    """
+    Read an exclusion list: one player per line, gsis ID or full name.
+
+    Blank lines and ``#`` comments are ignored, so a keeper list can be kept
+    readable (``# Togliatti Racers`` above each team's block).
+    """
+    entries: list[str] = []
+    for line in Path(path).read_text().splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            entries.append(line)
+    return entries
+
+
+def apply_exclusions(
+    board: pd.DataFrame, exclude: list[str]
+) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Drop excluded players from the board.
+
+    Entries match either ``player_id`` (a gsis ID) exactly or ``player_name``
+    after normalisation. Returns the filtered board and the entries that
+    matched nothing — a keeper whose name is misspelled would otherwise stay
+    on the board and get recommended to you all draft.
+    """
+    if not exclude:
+        return board, []
+
+    ids = set(board["player_id"].astype(str)) if "player_id" in board.columns else set()
+    names = {normalise_player_name(n): n for n in board["player_name"]}
+
+    drop_ids: set[str] = set()
+    drop_names: set[str] = set()
+    unmatched: list[str] = []
+    for entry in exclude:
+        if entry in ids:
+            drop_ids.add(entry)
+        elif normalise_player_name(entry) in names:
+            drop_names.add(normalise_player_name(entry))
+        else:
+            unmatched.append(entry)
+
+    mask = pd.Series(False, index=board.index)
+    if drop_ids and "player_id" in board.columns:
+        mask |= board["player_id"].astype(str).isin(drop_ids)
+    if drop_names:
+        mask |= board["player_name"].map(normalise_player_name).isin(drop_names)
+
+    return board.loc[~mask].reset_index(drop=True), unmatched
+
+
 def build_draft_board(
     as_of_season: int,
     positions: list[str] | None = None,
     adp_path: str | None = None,
     settings: DraftSettings | None = None,
+    exclude: list[str] | None = None,
 ) -> pd.DataFrame:
     """
     Build the full draft board from per-position season projections.
@@ -214,6 +274,7 @@ def build_draft_board(
     positions    : positions to include (default: QB / RB / WR / TE / K)
     adp_path     : optional CSV path with ADP data (columns: player_name, adp)
     settings     : DraftSettings for VOR calculation
+    exclude      : players unavailable to draft (keepers), by gsis ID or name
 
     Returns
     -------
@@ -245,6 +306,18 @@ def build_draft_board(
     for col in ("proj_p10", "proj_p50", "proj_p90"):
         if col not in board.columns:
             board[col] = float("nan")
+
+    # Excluded players are removed *before* VOR, so replacement level is
+    # measured against the pool you can actually draft. In a keeper league
+    # that pool is materially shallower than the full player universe.
+    if exclude:
+        board, unmatched = apply_exclusions(board, exclude)
+        print(f"  Excluded {len(exclude) - len(unmatched)} players from the pool.")
+        if unmatched:
+            print(
+                f"  WARNING: {len(unmatched)} exclusion(s) matched nobody and are "
+                f"still on the board: {', '.join(unmatched)}"
+            )
 
     # VOR and tiers
     board = compute_vor(board, settings=settings)

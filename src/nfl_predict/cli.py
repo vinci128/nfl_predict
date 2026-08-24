@@ -276,12 +276,20 @@ def board(
     superflex: bool = typer.Option(
         False, help="Superflex league: sets --qb-scarcity 1.0 automatically."
     ),
+    exclude: str | None = typer.Option(
+        None,
+        help=(
+            "Path to a list of players who cannot be drafted (keepers): "
+            "one gsis ID or full name per line, # comments allowed."
+        ),
+    ),
 ) -> None:
     """Build and export the full fantasy draft board with VOR and tiers."""
     from nfl_predict.draft_board import (
         DraftSettings,
         build_draft_board,
         export_draft_board,
+        load_exclusions,
     )
     from nfl_predict.season_features import load_features
 
@@ -308,11 +316,16 @@ def board(
         },
     )
 
+    exclusions = load_exclusions(exclude) if exclude else None
+    if exclusions is not None:
+        print(f"Loaded {len(exclusions)} exclusions from {exclude}")
+
     draft_board = build_draft_board(
         as_of_season=season,
         positions=pos_list,
         adp_path=adp,
         settings=settings,
+        exclude=exclusions,
     )
 
     table_cols = [

@@ -309,3 +309,83 @@ class TestFetchAdpCli:
                 ["fetch-adp", "--source", "sleeper", "--no-fallback"],
             )
         assert result.exit_code == 1
+
+
+# ---------------------------------------------------------------------------
+# Keeper exclusions
+# ---------------------------------------------------------------------------
+
+
+class TestExclusions:
+    """
+    Keeper leagues take players off the board before the draft starts. An
+    exclusion that silently matches nobody is the dangerous case: the kept
+    player stays on the board and gets recommended all draft.
+    """
+
+    @pytest.fixture
+    def board(self):
+        import pandas as pd
+
+        return pd.DataFrame(
+            {
+                "player_id": ["00-0000001", "00-0000002", "00-0000003"],
+                "player_name": ["Bijan Robinson", "Ja'Marr Chase", "Josh Allen Jr."],
+                "position": ["RB", "WR", "QB"],
+            }
+        )
+
+    def test_excludes_by_name(self, board) -> None:
+        from nfl_predict.draft_board import apply_exclusions
+
+        out, unmatched = apply_exclusions(board, ["Bijan Robinson"])
+        assert list(out.player_name) == ["Ja'Marr Chase", "Josh Allen Jr."]
+        assert unmatched == []
+
+    def test_excludes_by_gsis_id(self, board) -> None:
+        from nfl_predict.draft_board import apply_exclusions
+
+        out, unmatched = apply_exclusions(board, ["00-0000002"])
+        assert "Ja'Marr Chase" not in list(out.player_name)
+        assert unmatched == []
+
+    def test_name_match_ignores_case_and_suffix(self, board) -> None:
+        from nfl_predict.draft_board import apply_exclusions
+
+        out, unmatched = apply_exclusions(board, ["josh allen"])
+        assert list(out.player_name) == ["Bijan Robinson", "Ja'Marr Chase"]
+        assert unmatched == []
+
+    def test_unmatched_entry_is_reported_not_swallowed(self, board) -> None:
+        from nfl_predict.draft_board import apply_exclusions
+
+        out, unmatched = apply_exclusions(board, ["Bijan Robinson", "Nonexistent Guy"])
+        assert unmatched == ["Nonexistent Guy"]
+        assert len(out) == 2
+
+    def test_empty_exclusions_leave_board_untouched(self, board) -> None:
+        from nfl_predict.draft_board import apply_exclusions
+
+        out, unmatched = apply_exclusions(board, [])
+        assert len(out) == 3
+        assert unmatched == []
+
+    def test_index_is_reset_after_dropping(self, board) -> None:
+        from nfl_predict.draft_board import apply_exclusions
+
+        out, _ = apply_exclusions(board, ["Bijan Robinson"])
+        assert list(out.index) == [0, 1]
+
+    def test_load_exclusions_skips_comments_and_blanks(self, tmp_path) -> None:
+        from nfl_predict.draft_board import load_exclusions
+
+        f = tmp_path / "keepers.txt"
+        f.write_text(
+            "# Togliatti Racers\nBijan Robinson\n\n"
+            "Ja'Marr Chase   # kept in round 2\n\n# Numana Hawks\n00-0000003\n"
+        )
+        assert load_exclusions(f) == [
+            "Bijan Robinson",
+            "Ja'Marr Chase",
+            "00-0000003",
+        ]

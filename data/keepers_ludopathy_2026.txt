@@ -1,0 +1,35 @@
+# Ludopathy Bowl 2026 — keepers (players who cannot be drafted)
+#
+# 6 keepers per team x 10 teams = 60 players. ESPN locks keepers one hour
+# before the draft; until then this file stays empty and the board shows the
+# full pool.
+#
+# One player per line: full name, or gsis ID for an exact match. Anything
+# after # is a comment. Names are matched case-insensitively and ignore a
+# Jr/Sr/II/III/IV suffix. `nfl-predict board` prints a WARNING for any line
+# that matches nobody — check that warning is empty before drafting.
+#
+# Rebuild the board after filling this in:
+#   uv run nfl-predict board --league-size 10 \
+#     --exclude data/keepers_ludopathy_2026.txt \
+#     --out outputs/draft_board_2026_ludopathy.csv
+
+# Alessandrino Gamblers
+
+# Gardenie Catsitters
+
+# Edera Owls
+
+# Numana Hawks
+
+# Ancona Snails
+
+# Campidano Cabalists
+
+# Montagnola Basilisks
+
+# Casalguidi Canaries
+
+# Togliatti Racers (mine)
+
+# Terracina pumos
