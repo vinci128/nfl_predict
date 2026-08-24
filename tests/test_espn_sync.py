@@ -1025,3 +1025,47 @@ class TestProviderSelection:
             c = make_client("auto")
         assert isinstance(c, EspnFantasyClient)
         assert c.league_id == "77"
+
+
+# ---------------------------------------------------------------------------
+# Sync banner
+# ---------------------------------------------------------------------------
+
+
+class TestSyncBanner:
+    """
+    The sync endpoint used to set sync_count/sync_errors on the template
+    context, but no template read them: a successful sync swapped the board
+    with no confirmation, and picks ESPN reported that we could not match
+    were dropped silently.
+    """
+
+    def test_reports_how_many_picks_landed(self) -> None:
+        from nfl_predict.draft_api import _sync_banner
+
+        message, tone = _sync_banner(3, [])
+        assert message == "Synced 3 picks from ESPN."
+        assert "blue" in tone
+
+    def test_singular_pick(self) -> None:
+        from nfl_predict.draft_api import _sync_banner
+
+        message, _ = _sync_banner(1, [])
+        assert message == "Synced 1 pick from ESPN."
+
+    def test_unmatched_players_are_named_and_warn(self) -> None:
+        from nfl_predict.draft_api import _sync_banner
+
+        message, tone = _sync_banner(2, ["Player 'X' not found in available board."])
+        assert "Synced 2 picks" in message
+        assert "1 not matched" in message
+        assert "Player 'X' not found" in message
+        assert "yellow" in tone
+
+    def test_all_picks_unmatched(self) -> None:
+        from nfl_predict.draft_api import _sync_banner
+
+        message, tone = _sync_banner(0, ["a failed", "b failed"])
+        assert "Synced 0 picks" in message
+        assert "2 not matched: a failed; b failed" in message
+        assert "yellow" in tone

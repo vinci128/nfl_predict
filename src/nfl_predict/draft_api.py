@@ -125,6 +125,19 @@ _BANNER_TONES = {
 }
 
 
+def _sync_banner(synced: int, errors: list[str]) -> tuple[str, str]:
+    """
+    Build the banner text and tone for a completed sync.
+
+    Unmatched players are named rather than counted: the user has to record
+    those picks by hand, so they need to know which ones.
+    """
+    message = f"Synced {synced} pick{'' if synced == 1 else 's'} from ESPN."
+    if errors:
+        message += f" {len(errors)} not matched: " + "; ".join(errors)
+    return message, _BANNER_TONES["warn" if errors else "info"]
+
+
 def _banner_response(
     request: Request,
     state: Any,
@@ -454,7 +467,11 @@ async def nfl_sync(request: Request, pos: str = Form("ALL")):
     ctx["pos_filter"] = pos
     ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
     ctx["request"] = request
-    ctx["sync_errors"] = errors
-    ctx["sync_count"] = len(new_picks) - len(errors)
+    # Rendered as an out-of-band banner by pick_response.html. Without this
+    # the board just changes under the user with no confirmation, and picks
+    # ESPN reported but we could not match are dropped in silence.
+    ctx["sync_message"], ctx["sync_tone_class"] = _sync_banner(
+        len(new_picks) - len(errors), errors
+    )
 
     return templates.TemplateResponse("partials/pick_response.html", ctx)

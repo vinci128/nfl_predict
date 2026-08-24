@@ -1,5 +1,11 @@
 {% include "partials/board_table.html" %}
 
+{# Sync banner. Always emitted so an ordinary pick clears a stale message. #}
+<div id="pick-error" hx-swap-oob="true"
+     class="{% if sync_message %}border px-4 py-2 rounded mb-2 {{ sync_tone_class }}{% endif %}">
+  {%- if sync_message %}{{ sync_message }}{% endif -%}
+</div>
+
 <div id="roster-panel" hx-swap-oob="innerHTML">
   {% include "partials/roster_panel.html" %}
 </div>
