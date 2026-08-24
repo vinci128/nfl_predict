@@ -219,7 +219,7 @@ class TestFetchAllPicks:
         assert picks[1]["pick_in_round"] == 2
 
     def test_no_player_id_field_in_pick(self, client: EspnFantasyClient) -> None:
-        """A pick with no playerId key at all -- should not crash."""
+        """A pick with no playerId key at all is an unmade slot -- skip it."""
         payload = {
             "draftDetail": {
                 "picks": [
@@ -229,8 +229,49 @@ class TestFetchAllPicks:
         }
         with patch.object(client, "_get", return_value=payload):
             picks = client.fetch_all_picks()
+        assert picks == []
+
+    def test_unmade_slots_are_skipped(self, client: EspnFantasyClient) -> None:
+        """
+        ESPN pre-seeds the whole slate once the draft is scheduled: unmade
+        slots carry playerId -1. Recording those would fill the local draft
+        state with phantom picks before anyone has drafted.
+        """
+        payload = {
+            "draftDetail": {
+                "picks": [
+                    {"teamId": 1, "playerId": 111, "roundId": 1, "roundPickNumber": 1},
+                    {"teamId": 2, "playerId": -1, "roundId": 1, "roundPickNumber": 2},
+                    {"teamId": 3, "playerId": -1, "roundId": 1, "roundPickNumber": 3},
+                ],
+            }
+        }
+        with patch.object(client, "_get", return_value=payload):
+            picks = client.fetch_all_picks()
         assert len(picks) == 1
-        assert picks[0]["player_id"] == ""
+        assert picks[0]["player_name"] == "Bijan Robinson"
+
+    def test_full_unstarted_slate_reads_as_no_picks(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """A scheduled but unstarted draft returns picks for every slot."""
+        payload = {
+            "draftDetail": {
+                "drafted": False,
+                "inProgress": False,
+                "picks": [
+                    {
+                        "teamId": (i % 12) + 1,
+                        "playerId": -1,
+                        "roundId": (i // 12) + 1,
+                        "roundPickNumber": (i % 12) + 1,
+                    }
+                    for i in range(180)
+                ],
+            }
+        }
+        with patch.object(client, "_get", return_value=payload):
+            assert client.fetch_all_picks() == []
 
     def test_empty_team_id(self, client: EspnFantasyClient) -> None:
         """A pick with no teamId -- should still record."""

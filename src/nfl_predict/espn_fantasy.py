@@ -299,6 +299,12 @@ class EspnFantasyClient:
         detail = data.get("draftDetail") or {}
         raw_picks: list[dict] = detail.get("picks") or []
 
+        # ESPN pre-seeds the entire pick slate as soon as the draft is
+        # scheduled: every unmade slot comes back with ``playerId: -1``. A
+        # sync run before or during the draft would otherwise record the
+        # whole remaining board as picks.
+        raw_picks = [p for p in raw_picks if int(p.get("playerId") or -1) > 0]
+
         if not raw_picks:
             return []
 
