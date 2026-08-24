@@ -1,0 +1,58 @@
+{#
+  Refresh panel. While a run is in flight this fragment polls itself and
+  replaces itself; once the run ends the poll trigger is gone, so the browser
+  stops asking.
+#}
+<div id="update-panel"
+     {% if status == "running" %}
+     hx-get="/weekly/update"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     {% endif %}
+     class="bg-gray-900 border rounded-xl p-4 space-y-3
+            {% if status == 'error' %}border-red-700{% elif status == 'running' %}border-blue-700{% else %}border-gray-700{% endif %}">
+
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h2 class="text-sm font-semibold text-gray-200">Data</h2>
+      <p class="text-xs text-gray-500">
+        {% if predictions_at %}
+          Predictions written {{ predictions_at | timeago }} · {{ n_prediction_files }} position{{ '' if n_prediction_files == 1 else 's' }}
+        {% else %}
+          No predictions yet
+        {% endif %}
+      </p>
+    </div>
+
+    {% if status == "running" %}
+    <span class="text-xs text-blue-300 flex items-center gap-2 shrink-0">
+      <span class="animate-pulse">⟳</span>
+      {{ step or "Working" }}{% if elapsed %} · {{ elapsed }}s{% endif %}
+    </span>
+    {% else %}
+    <form hx-post="/weekly/update" hx-target="#update-panel" hx-swap="outerHTML" class="shrink-0">
+      <button type="submit"
+              class="text-sm bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-green-600
+                     text-gray-200 px-3 py-1.5 rounded-lg transition">
+        Refresh data
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if status == "running" %}
+  <p class="text-xs text-gray-500">
+    Fetching stats, rebuilding features and scoring all five positions. This takes a few
+    minutes — you can leave the page, the run continues on the server.
+  </p>
+  {% elif status == "done" %}
+  <p class="text-xs text-green-400">
+    Refresh finished. <a href="/weekly" class="underline hover:text-green-300">Reload to see the new week</a>.
+  </p>
+  {% elif status == "error" %}
+  <p class="text-xs text-red-400">Refresh failed: {{ error }}</p>
+  <p class="text-xs text-gray-500">
+    Check the server log for the traceback, then try again.
+  </p>
+  {% endif %}
+</div>

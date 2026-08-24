@@ -10,11 +10,17 @@ Endpoints
 ---------
 GET  /weekly              - team picker page
 GET  /weekly/team/{team}  - lineup + bench for one team, current week
+POST /weekly/update       - start the data + prediction refresh
+GET  /weekly/update       - poll refresh progress (htmx partial)
 """
 
 from __future__ import annotations
 
 import json
+import threading
+import time
+import traceback
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -28,10 +34,131 @@ from nfl_predict.predict_week import get_default_season_and_week
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+
+def _timeago(ts: float | None) -> str:
+    """Render a unix timestamp as a short relative age (`4m ago`)."""
+    if not ts:
+        return "never"
+    secs = max(0, int(time.time() - ts))
+    if secs < 60:
+        return f"{secs}s ago"
+    if secs < 3600:
+        return f"{secs // 60}m ago"
+    if secs < 86400:
+        return f"{secs // 3600}h ago"
+    return f"{secs // 86400}d ago"
+
+
+templates.env.filters["timeago"] = _timeago
+
 ROSTERS_PATH = Path("data/league_rosters.json")
 OUT_DIR = Path("outputs")
 
 router = APIRouter(prefix="/weekly", tags=["weekly"])
+
+
+# ---------------------------------------------------------------------------
+# Data refresh
+# ---------------------------------------------------------------------------
+
+# Positions the weekly page needs a prediction file for.
+UPDATE_POSITIONS = ("QB", "RB", "WR", "TE", "K")
+
+# Progress of the refresh, shared between the worker thread and the pollers.
+# A refresh takes minutes, so the request that starts it cannot wait for it.
+_update_state: dict = {
+    "status": "idle",  # idle | running | done | error
+    "step": "",
+    "started_at": None,
+    "finished_at": None,
+    "error": None,
+}
+_update_lock = threading.Lock()
+
+
+def _update_steps() -> list[tuple[str, Callable[[], object]]]:
+    """
+    The refresh pipeline, as named steps.
+
+    Model training is deliberately absent: it is far slower than the rest and
+    the weekly page only needs current data scored by the existing models.
+    Retraining stays a CLI decision (`nfl-predict update-all`).
+    """
+    from nfl_predict import features, fetch_nfl_data, predict_week
+
+    steps: list[tuple[str, Callable[[], object]]] = [
+        ("Fetching NFL data", fetch_nfl_data.main),
+        ("Building features", features.build_player_week_features),
+    ]
+    for pos in UPDATE_POSITIONS:
+        steps.append(
+            (
+                f"Predicting {pos}",
+                lambda p=pos: predict_week.run_predictions(position=p),
+            )
+        )
+    return steps
+
+
+def _run_update(steps: list[tuple[str, Callable[[], object]]] | None = None) -> None:
+    """Run the refresh, recording progress in ``_update_state``."""
+    try:
+        for label, fn in steps if steps is not None else _update_steps():
+            with _update_lock:
+                _update_state["step"] = label
+            fn()
+        with _update_lock:
+            _update_state.update(
+                status="done", step="", finished_at=time.time(), error=None
+            )
+    except Exception as exc:  # noqa: BLE001 - surfaced to the page, not swallowed
+        traceback.print_exc()
+        with _update_lock:
+            _update_state.update(
+                status="error",
+                step="",
+                finished_at=time.time(),
+                error=f"{type(exc).__name__}: {exc}",
+            )
+
+
+def start_update(
+    steps: list[tuple[str, Callable[[], object]]] | None = None,
+) -> bool:
+    """
+    Start a refresh unless one is already running.
+
+    Returns True if this call started it. The guard matters: the pipeline
+    writes the same parquet and CSV files from every step, so two concurrent
+    runs would race on them.
+    """
+    with _update_lock:
+        if _update_state["status"] == "running":
+            return False
+        _update_state.update(
+            status="running",
+            step="Starting",
+            started_at=time.time(),
+            finished_at=None,
+            error=None,
+        )
+    threading.Thread(target=_run_update, args=(steps,), daemon=True).start()
+    return True
+
+
+def update_status() -> dict:
+    """Snapshot of the refresh state, plus when predictions were last written."""
+    with _update_lock:
+        state = dict(_update_state)
+
+    files = _latest_prediction_files()
+    state["predictions_at"] = max(f.stat().st_mtime for f in files) if files else None
+    state["n_prediction_files"] = len(files)
+    if state["started_at"] and state["status"] == "running":
+        state["elapsed"] = int(time.time() - state["started_at"])
+    else:
+        state["elapsed"] = None
+    return state
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +288,7 @@ async def weekly_setup(request: Request):
             "season": season,
             "week": week,
             "has_rosters": bool(rosters),
+            **update_status(),
         },
     )
 
@@ -221,3 +349,33 @@ async def weekly_team(request: Request, team_name: str):
             "unmatched": unmatched,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Data refresh endpoints
+# ---------------------------------------------------------------------------
+
+
+def _update_partial(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "partials/update_status.html",
+        {"request": request, **update_status()},
+    )
+
+
+@router.post("/update", response_class=HTMLResponse)
+async def weekly_update(request: Request):
+    """
+    Kick off the data + prediction refresh.
+
+    Returns the progress panel immediately; the work continues in a worker
+    thread and the panel polls itself until it finishes.
+    """
+    start_update()
+    return _update_partial(request)
+
+
+@router.get("/update", response_class=HTMLResponse)
+async def weekly_update_status(request: Request):
+    """Progress panel — polled by htmx while a refresh is running."""
+    return _update_partial(request)
