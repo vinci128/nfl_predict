@@ -41,6 +41,26 @@ _DEFAULT_ROSTER_TARGETS: dict[str, int] = {
     "K": 1,
 }
 
+# Hard roster caps.  A position at its cap is dropped from suggestions
+# entirely: cross-position VOR stops being meaningful once the starter pool
+# is drained (kicker scores cluster within a few points, so the best K sits
+# at its own replacement line while the RB/WR tails fall far below theirs),
+# and without a cap the panel recommends a second kicker over every skill
+# player on the board.
+_DEFAULT_ROSTER_CAPS: dict[str, int] = {
+    "QB": 3,
+    "RB": 8,
+    "WR": 8,
+    "TE": 3,
+    "K": 1,
+}
+
+# Per-position ceiling on how many players of one position a single
+# suggestion panel may show, for positions whose VOR is not comparable
+# across positions.  One kicker is a legitimate suggestion; five is the
+# collapse.
+_SUGGESTION_POS_LIMIT: dict[str, int] = {"K": 1}
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -283,6 +303,14 @@ def suggest_best_available(
     if avail.empty:
         return pd.DataFrame()
 
+    # Drop positions the roster has already filled to its cap.  Keep the
+    # unfiltered board if that would empty the panel.
+    full = saturated_positions(state)
+    if full and "position" in avail.columns:
+        trimmed = avail[~avail["position"].isin(full)]
+        if not trimmed.empty:
+            avail = trimmed
+
     display_cols = [
         c
         for c in (
@@ -314,7 +342,28 @@ def suggest_best_available(
     else:
         ordered = avail.sort_values("vor", ascending=False)
 
+    ordered = _apply_position_limits(ordered)
+
     return ordered[display_cols].head(n).reset_index(drop=True)
+
+
+def _apply_position_limits(ordered: pd.DataFrame) -> pd.DataFrame:
+    """
+    Trim positions listed in ``_SUGGESTION_POS_LIMIT`` to their ceiling.
+
+    ``ordered`` must already be in recommendation order; the highest-ranked
+    rows of a limited position are the ones kept.
+    """
+    if "position" not in ordered.columns or ordered.empty:
+        return ordered
+
+    limits = ordered["position"].map(_SUGGESTION_POS_LIMIT)
+    if limits.isna().all():
+        return ordered
+
+    rank_in_pos = ordered.groupby("position").cumcount()
+    keep = limits.isna() | (rank_in_pos < limits)
+    return ordered[keep]
 
 
 def analyse_roster_needs(state: DraftState) -> list[str]:
@@ -333,6 +382,20 @@ def analyse_roster_needs(state: DraftState) -> list[str]:
     # Sort by deficit (descending) so the most needed position comes first
     needs.sort(reverse=True)
     return [pos for _, pos in needs]
+
+
+def saturated_positions(state: DraftState) -> list[str]:
+    """
+    Positions the user's roster has filled to ``_DEFAULT_ROSTER_CAPS``.
+
+    These are excluded from suggestions: past the cap another player at that
+    position has no roster value, however his VOR ranks.
+    """
+    return [
+        pos
+        for pos, cap in _DEFAULT_ROSTER_CAPS.items()
+        if len(state.my_roster.get(pos, [])) >= cap
+    ]
 
 
 # ---------------------------------------------------------------------------

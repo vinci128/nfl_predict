@@ -191,6 +191,54 @@ class TestMarkDrafted:
             mark_drafted(state, "QB Player")  # matches QB Player 0..11
 
 
+def _make_board_with_kickers() -> pd.DataFrame:
+    """Late-draft board: kickers cluster at their replacement line (positive
+    VOR), every remaining skill player is far below his."""
+    rows = []
+    rank = 1
+    for i in range(3):
+        rows.append(
+            {
+                "overall_rank": rank,
+                "tier": 8,
+                "pos_rank": i + 1,
+                "pos_tier": 1,
+                "player_id": f"K{i}",
+                "player_name": f"K Player {i}",
+                "position": "K",
+                "team": "TM",
+                "proj_p10": 100.0,
+                "proj_p50": 125.0 - i,
+                "proj_p90": 140.0,
+                "vor": 0.6 - i * 0.3,
+                "replacement_baseline": 124.0,
+                "projected_season": 2026,
+            }
+        )
+        rank += 1
+    for i in range(6):
+        rows.append(
+            {
+                "overall_rank": rank,
+                "tier": 9,
+                "pos_rank": i + 1,
+                "pos_tier": 2,
+                "player_id": f"WR{i}",
+                "player_name": f"WR Player {i}",
+                "position": "WR",
+                "team": "TM",
+                "proj_p10": 40.0,
+                "proj_p50": 80.0 - i,
+                "proj_p90": 120.0,
+                "vor": -60.0 - i,
+                "replacement_baseline": 140.0,
+                "projected_season": 2026,
+            }
+        )
+        rank += 1
+    return pd.DataFrame(rows)
+
+
 # ---------------------------------------------------------------------------
 # suggest_best_available
 # ---------------------------------------------------------------------------
@@ -236,6 +284,36 @@ class TestSuggestBestAvailable:
         suggestions = suggest_best_available(state, needs=["WR"], n=3)
         # At least the top suggestion should be a WR (highest-VOR WR > highest-VOR RB in our data)
         assert suggestions.iloc[0]["position"] == "WR"
+
+    def test_capped_position_dropped_from_suggestions(self, tmp_path: Path) -> None:
+        """Once the K slot is filled, kickers must not be suggested again —
+        late in a draft the best remaining K sits at its own replacement line
+        while every skill player is far below theirs, so pure VOR order
+        recommends kickers forever."""
+        board = _make_board_with_kickers()
+        state = init_draft_state(board, state_path=tmp_path / "s.json")
+        state = mark_drafted(state, "K Player 0", drafter="me")
+        suggestions = suggest_best_available(
+            state, needs=analyse_roster_needs(state), n=5
+        )
+        assert "K" not in suggestions["position"].tolist()
+
+    def test_at_most_one_kicker_before_the_slot_is_filled(self, tmp_path: Path) -> None:
+        board = _make_board_with_kickers()
+        state = init_draft_state(board, state_path=tmp_path / "s.json")
+        suggestions = suggest_best_available(state, n=5)
+        assert (suggestions["position"] == "K").sum() == 1
+
+    def test_falls_back_to_full_board_when_all_positions_capped(
+        self, tmp_path: Path
+    ) -> None:
+        """A saturated roster must still get suggestions rather than a blank
+        panel."""
+        board = _make_board(n_qb=1, n_rb=0, n_wr=0)
+        state = init_draft_state(board, state_path=tmp_path / "s.json")
+        state.my_roster = {pos: ["x"] * 10 for pos in ("QB", "RB", "WR", "TE", "K")}
+        suggestions = suggest_best_available(state, n=5)
+        assert len(suggestions) == 1
 
     def test_empty_when_board_exhausted(self, tmp_path: Path) -> None:
         board = _make_board(n_qb=1, n_rb=0, n_wr=0)
