@@ -36,7 +36,10 @@ src/nfl_predict/
   draft_board.py       VOR calculation, tier assignment, CSV/JSON export
   draft_assistant.py   Live draft state — mark_drafted, undo, suggest, save/load JSON
   adp_fetch.py         ADP from Sleeper / FantasyPros / synthetic fallback
-  nfl_fantasy.py       NFL.com OAuth2 client — live draft pick polling
+  draft_queue.py       ESPN autodraft queue built from a board
+  espn_fantasy.py      ESPN API client — draft picks, rosters, box scores
+  nfl_fantasy.py       NFL.com OAuth2 client — DEPRECATED, folded into ESPN
+  draft_sync.py        Picks a live-sync provider (ESPN, or the legacy NFL one)
   leagues.py           League profiles — scoring rules, rosters, artifact paths
   dst.py               Team defence / special teams projections (shrinkage)
   draft_api.py         FastAPI router (/draft/*) with htmx partials
@@ -46,14 +49,21 @@ src/nfl_predict/
   cli.py               Typer CLI entry point (nfl-predict)
 
   templates/
+    base.html                  Shell: nav, league switcher
+    home.html                  Landing page
     draft_setup.html           Setup / landing page
     draft_board.html           Live draft board page
     partials/board_table.html  htmx swap target — available players table
     partials/pick_response.html OOB swap after each pick (board+roster+header)
     partials/roster_panel.html  My roster sidebar
     partials/suggestions.html   Best-available panel
+    partials/update_status.html Data-refresh progress panel
     weekly_setup.html          /weekly team picker
     weekly_team.html           /weekly per-team lineup view
+
+scripts/
+  compare_espn_clients.py  Diffs our ESPN client against the espn-api library
+  compare_features.py      Model MAE with and without the context features
 
 data/
   weekly_stats.parquet    Raw NFL weekly player stats
@@ -61,25 +71,36 @@ data/
   injuries.parquet        Weekly injury report
   schedules.parquet       Game schedules
   snap_counts.parquet     Snap count data
-  processed/
+  processed/{artifact_key}/
     player_week_features.parquet  Engineered features (roll windows, cumulative)
   adp_current.csv         Most recent ADP fetch
   team_stats.parquet      Team-level stats (the D/ST projection's only source)
   keepers_ludopathy_2026.txt  Ludopathy keeper list (excluded from the board)
 
 outputs/
-  draft_board_YYYY.csv    Current draft board (rebuilt each year)
-  draft_state.json        Live draft session state (persisted per pick)
+  draft_board_YYYY_{league}.csv  Current draft board (rebuilt each year)
+  draft_queue_YYYY_{league}.csv  ESPN autodraft queue, board order
+  draft_state_{league}.json      Live draft session state (persisted per pick)
 
 models/
   model_registry.json     Version registry
   {pos}_season_{target}_{q}.cbm       Trained season models + _meta.json sidecars
 
-tests/
-  test_bugs.py            Regression tests (9 tests)
-  test_draft_phase1.py    season_features, season_model, draft_board (60 tests)
-  test_draft_phase2.py    draft_assistant (34 tests)
-  test_draft_phase3.py    adp_fetch, CLI (25 tests)
+tests/                                                    525 tests total
+  test_bugs.py              Regression tests for fixed defects (16)
+  test_draft_phase1.py      season_features, season_model, draft_board (60)
+  test_draft_phase2.py      draft_assistant (37)
+  test_draft_phase3.py      adp_fetch, CLI (32)
+  test_leagues.py           Scoring rules verified against ESPN, per league (84)
+  test_espn_sync.py         ESPN client: picks, rosters, box scores (156)
+  test_espn_login.py        Cookie storage, without echoing them (13)
+  test_dst.py               Team defence shrinkage projection (21)
+  test_draft_queue.py       Autodraft queue depth and ordering (16)
+  test_projection_sanity.py Properties every league's board must hold (31)
+  test_league_switcher.py   Per-request league from a cookie (15)
+  test_draft_api_league.py  Web UI acts on the right league's session (14)
+  test_draft_cli_league.py  CLI acts on the right league's session (9)
+  test_weekly_update.py     Background data refresh (21)
 ```
 
 ---
@@ -308,11 +329,9 @@ pool's best are gone, so replacement level moves a long way.
 
 ### At the venue
 ```bash
-export NFL_PREDICT_LEAGUE=hoh
-# Only needed for a private league — Hell or Highwater is public,
-# Ludopathy is not. Copy from a logged-in browser; these expire.
-export ESPN_S2=...
-export ESPN_SWID=...
+# Private leagues need cookies. Hell or Highwater is public; Ludopathy and
+# Royal Rumble are not. Prompts without echoing and checks all three.
+uv run nfl-predict espn-login
 
 uvicorn nfl_predict.api:app --host 0.0.0.0 --port 8000
 # Open http://localhost:8000/draft in browser
@@ -322,9 +341,25 @@ uvicorn nfl_predict.api:app --host 0.0.0.0 --port 8000
 uv run nfl-predict nfl-sync --league hoh --interval 30
 ```
 
+Pick the league from the **nav dropdown**, not an environment variable. The
+active league is a per-request cookie, so one server can run two drafts at once
+in two browser profiles and each keeps its own session file. `NFL_PREDICT_LEAGUE`
+still works and is what the CLI reads.
+
+Load the **autodraft queue** into ESPN before the clock starts, so a pick you
+miss still follows the board:
+
+```bash
+uv run nfl-predict queue --league hoh    # then paste the order into ESPN's Pick Queue
+```
+
+Verified against a live practice draft: ESPN drafts from the queue before
+falling back to its own rankings.
+
 ### During the draft
 - Type a player name (or substring) and press Enter to record an opponent pick
-- Toggle **Mine** checkbox before submitting for your own picks
+- Toggle **Opponent/Mine** before submitting for your own picks; it resets to
+  Opponent after each pick, since most picks are not yours
 - Click a row's **Fill** or **Mine** button to pre-fill the input (also sets player_id for exact match)
 - Click **↩ Undo** to reverse the last pick (any miskey)
 - Use position filter tabs to narrow the board — they follow the league, so
@@ -358,6 +393,15 @@ A season total conflates *how good a player is* with *how much of him you get*. 
 | `games_played_next` | `proj_games_p50` | availability |
 
 A player who missed time now reads as "elite rate, low games" rather than one deflated number — e.g. Dak Prescott (8 games in 2024) projects 29.6 ppg over 11.7 games.
+
+**The three quantiles are separate models and can cross.** Nothing constrains
+p10 <= p50 <= p90, so on a player the fits disagree about they invert — Davante
+Adams came out with a p90 below his p50 while ranking inside the top 30 on
+every board, which the UI renders as a ceiling lower than the median.
+`season_model._enforce_quantile_order` clamps the band around the median rather
+than sorting all three: p50 is what VOR ranks on and the only quantile with
+walk-forward validation behind it, so re-ranking players on the say-so of the
+least reliable model would be the worse trade.
 
 **These columns do not multiply back to `proj_p50`.** The product overstates the total in ~80% of rows (median ~10%): the rate model answers "when he plays", and players who miss time also score less while hurt. The total is modelled directly rather than derived, because the median of a product is not the product of the medians — multiplying component medians measurably worsened QB MAE.
 
