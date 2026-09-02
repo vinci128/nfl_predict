@@ -666,7 +666,7 @@ def nfl_sync_cmd(
       Optionally ESPN_TEAM_ID to identify your own picks as 'mine'.
 
     Run this in a separate terminal while the UI is open — it updates
-    the same draft_state.json that the web UI reads.
+    the same per-league draft state that the web UI reads.
     """
     from nfl_predict.draft_assistant import (
         load_state,

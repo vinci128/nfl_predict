@@ -39,8 +39,8 @@ from nfl_predict.draft_assistant import (
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-STATE_PATH = Path("outputs/draft_state.json")
 BOARDS_GLOB = "outputs/draft_board_*.csv"
+STATES_GLOB = "outputs/draft_state_*.json"
 
 router = APIRouter(prefix="/draft", tags=["draft"])
 
@@ -50,17 +50,45 @@ router = APIRouter(prefix="/draft", tags=["draft"])
 # ---------------------------------------------------------------------------
 
 
+def _state_path(league: str | None = None) -> Path:
+    """Where a league's draft session lives.
+
+    The same path the CLI uses, so `nfl-sync` in a second terminal writes the
+    session this UI is reading. A hardcoded path here meant the two wrote to
+    different files and picks pulled from ESPN never reached the browser.
+    """
+    from nfl_predict.leagues import get_profile
+
+    return get_profile(league).state_path
+
+
+def _active_state_path() -> Path:
+    """The session this UI should act on.
+
+    Normally the active league's, which is what the draft-day workflow sets.
+    A session started from another league's board is still found, because the
+    board picker offers every board regardless of the active league.
+    """
+    active = _state_path()
+    if active.exists():
+        return active
+
+    existing = sorted(glob.glob(STATES_GLOB))
+    return Path(existing[0]) if len(existing) == 1 else active
+
+
 def _state_exists() -> bool:
-    return STATE_PATH.exists()
+    return _active_state_path().exists()
 
 
 def _load_or_404():
-    if not _state_exists():
+    path = _active_state_path()
+    if not path.exists():
         raise HTTPException(
             status_code=404,
             detail="No active draft session. Go to /draft to start one.",
         )
-    return load_state(STATE_PATH)
+    return load_state(path)
 
 
 def _available_boards() -> list[str]:
@@ -213,14 +241,33 @@ def _board_rows(state: Any, position_filter: str = "ALL") -> list[dict]:
 
 @router.get("", response_class=HTMLResponse)
 async def draft_setup(request: Request):
-    """Setup / landing page."""
+    """Setup / landing page.
+
+    Defaults come from the active league profile rather than fixed values —
+    neither league has 12 teams, so a hardcoded default was wrong for both and
+    would have thrown the snake order off from the first pick.
+    """
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile()
     boards = _available_boards()
+
+    # Preselect this league's board, so the picker opens on the one the rest
+    # of the page is describing.
+    selected = next(
+        (b for b in boards if _board_league(b) == profile.key),
+        boards[-1] if boards else "",
+    )
+
     return templates.TemplateResponse(
         "draft_setup.html",
         {
             "request": request,
             "active_tab": "Draft",
             "boards": boards,
+            "selected_board": selected,
+            "league_name": profile.name,
+            "league_size": profile.roster.league_size,
             "session_active": _state_exists(),
         },
     )
@@ -234,24 +281,31 @@ async def draft_setup(request: Request):
 @router.post("/start")
 async def draft_start(
     board_path: str = Form(...),
-    league_size: int = Form(12),
+    league_size: int | None = Form(None),
     draft_position: int = Form(1),
 ):
     """Initialise a new draft session from a board CSV."""
+    from nfl_predict.leagues import get_profile
+
     # Only accept boards from the known outputs/ glob — the path arrives from
     # a form field, so don't let it read arbitrary files on the server.
     if board_path not in _available_boards():
         raise HTTPException(status_code=400, detail=f"Board not found: {board_path}")
 
+    league = _board_league(board_path)
+    if not league_size or league_size < 2:
+        league_size = get_profile(league).roster.league_size
+
+    state_path = _state_path(league)
     board = pd.read_csv(Path(board_path))
     state = init_draft_state(
         board,
         league_size=league_size,
         draft_position=draft_position,
-        state_path=STATE_PATH,
-        league=_board_league(board_path),
+        state_path=state_path,
+        league=league,
     )
-    with state_lock(STATE_PATH):
+    with state_lock(state_path):
         save_state(state)
     return RedirectResponse(url="/draft/board", status_code=303)
 
@@ -337,7 +391,7 @@ async def draft_pick(
     player_id: str = Form(""),
 ):
     """Record a pick and return the refreshed board + roster partials."""
-    with state_lock(STATE_PATH):
+    with state_lock(_active_state_path()):
         state = _load_or_404()
 
         try:
@@ -369,8 +423,9 @@ async def draft_pick(
 
 @router.post("/reset")
 async def draft_reset():
-    if STATE_PATH.exists():
-        STATE_PATH.unlink()
+    path = _active_state_path()
+    if path.exists():
+        path.unlink()
     return RedirectResponse(url="/draft", status_code=303)
 
 
@@ -382,7 +437,7 @@ async def draft_reset():
 @router.post("/undo", response_class=HTMLResponse)
 async def draft_undo(request: Request, pos: str = Form("ALL")):
     """Reverse the last recorded pick."""
-    with state_lock(STATE_PATH):
+    with state_lock(_active_state_path()):
         state = _load_or_404()
 
         if not state.picks:
@@ -415,7 +470,7 @@ async def autocomplete(q: str = Query(default="")):
     """
     if not _state_exists() or not q:
         return HTMLResponse("")
-    state = load_state(STATE_PATH)
+    state = load_state(_active_state_path())
     avail = state.available
     names = avail["player_name"]
     # regex=False: user keystrokes like '(' or '.' must not be treated as regex
@@ -474,7 +529,7 @@ async def nfl_sync(request: Request, pos: str = Form("ALL")):
         )
 
     errors: list[str] = []
-    with state_lock(STATE_PATH):
+    with state_lock(_active_state_path()):
         # Re-load under the lock: nfl-sync (CLI) may have recorded picks between
         # our fetch and now — skip any that were already applied.
         state = _load_or_404()

@@ -27,6 +27,7 @@
     <!-- Setup form -->
     <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 space-y-5">
       <h2 class="text-lg font-semibold text-gray-200">New Draft Session</h2>
+      <p class="text-xs text-gray-500 -mt-3">{{ league_name }} &middot; {{ league_size }} teams</p>
 
       <form action="/draft/start" method="post" class="space-y-4">
 
@@ -37,7 +38,7 @@
           <select name="board_path"
                   class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
             {% for b in boards | reverse %}
-            <option value="{{ b }}">{{ b | replace('outputs/', '') }}</option>
+            <option value="{{ b }}" {% if b == selected_board %}selected{% endif %}>{{ b | replace('outputs/', '') }}</option>
             {% endfor %}
           </select>
           <p class="text-xs text-gray-500 mt-1">
@@ -60,13 +61,13 @@
             <select name="league_size"
                     class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
               {% for n in [8, 10, 12, 14, 16] %}
-              <option value="{{ n }}" {% if n == 12 %}selected{% endif %}>{{ n }} teams</option>
+              <option value="{{ n }}" {% if n == league_size %}selected{% endif %}>{{ n }} teams</option>
               {% endfor %}
             </select>
           </div>
           <div>
             <label class="block text-sm text-gray-400 mb-1">My Draft Position</label>
-            <input type="number" name="draft_position" value="1" min="1" max="16"
+            <input type="number" name="draft_position" value="1" min="1" max="{{ league_size }}"
                    class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
           </div>
         </div>

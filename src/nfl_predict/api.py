@@ -93,10 +93,10 @@ def read_index(request: Request):
     current_pick = None
     if _state_exists():
         try:
-            from nfl_predict.draft_api import STATE_PATH
+            from nfl_predict.draft_api import _active_state_path
             from nfl_predict.draft_assistant import load_state
 
-            current_pick = load_state(STATE_PATH).current_pick
+            current_pick = load_state(_active_state_path()).current_pick
         except Exception:
             # A corrupt or half-written state file must not take down the
             # landing page — the draft card just loses its pick number.
