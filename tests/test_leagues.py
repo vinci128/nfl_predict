@@ -34,8 +34,8 @@ def frame(**cols) -> pd.DataFrame:
 
 
 class TestProfileResolution:
-    def test_both_leagues_are_configured(self) -> None:
-        assert set(league_keys()) == {"ludopathy", "hoh"}
+    def test_every_league_is_configured(self) -> None:
+        assert set(league_keys()) == {"ludopathy", "hoh", "rumble"}
 
     def test_default_is_ludopathy(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("NFL_PREDICT_LEAGUE", raising=False)
@@ -369,3 +369,58 @@ class TestFantasyPositionMapping:
 
     def test_mapping_is_case_and_space_insensitive(self) -> None:
         assert fantasy_position("  de ") == "DL"
+
+
+class TestRoyalRumbleScoring:
+    """
+    Verified against ESPN's settings page on 2026-09-02. Royal Rumble runs
+    ESPN's default PPR, identical to Hell or Highwater, so the two share one
+    rule set — these tests exist to catch that sharing being broken by a
+    change meant for only one of them.
+    """
+
+    profile = PROFILES["rumble"]
+    scoring = profile.scoring
+
+    def test_scoring_is_identical_to_hell_or_highwater(self) -> None:
+        assert self.scoring is PROFILES["hoh"].scoring
+        assert self.profile.dst_scoring is PROFILES["hoh"].dst_scoring
+
+    def test_passing_is_four_hundredths_a_yard(self) -> None:
+        # 300 yards, 2 TD, 1 INT -> 12 + 8 - 2
+        df = frame(passing_yards=300, passing_tds=2, passing_interceptions=1)
+        assert self.scoring.score(df).iloc[0] == pytest.approx(18.0)
+
+    def test_full_point_per_reception(self) -> None:
+        assert self.scoring.score(frame(receptions=6)).iloc[0] == pytest.approx(6.0)
+
+    def test_no_game_bonuses(self) -> None:
+        """Unlike Ludopathy, a 400-yard game is worth no more than the yards."""
+        assert self.scoring.bonuses == ()
+
+    def test_eight_teams_is_the_shallowest_league(self) -> None:
+        sizes = {
+            k: PROFILES[k].roster.league_size for k in ("rumble", "hoh", "ludopathy")
+        }
+        assert sizes["rumble"] == 8
+        assert sizes["rumble"] < sizes["ludopathy"] < sizes["hoh"]
+
+    def test_starters_fill_nine_of_fourteen_spots(self) -> None:
+        r = self.profile.roster
+        assert sum(r.starters.values()) + r.flex_spots == 9
+        assert sum(r.starters.values()) + r.flex_spots + r.bench == r.roster_size
+
+    def test_roster_targets_fill_the_roster_exactly(self) -> None:
+        """A draft that hits every target ends with no empty spot and no overflow."""
+        assert (
+            sum(self.profile.roster_targets.values()) == self.profile.roster.roster_size
+        )
+
+    def test_it_starts_a_defence_not_idps(self) -> None:
+        assert "DST" in self.profile.roster.positions
+        assert "LB" not in self.profile.roster.positions
+
+    def test_artifacts_are_namespaced_away_from_the_other_leagues(self) -> None:
+        assert self.profile.features_path != PROFILES["hoh"].features_path
+        assert self.profile.state_path != PROFILES["hoh"].state_path
+        assert "rumble" in str(self.profile.board_path(2026))

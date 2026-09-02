@@ -11,10 +11,10 @@ This file gives Claude Code the context needed to work effectively in this repo.
 
 The stack: Python 3.12, CatBoost, pandas, FastAPI + htmx, Typer CLI, nflreadpy for data.
 
-It serves **two real ESPN leagues with incompatible rules**. Everything that
-depends on scoring — feature tables, models, boards, draft state — is
-namespaced by league. See "Leagues" below; run `nfl-predict leagues` for the
-current configuration.
+It serves **three real ESPN leagues**, two of which have incompatible rules.
+Everything that depends on scoring — feature tables, models, boards, draft
+state — is namespaced by league. See "Leagues" below; run `nfl-predict leagues`
+for the current configuration.
 
 ---
 
@@ -134,18 +134,29 @@ configuration, ESPN ids, keeper settings, and the artifact paths its outputs
 live under. **Scoring is data, not code** — `ScoringRules` is applied by
 `add_custom_league_points`, which no longer hardcodes any values.
 
-| | **Ludopathy Bowl** (`ludopathy`) | **Hell or Highwater** (`hoh`) |
-|---|---|---|
-| Teams / roster | 10 / 21 (9 bench, 3 IR) | 14 / 16 (7 bench, 3 IR) |
-| Starters | QB1 RB2 WR2 TE1 FLEX1 **LB3 DL1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
-| Passing yards | **1 pt / 10 yds** (floored) | **0.04 / yd** |
-| Field goals | 3 / 3 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed |
-| 2-pt conversions | 2 (pass, rush) | 2 |
-| Interception thrown | **−4** | −2 |
-| Sack taken (QB) | **−0.5** | not scored |
-| Game bonuses | 400 pass, 100/200 rush, 100/200 rec | none |
-| Keepers | **6 per team** | none |
-| ESPN league id | 1773102615 | 581348581 |
+| | **Ludopathy Bowl** (`ludopathy`) | **Hell or Highwater** (`hoh`) | **Royal Rumble** (`rumble`) |
+|---|---|---|---|
+| Teams / roster | 10 / 21 (9 bench, 3 IR) | 14 / 16 (7 bench, 3 IR) | 8 / 14 (5 bench, 1 IR) |
+| Starters | QB1 RB2 WR2 TE1 FLEX1 **LB3 DL1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
+| Passing yards | **1 pt / 10 yds** (floored) | **0.04 / yd** | 0.04 / yd |
+| Field goals | 3 / 3 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed |
+| 2-pt conversions | 2 (pass, rush) | 2 | 2 |
+| Interception thrown | **−4** | −2 | −2 |
+| Sack taken (QB) | **−0.5** | not scored | not scored |
+| Game bonuses | 400 pass, 100/200 rush, 100/200 rec | none | none |
+| Keepers | **6 per team** | none | none |
+| ESPN league id | 1773102615 | 581348581 | 1546288813 |
+| Private? | yes (needs cookies) | **no** | yes (needs cookies) |
+
+**Hell or Highwater and Royal Rumble run identical scoring** — ESPN's default
+PPR, verified category by category against both settings pages. They share one
+`ScoringRules` instance (`_ESPN_PPR_SCORING`), so a change meant for one would
+silently move the other; `TestRoyalRumbleScoring` asserts the sharing.
+
+What separates them is size. At 8 teams Royal Rumble has by far the deepest
+available pool, so replacement level is high and VOR gaps are much smaller —
+Chase Brown is worth 142 VOR in the 14-team league and 88 in the 8-team one,
+and kickers and defences come off the board ~26 picks earlier.
 
 Consequence: elite QB season totals of 500–750 are correct for Ludopathy and
 wrong for Hell or Highwater, where the same season lands near 300–430. A model

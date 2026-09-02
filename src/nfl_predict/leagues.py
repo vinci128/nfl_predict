@@ -386,7 +386,10 @@ _LUDOPATHY_SCORING = ScoringRules(
 # Scoring: Hell or Highwater
 # ---------------------------------------------------------------------------
 
-_HOH_SCORING = ScoringRules(
+# ESPN's out-of-the-box PPR scoring, unmodified. Hell or Highwater and Royal
+# Rumble both run it, verified category by category against each league's
+# settings page — so they share these rules rather than restating them.
+_ESPN_PPR_SCORING = ScoringRules(
     per_unit={
         "passing_yards": 0.04,
         "passing_tds": 4.0,
@@ -423,7 +426,7 @@ _HOH_SCORING = ScoringRules(
 # one. Both points-allowed and yards-allowed ladders are ordinary threshold
 # bands, so they need no special machinery.
 
-_HOH_DST_SCORING = ScoringRules(
+_ESPN_PPR_DST_SCORING = ScoringRules(
     per_unit={
         "def_sacks": 1.0,
         "def_interceptions": 2.0,
@@ -510,7 +513,7 @@ HELL_OR_HIGHWATER = LeagueProfile(
     key="hoh",
     name="Hell or Highwater",
     season=2026,
-    scoring=_HOH_SCORING,
+    scoring=_ESPN_PPR_SCORING,
     roster=RosterConfig(
         league_size=14,
         roster_size=16,
@@ -536,7 +539,7 @@ HELL_OR_HIGHWATER = LeagueProfile(
     },
     espn_league_id="581348581",
     espn_team_id="9",
-    dst_scoring=_HOH_DST_SCORING,
+    dst_scoring=_ESPN_PPR_DST_SCORING,
     # 16 roster spots: 2+5+5+2+1+1.
     roster_targets={"QB": 2, "RB": 5, "WR": 5, "TE": 2, "DST": 1, "K": 1},
     roster_caps={"QB": 4, "RB": 8, "WR": 8, "TE": 3, "DST": 1, "K": 1},
@@ -550,7 +553,55 @@ HELL_OR_HIGHWATER = LeagueProfile(
     ),
 )
 
-PROFILES: dict[str, LeagueProfile] = {p.key: p for p in (LUDOPATHY, HELL_OR_HIGHWATER)}
+ROYAL_RUMBLE = LeagueProfile(
+    key="rumble",
+    name="Royal Rumble",
+    season=2026,
+    # Identical to Hell or Highwater, category for category.
+    scoring=_ESPN_PPR_SCORING,
+    dst_scoring=_ESPN_PPR_DST_SCORING,
+    roster=RosterConfig(
+        league_size=8,
+        roster_size=14,
+        starters={
+            "QB": 1,
+            "RB": 2,
+            "WR": 2,
+            "TE": 1,
+            "DST": 1,
+            "K": 1,
+        },
+        bench=5,
+        ir=1,
+        flex_spots=1,
+    ),
+    positional_scarcity={
+        "QB": 0.7,
+        "RB": 1.0,
+        "WR": 1.0,
+        "TE": 0.85,
+        "DST": 0.5,
+        "K": 0.5,
+    },
+    espn_league_id="1546288813",
+    espn_team_id="12",
+    # 14 roster spots: 2+4+4+2+1+1.
+    roster_targets={"QB": 2, "RB": 4, "WR": 4, "TE": 2, "DST": 1, "K": 1},
+    # ESPN's own per-position maximums.
+    roster_caps={"QB": 4, "RB": 8, "WR": 8, "TE": 3, "DST": 3, "K": 3},
+    suggestion_limits={"K": 1, "DST": 1},
+    notes=(
+        "Same scoring as Hell or Highwater, but 8 teams to its 14: the "
+        "player pool is deep, replacement level is high, and VOR gaps at the "
+        "top matter far less than they do in the 14-team league.",
+        "14-man rosters and only 5 bench spots — there is little room to stash upside.",
+        "Waivers are a 1000-unit continuous free-agent budget, not priority.",
+    ),
+)
+
+PROFILES: dict[str, LeagueProfile] = {
+    p.key: p for p in (LUDOPATHY, HELL_OR_HIGHWATER, ROYAL_RUMBLE)
+}
 
 # Used when no league is named. Ludopathy is the league this repo's scoring was
 # originally written for, so it keeps historical behaviour the default.
@@ -561,6 +612,8 @@ _ALIASES = {
     "ludopathybowl": "ludopathy",
     "hell_or_highwater": "hoh",
     "hellorhighwater": "hoh",
+    "royal_rumble": "rumble",
+    "royalrumble": "rumble",
 }
 
 

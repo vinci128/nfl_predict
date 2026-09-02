@@ -76,6 +76,7 @@ class TestActiveLeagueContext:
         assert dict(nav["options"]) == {
             "ludopathy": "Ludopathy Bowl",
             "hoh": "Hell or Highwater",
+            "rumble": "Royal Rumble",
         }
 
 
@@ -132,10 +133,14 @@ class TestCookieDrivesThePage:
 
     def test_league_size_follows_the_cookie(self, client) -> None:
         client.cookies.set("league", "hoh")
-        assert '<option value="14" selected>14 teams</option>' in client.get("/draft").text
+        assert (
+            '<option value="14" selected>14 teams</option>' in client.get("/draft").text
+        )
 
         client.cookies.set("league", "ludopathy")
-        assert '<option value="10" selected>10 teams</option>' in client.get("/draft").text
+        assert (
+            '<option value="10" selected>10 teams</option>' in client.get("/draft").text
+        )
 
     def test_the_cookie_does_not_leak_between_requests(self, client) -> None:
         """One viewer on hoh must not change what another viewer sees."""
