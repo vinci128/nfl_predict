@@ -185,3 +185,33 @@ def _client():
     from nfl_predict.api import app
 
     return TestClient(app)
+
+
+class TestNoLeakedScripts:
+    """
+    htmx cannot execute a <script> delivered by an out-of-band swap: it appends
+    the element's text to the body instead. pick_response.html carried one, so
+    after every pick the JavaScript source rendered as visible text under the
+    board. draft_board.html already does the same work on htmx:afterSettle.
+    """
+
+    @staticmethod
+    def _partials() -> list[Path]:
+        root = Path(__file__).parent.parent / "src/nfl_predict/templates/partials"
+        return sorted(root.glob("*.html"))
+
+    def test_no_partial_ships_a_script_tag(self) -> None:
+        offenders = [p.name for p in self._partials() if "<script" in p.read_text()]
+        assert offenders == [], (
+            f"htmx swaps these in as text, not code: {offenders}. "
+            "Put the behaviour in draft_board.html's htmx:afterSettle handler."
+        )
+
+    def test_the_board_still_refocuses_and_rechecks_sync(self) -> None:
+        """Deleting the partial's script is only safe because this exists."""
+        board = (
+            Path(__file__).parent.parent / "src/nfl_predict/templates/draft_board.html"
+        ).read_text()
+        assert "htmx:afterSettle" in board
+        assert "nfl-sync-status" in board
+        assert "player-input" in board

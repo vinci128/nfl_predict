@@ -87,16 +87,10 @@
   {% endfor %}
 </div>
 
-<script hx-swap-oob="beforeend:body">
-  // Re-check NFL sync availability after each swap (button may have been re-rendered hidden)
-  fetch('/draft/nfl-sync-status')
-    .then(r => r.json())
-    .then(d => {
-      const btn = document.getElementById('nfl-sync-btn');
-      if (btn && d.available) btn.classList.remove('hidden');
-    })
-    .catch(() => {});
-  // Return focus to the player input
-  const inp = document.getElementById('player-input');
-  if (inp) inp.focus();
-</script>
+{#
+  No inline JavaScript here. htmx cannot execute a script element delivered by
+  an out-of-band swap -- it appends the element's text to the body, so the
+  source rendered as visible junk under the board after every pick.
+  draft_board.html already refocuses the input and re-checks the sync button on
+  htmx:afterSettle, which fires for this response too.
+#}

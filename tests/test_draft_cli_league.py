@@ -56,7 +56,15 @@ def _start(league: str, workdir: Path):
     _board().to_csv(workdir / board, index=False)
     return runner.invoke(
         app,
-        ["draft-start", "--league", league, "--board-path", board, "--draft-position", "1"],
+        [
+            "draft-start",
+            "--league",
+            league,
+            "--board-path",
+            board,
+            "--draft-position",
+            "1",
+        ],
     )
 
 
@@ -129,9 +137,12 @@ class TestMineFlag:
 
     def test_mine_and_drafter_agree(self, workdir: Path) -> None:
         _start("hoh", workdir)
-        a = runner.invoke(app, ["draft-pick", "Bijan Robinson", "--mine", "--league", "hoh"])
+        a = runner.invoke(
+            app, ["draft-pick", "Bijan Robinson", "--mine", "--league", "hoh"]
+        )
         _start("rumble", workdir)
         b = runner.invoke(
-            app, ["draft-pick", "Bijan Robinson", "--drafter", "me", "--league", "rumble"]
+            app,
+            ["draft-pick", "Bijan Robinson", "--drafter", "me", "--league", "rumble"],
         )
         assert ("YOUR PICK" in a.output) == ("YOUR PICK" in b.output) is True
