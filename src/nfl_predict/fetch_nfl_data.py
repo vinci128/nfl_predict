@@ -84,6 +84,44 @@ def _seasons_to_fetch(
     return sorted(s for s in all_seasons if s == current_season or s not in fetched)
 
 
+def _align_dtypes(
+    stored: pd.DataFrame, fresh: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Reconcile column types between a stored parquet and a fresh load.
+
+    nflverse changes column types between releases — jersey_number and
+    draft_number were strings in older loads and are floats now. Concatenating
+    the two then yields an object column holding both, which pyarrow refuses to
+    write, and the entire refresh dies on a column no model reads.
+
+    The fresh load wins wherever the stored values convert cleanly; where they
+    do not, both sides become strings, which always round-trips.
+    """
+    stored = stored.copy()
+    fresh = fresh.copy()
+
+    for col in stored.columns.intersection(fresh.columns):
+        stored_type, fresh_type = stored[col].dtype, fresh[col].dtype
+        if stored_type == fresh_type:
+            continue
+
+        stored_obj = pd.api.types.is_object_dtype(stored_type)
+        fresh_obj = pd.api.types.is_object_dtype(fresh_type)
+        if stored_obj == fresh_obj:
+            # Both numeric (int vs float, say). Concat widens these safely.
+            continue
+
+        text, number = (stored, fresh) if stored_obj else (fresh, stored)
+        converted = pd.to_numeric(text[col], errors="coerce")
+        if converted.notna().sum() == text[col].notna().sum():
+            text[col] = converted.astype(number[col].dtype, errors="ignore")
+        else:
+            stored[col] = stored[col].astype("string")
+            fresh[col] = fresh[col].astype("string")
+
+    return stored, fresh
+
+
 def _merge_and_save(name: str, new_df: pd.DataFrame) -> None:
     """Merge new seasons into existing parquet (replacing overlapping seasons), then save."""
     path = DATA_DIR / f"{name}.parquet"
@@ -91,6 +129,7 @@ def _merge_and_save(name: str, new_df: pd.DataFrame) -> None:
         existing = pd.read_parquet(path)
         new_seasons = set(new_df["season"].unique())
         existing = existing[~existing["season"].isin(new_seasons)]
+        existing, new_df = _align_dtypes(existing, new_df)
         combined = pd.concat([existing, new_df], ignore_index=True)
     else:
         combined = new_df

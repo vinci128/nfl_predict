@@ -182,3 +182,99 @@ class TestBoardRecordsNaNHandling:
         df = pd.DataFrame({"a": [float("nan")], "b": [None], "c": ["x"]})
         for value in _records(df)[0].values():
             assert value is None or value == "x"
+
+
+# ---------------------------------------------------------------------------
+# Bug: a refresh died merging a stored parquet with a fresh nflverse load
+# ---------------------------------------------------------------------------
+
+
+class TestMergeDtypeAlignment:
+    """
+    nflverse changed jersey_number and draft_number from string to float
+    between releases. Concatenating the stored parquet with a fresh load then
+    produced an object column holding both, which pyarrow refuses to write —
+    so `update-all` aborted on columns no model reads, leaving rosters,
+    injuries, schedules and team stats stale.
+    """
+
+    @staticmethod
+    def _merged(stored, fresh):
+        import pandas as pd
+
+        from nfl_predict.fetch_nfl_data import _align_dtypes
+
+        a, b = _align_dtypes(stored, fresh)
+        return pd.concat([a, b], ignore_index=True)
+
+    def test_numeric_strings_merge_and_write(self, tmp_path):
+        """The real failure: '9' stored, 69.0 fresh."""
+        import pandas as pd
+
+        stored = pd.DataFrame({"season": [2024], "jersey_number": ["9"]})
+        fresh = pd.DataFrame({"season": [2025], "jersey_number": [69.0]})
+
+        combined = self._merged(stored, fresh)
+
+        assert pd.api.types.is_numeric_dtype(combined["jersey_number"])
+        combined.to_parquet(tmp_path / "out.parquet", index=False)
+
+    def test_values_survive_the_conversion(self):
+        import pandas as pd
+
+        stored = pd.DataFrame({"season": [2024, 2024], "n": ["9", "18"]})
+        fresh = pd.DataFrame({"season": [2025], "n": [69.0]})
+
+        assert self._merged(stored, fresh)["n"].tolist() == [9.0, 18.0, 69.0]
+
+    def test_non_numeric_strings_fall_back_to_text(self, tmp_path):
+        """A column that will not convert must not be silently NaN'd."""
+        import pandas as pd
+
+        stored = pd.DataFrame({"season": [2024], "code": ["ABC"]})
+        fresh = pd.DataFrame({"season": [2025], "code": [12.0]})
+
+        combined = self._merged(stored, fresh)
+
+        assert combined["code"].tolist() == ["ABC", "12.0"]
+        combined.to_parquet(tmp_path / "out.parquet", index=False)
+
+    def test_nulls_do_not_trigger_the_string_fallback(self):
+        """A missing jersey number is not a failed conversion."""
+        import pandas as pd
+
+        stored = pd.DataFrame({"season": [2024, 2024], "n": ["9", None]})
+        fresh = pd.DataFrame({"season": [2025], "n": [69.0]})
+
+        assert pd.api.types.is_numeric_dtype(self._merged(stored, fresh)["n"])
+
+    def test_int_versus_float_is_left_alone(self):
+        """Both numeric — concat widens these safely, so don't touch them."""
+        import pandas as pd
+
+        stored = pd.DataFrame({"season": [2024], "years_exp": [3.0]})
+        fresh = pd.DataFrame({"season": [2025], "years_exp": [4]})
+
+        assert self._merged(stored, fresh)["years_exp"].tolist() == [3.0, 4.0]
+
+    def test_matching_dtypes_are_untouched(self):
+        import pandas as pd
+
+        stored = pd.DataFrame({"season": [2024], "name": ["J.Allen"]})
+        fresh = pd.DataFrame({"season": [2025], "name": ["B.Robinson"]})
+
+        assert self._merged(stored, fresh)["name"].tolist() == ["J.Allen", "B.Robinson"]
+
+    def test_inputs_are_not_mutated(self):
+        """The caller's frames must survive — _merge_and_save reuses them."""
+        import pandas as pd
+
+        stored = pd.DataFrame({"season": [2024], "n": ["9"]})
+        fresh = pd.DataFrame({"season": [2025], "n": [69.0]})
+
+        from nfl_predict.fetch_nfl_data import _align_dtypes
+
+        _align_dtypes(stored, fresh)
+
+        assert stored["n"].tolist() == ["9"]
+        assert pd.api.types.is_object_dtype(stored["n"])
