@@ -21,7 +21,12 @@ from nfl_predict.espn_fantasy import (
     EspnFantasyClient,
     EspnFantasyError,
     _explain_http_error,
+    _normalise_position,
     _normalise_swid,
+    _normalise_team,
+    _position_from_slots,
+    _team_names,
+    _week_points,
 )
 
 # ---------------------------------------------------------------------------
@@ -1141,3 +1146,572 @@ class TestSyncBanner:
         assert "Synced 0 picks" in message
         assert "2 not matched: a failed; b failed" in message
         assert "yellow" in tone
+
+
+# ---------------------------------------------------------------------------
+# Rosters (?view=mRoster)
+# ---------------------------------------------------------------------------
+
+
+def _roster_entry(
+    player_id: int,
+    slot: int,
+    *,
+    full_name: str | None = None,
+    eligible: list[int] | None = None,
+    injury: str | None = None,
+    acquisition: str | None = None,
+    stats: list[dict] | None = None,
+) -> dict:
+    """One ESPN roster entry, shaped as mRoster / mBoxscore return them."""
+    player: dict = {"id": player_id}
+    if full_name is not None:
+        player["fullName"] = full_name
+    if eligible is not None:
+        player["eligibleSlots"] = eligible
+    if injury is not None:
+        player["injuryStatus"] = injury
+    if stats is not None:
+        player["stats"] = stats
+
+    entry: dict = {
+        "playerId": player_id,
+        "lineupSlotId": slot,
+        "playerPoolEntry": {"player": player},
+    }
+    if acquisition is not None:
+        entry["acquisitionType"] = acquisition
+    return entry
+
+
+def _roster_payload() -> dict:
+    """A minimal mRoster + mTeam response covering two teams."""
+    return {
+        "teams": [
+            {
+                "id": 3,
+                "name": "My Team",
+                "roster": {
+                    "entries": [
+                        _roster_entry(111, 2, injury="ACTIVE", acquisition="DRAFT"),
+                        _roster_entry(222, 20, acquisition="ADD"),
+                        _roster_entry(
+                            -16033,
+                            16,
+                            full_name="Ravens D/ST",
+                            eligible=[16, 20, 21],
+                        ),
+                    ]
+                },
+            },
+            {
+                "id": 7,
+                "name": "Their Team",
+                "roster": {
+                    "entries": [
+                        _roster_entry(
+                            555,
+                            17,
+                            full_name="Cameron Dicker",
+                            eligible=[17, 20, 21],
+                        ),
+                        _roster_entry(999, 21),
+                    ]
+                },
+            },
+        ]
+    }
+
+
+class TestFetchRosters:
+    def test_every_rostered_player_returned(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        assert len(rows) == 5
+
+    def test_crosswalk_resolves_gsis_id(self, client: EspnFantasyClient) -> None:
+        """Rosters must join to the board on player_id, exactly as picks do."""
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        bijan = next(r for r in rows if r["espn_player_id"] == 111)
+        assert bijan["player_id"] == "00-0011111"
+        assert bijan["player_name"] == "Bijan Robinson"
+        assert bijan["position"] == "RB"
+        assert bijan["nfl_team"] == "ATL"
+
+    def test_lineup_slot_ids_mapped_to_labels(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        slots = {r["espn_player_id"]: r["lineup_slot"] for r in rows}
+        assert slots[111] == "RB"
+        assert slots[222] == "BE"
+        assert slots[-16033] == "DST"
+        assert slots[555] == "K"
+        assert slots[999] == "IR"
+
+    def test_bench_and_ir_are_not_starters(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        starting = {r["espn_player_id"]: r["is_starter"] for r in rows}
+        assert starting[111] is True
+        assert starting[-16033] is True
+        assert starting[222] is False  # bench
+        assert starting[999] is False  # IR
+
+    def test_missing_lineup_slot_is_not_a_starter(
+        self, client: EspnFantasyClient
+    ) -> None:
+        payload = {"teams": [{"id": 3, "roster": {"entries": [{"playerId": 111}]}}]}
+        with patch.object(client, "_get", return_value=payload):
+            (row,) = client.fetch_rosters()
+        assert row["is_starter"] is False
+        assert row["lineup_slot"] == ""
+
+    def test_dst_falls_back_to_espn_name_and_slots(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """A D/ST has no gsis id, so the crosswalk cannot identify it."""
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        dst = next(r for r in rows if r["espn_player_id"] == -16033)
+        assert dst["player_name"] == "Ravens D/ST"
+        assert dst["position"] == "DST"
+        assert dst["player_id"] == ""
+
+    def test_unknown_player_position_from_eligible_slots(
+        self, client: EspnFantasyClient
+    ) -> None:
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        kicker = next(r for r in rows if r["espn_player_id"] == 555)
+        assert kicker["player_name"] == "Cameron Dicker"
+        assert kicker["position"] == "K"
+
+    def test_wholly_unknown_player_still_listed(
+        self, client: EspnFantasyClient
+    ) -> None:
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        unknown = next(r for r in rows if r["espn_player_id"] == 999)
+        assert unknown["player_name"] == "ESPN player 999"
+        assert unknown["position"] == ""
+
+    def test_team_name_and_ownership(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        mine = [r for r in rows if r["is_mine"]]
+        assert {r["espn_player_id"] for r in mine} == {111, 222, -16033}
+        assert all(r["team_name"] == "My Team" for r in mine)
+        assert next(r for r in rows if r["espn_player_id"] == 555)["is_mine"] is False
+
+    def test_injury_and_acquisition_passed_through(
+        self, client: EspnFantasyClient
+    ) -> None:
+        with patch.object(client, "_get", return_value=_roster_payload()):
+            rows = client.fetch_rosters()
+        bijan = next(r for r in rows if r["espn_player_id"] == 111)
+        assert bijan["injury_status"] == "ACTIVE"
+        assert bijan["acquisition_type"] == "DRAFT"
+        assert (
+            next(r for r in rows if r["espn_player_id"] == 999)["injury_status"] == ""
+        )
+
+    def test_requests_the_right_views(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={}) as mock_get:
+            client.fetch_rosters()
+        assert mock_get.call_args[0][0] == ["mRoster", "mTeam"]
+        assert mock_get.call_args[1]["scoringPeriodId"] is None
+
+    def test_week_becomes_scoring_period(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={}) as mock_get:
+            client.fetch_rosters(week=4)
+        assert mock_get.call_args[1]["scoringPeriodId"] == 4
+
+    def test_empty_payload(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={}):
+            assert client.fetch_rosters() == []
+
+    def test_team_without_a_roster(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={"teams": [{"id": 3}]}):
+            assert client.fetch_rosters() == []
+
+
+# ---------------------------------------------------------------------------
+# Weekly scoring (?view=mBoxscore)
+# ---------------------------------------------------------------------------
+
+
+def _stats(week: int, actual: float | None, projected: float | None) -> list[dict]:
+    """ESPN stat rows for one scoring period, plus a season-total distractor."""
+    rows = [{"scoringPeriodId": 0, "statSourceId": 0, "appliedTotal": 999.9}]
+    if actual is not None:
+        rows.append(
+            {"scoringPeriodId": week, "statSourceId": 0, "appliedTotal": actual}
+        )
+    if projected is not None:
+        rows.append(
+            {"scoringPeriodId": week, "statSourceId": 1, "appliedTotal": projected}
+        )
+    return rows
+
+
+def _boxscore_payload() -> dict:
+    """A minimal mBoxscore response: one week-1 matchup, one week-2 matchup."""
+    return {
+        "teams": [{"id": 3, "name": "My Team"}, {"id": 7, "name": "Their Team"}],
+        "schedule": [
+            {
+                "matchupPeriodId": 1,
+                "home": {
+                    "teamId": 3,
+                    "totalPoints": 121.5,
+                    "rosterForCurrentScoringPeriod": {
+                        "entries": [
+                            _roster_entry(111, 2, stats=_stats(1, 22.4, 15.1)),
+                            _roster_entry(222, 20, stats=_stats(1, None, 14.0)),
+                        ]
+                    },
+                },
+                "away": {
+                    "teamId": 7,
+                    "totalPoints": 98.0,
+                    "rosterForCurrentScoringPeriod": {
+                        "entries": [_roster_entry(555, 17, stats=_stats(1, 9.0, None))]
+                    },
+                },
+            },
+            {
+                "matchupPeriodId": 2,
+                "home": {
+                    "teamId": 3,
+                    "totalPoints": 0,
+                    "rosterForCurrentScoringPeriod": {
+                        "entries": [_roster_entry(999, 4, stats=_stats(2, 5.0, 5.0))]
+                    },
+                },
+                "away": {"teamId": 7, "totalPoints": 0},
+            },
+        ],
+    }
+
+
+class TestFetchBoxscore:
+    def test_only_the_requested_week(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_boxscore_payload()):
+            rows = client.fetch_boxscore(week=1)
+        assert {r["espn_player_id"] for r in rows} == {111, 222, 555}
+        assert all(r["week"] == 1 for r in rows)
+
+    def test_actual_and_projected_points(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_boxscore_payload()):
+            rows = client.fetch_boxscore(week=1)
+        bijan = next(r for r in rows if r["espn_player_id"] == 111)
+        assert bijan["actual_points"] == 22.4
+        assert bijan["projected_points"] == 15.1
+
+    def test_unplayed_game_has_no_actual(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_boxscore_payload()):
+            rows = client.fetch_boxscore(week=1)
+        jj = next(r for r in rows if r["espn_player_id"] == 222)
+        assert jj["actual_points"] is None
+        assert jj["projected_points"] == 14.0
+
+    def test_missing_projection_is_none(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_boxscore_payload()):
+            rows = client.fetch_boxscore(week=1)
+        kicker = next(r for r in rows if r["espn_player_id"] == 555)
+        assert kicker["actual_points"] == 9.0
+        assert kicker["projected_points"] is None
+
+    def test_season_totals_are_not_mistaken_for_a_week(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """stats[] carries season rows (scoringPeriodId 0) in the same list."""
+        with patch.object(client, "_get", return_value=_boxscore_payload()):
+            rows = client.fetch_boxscore(week=1)
+        assert all(r["actual_points"] != 999.9 for r in rows)
+
+    def test_identity_and_ownership_match_rosters(
+        self, client: EspnFantasyClient
+    ) -> None:
+        with patch.object(client, "_get", return_value=_boxscore_payload()):
+            rows = client.fetch_boxscore(week=1)
+        bijan = next(r for r in rows if r["espn_player_id"] == 111)
+        assert bijan["player_id"] == "00-0011111"
+        assert bijan["position"] == "RB"
+        assert bijan["lineup_slot"] == "RB"
+        assert bijan["is_starter"] is True
+        assert bijan["is_mine"] is True
+        assert bijan["team_name"] == "My Team"
+        assert next(r for r in rows if r["espn_player_id"] == 555)["is_mine"] is False
+
+    def test_team_points_carried_through(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_boxscore_payload()):
+            rows = client.fetch_boxscore(week=1)
+        assert next(r for r in rows if r["team_id"] == "3")["team_points"] == 121.5
+        assert next(r for r in rows if r["team_id"] == "7")["team_points"] == 98.0
+
+    def test_completed_week_uses_matchup_period_roster(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """A finished week comes back under rosterForMatchupPeriod instead."""
+        payload = {
+            "schedule": [
+                {
+                    "matchupPeriodId": 1,
+                    "home": {
+                        "teamId": 3,
+                        "rosterForMatchupPeriod": {
+                            "entries": [
+                                _roster_entry(111, 2, stats=_stats(1, 18.0, 12.0))
+                            ]
+                        },
+                    },
+                }
+            ]
+        }
+        with patch.object(client, "_get", return_value=payload):
+            (row,) = client.fetch_boxscore(week=1)
+        assert row["actual_points"] == 18.0
+
+    def test_falls_back_to_whole_schedule_when_periods_do_not_line_up(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """Multi-week matchup periods mean matchupPeriodId != scoringPeriodId."""
+        payload = {
+            "schedule": [
+                {
+                    "matchupPeriodId": 9,
+                    "home": {
+                        "teamId": 3,
+                        "rosterForCurrentScoringPeriod": {
+                            "entries": [
+                                _roster_entry(111, 2, stats=_stats(1, 18.0, 12.0))
+                            ]
+                        },
+                    },
+                }
+            ]
+        }
+        with patch.object(client, "_get", return_value=payload):
+            rows = client.fetch_boxscore(week=1)
+        assert [r["espn_player_id"] for r in rows] == [111]
+
+    def test_fallback_does_not_double_count_a_player(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """The schedule-wide fallback can show one player in two matchups."""
+        game = {
+            "matchupPeriodId": 9,
+            "home": {
+                "teamId": 3,
+                "rosterForCurrentScoringPeriod": {
+                    "entries": [_roster_entry(111, 2, stats=_stats(1, 18.0, 12.0))]
+                },
+            },
+        }
+        with patch.object(client, "_get", return_value={"schedule": [game, game]}):
+            rows = client.fetch_boxscore(week=1)
+        assert len(rows) == 1
+
+    def test_requests_the_right_views_and_week(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={}) as mock_get:
+            client.fetch_boxscore(week=6)
+        assert mock_get.call_args[0][0] == ["mBoxscore", "mMatchupScore", "mTeam"]
+        assert mock_get.call_args[1]["scoringPeriodId"] == 6
+
+    def test_empty_schedule(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={}):
+            assert client.fetch_boxscore(week=1) == []
+
+    def test_bye_week_side_without_a_roster(self, client: EspnFantasyClient) -> None:
+        payload = {"schedule": [{"matchupPeriodId": 1, "home": {"teamId": 3}}]}
+        with patch.object(client, "_get", return_value=payload):
+            assert client.fetch_boxscore(week=1) == []
+
+
+# ---------------------------------------------------------------------------
+# Roster helpers
+# ---------------------------------------------------------------------------
+
+
+class TestRosterHelpers:
+    @pytest.mark.parametrize(
+        ("eligible", "expected"),
+        [
+            ([2, 3, 23, 20, 21], "RB"),
+            ([4, 3, 5, 23, 20, 21], "WR"),
+            ([6, 5, 23, 20, 21], "TE"),
+            ([0, 7, 20, 21], "QB"),
+            ([16, 20, 21], "DST"),
+            ([17, 20, 21], "K"),
+            ([9, 11, 15, 20, 21], "DL"),
+            ([10, 11, 15, 20, 21], "LB"),
+            ([13, 14, 15, 20, 21], "DB"),
+        ],
+    )
+    def test_position_from_eligible_slots(
+        self, eligible: list[int], expected: str
+    ) -> None:
+        assert _position_from_slots(eligible) == expected
+
+    def test_combination_slots_alone_identify_nothing(self) -> None:
+        """FLEX and BE say where a player sits, not what he is."""
+        assert _position_from_slots([23, 20, 21]) == ""
+
+    def test_no_eligible_slots(self) -> None:
+        assert _position_from_slots(None) == ""
+        assert _position_from_slots([]) == ""
+
+    def test_team_names_from_modern_payload(self) -> None:
+        payload = {"teams": [{"id": 3, "name": "My Team"}]}
+        assert _team_names(payload) == {"3": "My Team"}
+
+    def test_team_names_from_legacy_location_nickname(self) -> None:
+        """Seasons before 2023 split the name across two fields."""
+        payload = {"teams": [{"id": 7, "location": "Team", "nickname": "Seven"}]}
+        assert _team_names(payload) == {"7": "Team Seven"}
+
+    def test_team_names_empty_payload(self) -> None:
+        assert _team_names({}) == {}
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [("pk", "K"), ("D/ST", "DST"), ("def", "DST"), ("wr", "WR"), ("", "")],
+    )
+    def test_normalise_position(self, raw: str, expected: str) -> None:
+        assert _normalise_position(raw) == expected
+
+    def test_week_points_ignores_other_weeks(self) -> None:
+        player = {"stats": _stats(3, 11.0, 9.0) + _stats(4, 22.0, 18.0)}
+        assert _week_points(player, 3) == (11.0, 9.0)
+        assert _week_points(player, 4) == (22.0, 18.0)
+
+    def test_week_points_without_stats(self) -> None:
+        assert _week_points({}, 1) == (None, None)
+
+    def test_week_points_ignores_null_totals(self) -> None:
+        player = {
+            "stats": [
+                {"scoringPeriodId": 1, "statSourceId": 0, "appliedTotal": None},
+                {"scoringPeriodId": 1, "statSourceId": 1, "appliedTotal": 8.0},
+            ]
+        }
+        assert _week_points(player, 1) == (None, 8.0)
+
+
+# ---------------------------------------------------------------------------
+# Query parameters
+# ---------------------------------------------------------------------------
+
+
+class TestGetQueryParams:
+    def test_extra_params_reach_the_url(self, client: EspnFantasyClient) -> None:
+        with patch("urllib.request.urlopen") as mock_open:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = json.dumps({"ok": True}).encode()
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_open.return_value = mock_resp
+
+            client._get(["mBoxscore"], scoringPeriodId=7)
+
+        url = mock_open.call_args[0][0].full_url
+        assert "view=mBoxscore" in url
+        assert "scoringPeriodId=7" in url
+
+    def test_none_params_are_omitted(self, client: EspnFantasyClient) -> None:
+        """fetch_rosters() with no week must not ask for scoringPeriodId=None."""
+        with patch("urllib.request.urlopen") as mock_open:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = json.dumps({"ok": True}).encode()
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_open.return_value = mock_resp
+
+            client._get(["mRoster"], scoringPeriodId=None)
+
+        assert "scoringPeriodId" not in mock_open.call_args[0][0].full_url
+
+
+# ---------------------------------------------------------------------------
+# Team abbreviations
+# ---------------------------------------------------------------------------
+
+
+class TestTeamNormalisation:
+    @pytest.mark.parametrize(
+        ("crosswalk", "nflverse"),
+        [
+            ("SFO", "SF"),
+            ("GBP", "GB"),
+            ("JAC", "JAX"),
+            ("KCC", "KC"),
+            ("LVR", "LV"),
+            ("NEP", "NE"),
+            ("NOS", "NO"),
+            ("TBB", "TB"),
+        ],
+    )
+    def test_mfl_style_codes_become_nflverse(
+        self, crosswalk: str, nflverse: str
+    ) -> None:
+        assert _normalise_team(crosswalk) == nflverse
+
+    @pytest.mark.parametrize("code", ["ATL", "MIN", "BUF", "LAC", "WAS", "NYG"])
+    def test_shared_codes_pass_through(self, code: str) -> None:
+        assert _normalise_team(code) == code
+
+    @pytest.mark.parametrize("code", ["LAR", "RAM", "STL"])
+    def test_rams_resolve_to_nflverses_la(self, code: str) -> None:
+        """nflverse writes the Rams 'LA' throughout, never 'LAR'."""
+        assert _normalise_team(code) == "LA"
+
+    @pytest.mark.parametrize(("code", "expected"), [("OAK", "LV"), ("SDC", "LAC")])
+    def test_relocated_franchises_resolve_to_the_current_holder(
+        self, code: str, expected: str
+    ) -> None:
+        assert _normalise_team(code) == expected
+
+    @pytest.mark.parametrize("code", ["FA", "FA*"])
+    def test_free_agent_is_not_a_team(self, code: str) -> None:
+        assert _normalise_team(code) == ""
+
+    def test_empty_and_unknown_survive(self) -> None:
+        assert _normalise_team("") == ""
+        assert _normalise_team("ZZZ") == "ZZZ"
+
+    def test_rosters_emit_nflverse_codes(self, client: EspnFantasyClient) -> None:
+        """A roster's nfl_team must match the board's, or no join can work."""
+        client._player_map = {
+            111: {
+                "player_id": "00-0011111",
+                "name": "Brock Purdy",
+                "position": "QB",
+                "team": "SFO",
+            }
+        }
+        payload = {"teams": [{"id": 3, "roster": {"entries": [_roster_entry(111, 0)]}}]}
+        with patch.object(client, "_get", return_value=payload):
+            (row,) = client.fetch_rosters()
+        assert row["nfl_team"] == "SF"
+
+    def test_picks_emit_nflverse_codes(self, client: EspnFantasyClient) -> None:
+        client._player_map = {
+            111: {
+                "player_id": "00-0011111",
+                "name": "Josh Jacobs",
+                "position": "RB",
+                "team": "GBP",
+            }
+        }
+        payload = {
+            "draftDetail": {
+                "picks": [
+                    {"teamId": 3, "playerId": 111, "roundId": 1, "roundPickNumber": 1}
+                ]
+            }
+        }
+        with patch.object(client, "_get", return_value=payload):
+            (pick,) = client.fetch_all_picks()
+        assert pick["nfl_team"] == "GB"

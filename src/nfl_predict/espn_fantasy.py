@@ -34,6 +34,10 @@ board. We map it to ``gsis_id`` through the ffverse crosswalk
 name — this matters because abbreviated names collide (Bijan Robinson and
 Brian Robinson are both ``B.Robinson``).
 
+The crosswalk names teams in MFL's style (``SFO``, ``GBP``, ``JAC``) while
+everything else here uses nflverse's (``SF``, ``GB``, ``JAX``), so team
+abbreviations are normalised on the way out.
+
 Configuration (environment variables)
 --------------------------------------
     ESPN_LEAGUE_ID    numeric league ID from your league URL (required)
@@ -43,6 +47,15 @@ Configuration (environment variables)
     ESPN_TEAM_ID      your team ID in the league (optional)
     ESPN_LEAGUE_SIZE  team count, used only as a round-math fallback
 
+What this reads
+---------------
+The same league endpoint serves everything; only the ``view`` parameter
+changes.
+
+    ``mDraftDetail``   draft pick log      -> ``fetch_all_picks``
+    ``mRoster``        current rosters     -> ``fetch_rosters``
+    ``mBoxscore``      weekly scoring      -> ``fetch_boxscore``
+
 Usage
 -----
     from nfl_predict.espn_fantasy import EspnFantasyClient
@@ -50,6 +63,12 @@ Usage
     client = EspnFantasyClient.from_env()
     for pick in client.fetch_new_picks(already_recorded=5):
         print(pick["overall_pick"], pick["player_name"], pick["is_mine"])
+
+    for row in client.fetch_rosters():
+        print(row["team_name"], row["lineup_slot"], row["player_name"])
+
+    for row in client.fetch_boxscore(week=1):
+        print(row["player_name"], row["actual_points"], row["projected_points"])
 
 CLI
 ---
@@ -88,6 +107,76 @@ _POSITION_MAP = {
     "DST": "DST",
     "D/ST": "DST",
     "DEF": "DST",
+}
+
+# ESPN identifies roster slots by a numeric ``lineupSlotId``. The labels here
+# are *our* vocabulary, not ESPN's: its separate DT (8) and DE (9) slots both
+# collapse to DL and CB/S to DB, matching ``leagues.fantasy_position``.
+_LINEUP_SLOTS = {
+    0: "QB",
+    1: "TQB",
+    2: "RB",
+    3: "RB/WR",
+    4: "WR",
+    5: "WR/TE",
+    6: "TE",
+    7: "OP",
+    8: "DL",
+    9: "DL",
+    10: "LB",
+    11: "DL",
+    12: "DB",
+    13: "DB",
+    14: "DB",
+    15: "DP",
+    16: "DST",
+    17: "K",
+    18: "P",
+    19: "HC",
+    20: "BE",
+    21: "IR",
+    23: "FLEX",
+    24: "EDR",
+}
+
+# Slots that are not a starting lineup spot. Everything else counts as a
+# start, including league-specific ones we do not use.
+_BENCH_SLOTS = frozenset({20, 21})
+
+# Slots naming exactly one position, so they can identify a player whom the
+# crosswalk misses. The combination slots (RB/WR, FLEX, OP) and the roster
+# housekeeping ones (BE, IR, HC) say nothing about what a player *is*.
+_UNAMBIGUOUS_SLOTS = frozenset({0, 2, 4, 6, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 24})
+
+# ESPN's stats[] entries carry both the real result and its own projection,
+# distinguished only by this field.
+_STAT_ACTUAL = 0
+_STAT_PROJECTED = 1
+
+# The ffverse crosswalk names teams in MFL's style; every other table in this
+# repo (weekly_stats, the feature tables, the board) uses nflverse's. Left
+# unmapped, an ESPN-sourced ``nfl_team`` silently matches nothing downstream.
+# Codes absent here are already identical in both vocabularies.
+_TEAM_MAP = {
+    "GBP": "GB",
+    "JAC": "JAX",
+    "KCC": "KC",
+    "LVR": "LV",
+    "NEP": "NE",
+    "NOS": "NO",
+    "SFO": "SF",
+    "TBB": "TB",
+    # nflverse writes the Rams "LA" throughout, and the crosswalk keeps a
+    # player's franchise history in this column, so the relocated franchises
+    # resolve to whoever holds them now.
+    "LAR": "LA",
+    "RAM": "LA",
+    "STL": "LA",
+    "OAK": "LV",
+    "SDC": "LAC",
+    # Not a team. The crosswalk uses both spellings for a free agent.
+    "FA": "",
+    "FA*": "",
 }
 
 
@@ -190,17 +279,36 @@ class EspnFantasyClient:
     # Raw API helper
     # ------------------------------------------------------------------
 
-    def _get(self, views: list[str]) -> Any:
-        """GET the league endpoint with one or more ``view`` parameters."""
+    def _get(
+        self,
+        views: list[str],
+        extra_headers: dict[str, str] | None = None,
+        **params: Any,
+    ) -> Any:
+        """
+        GET the league endpoint with one or more ``view`` parameters.
+
+        Extra keyword arguments become query parameters. ``mBoxscore`` needs
+        ``scoringPeriodId`` to say which week it should fill rosters for;
+        without it ESPN answers for the current week whatever you ask.
+
+        ``extra_headers`` carries ESPN's ``x-fantasy-filter``, the only way to
+        page or filter the player pool — it takes a JSON document rather than
+        query parameters.
+        """
+        query: list[tuple[str, Any]] = [("view", v) for v in views]
+        query += [(k, v) for k, v in params.items() if v is not None]
+
         url = (
             f"{_API_BASE}/seasons/{self.season}"
             f"/segments/0/leagues/{self.league_id}"
-            f"?{urllib.parse.urlencode([('view', v) for v in views])}"
+            f"?{urllib.parse.urlencode(query)}"
         )
 
         headers = {"User-Agent": _USER_AGENT, "Accept": "application/json"}
         if self.espn_s2 and self.swid:
             headers["Cookie"] = f"espn_s2={self.espn_s2}; SWID={self.swid}"
+        headers.update(extra_headers or {})
 
         req = urllib.request.Request(url, headers=headers)
 
@@ -338,12 +446,7 @@ class EspnFantasyClient:
             ),
         )
 
-        import contextlib
-
-        my_team_id: str | None = None
-        with contextlib.suppress(EspnFantasyError):
-            my_team_id = self.get_my_team_id()
-
+        my_team_id = self._my_team_id_or_none()
         players = self._players()
 
         picks: list[dict] = []
@@ -352,7 +455,7 @@ class EspnFantasyClient:
             info = players.get(int(espn_player_id)) if espn_player_id else None
 
             raw_pos = (info or {}).get("position", "")
-            position = _POSITION_MAP.get(raw_pos.upper(), raw_pos.upper())
+            position = _normalise_position(raw_pos)
 
             name = (info or {}).get("name") or f"ESPN player {espn_player_id}"
             team_id = str(p.get("teamId") or "")
@@ -366,7 +469,7 @@ class EspnFantasyClient:
                     "player_name": name,
                     "player_id": (info or {}).get("player_id", ""),
                     "position": position,
-                    "nfl_team": (info or {}).get("team", ""),
+                    "nfl_team": _normalise_team((info or {}).get("team", "")),
                     "team_id": team_id,
                     "is_mine": bool(my_team_id and team_id == my_team_id),
                 }
@@ -384,10 +487,238 @@ class EspnFantasyClient:
         """
         return self.fetch_all_picks()[already_recorded:]
 
+    # ------------------------------------------------------------------
+    # Rosters
+    # ------------------------------------------------------------------
+
+    def fetch_rosters(self, week: int | None = None) -> list[dict]:
+        """
+        Fetch every team's current roster.
+
+        Returns one dict per rostered player, with the same identity keys as
+        ``fetch_all_picks`` (``player_name``, ``player_id``, ``position``,
+        ``nfl_team``, ``team_id``, ``is_mine``) plus:
+
+            team_name        the fantasy team's name
+            lineup_slot      QB / RB / ... / FLEX / BE / IR
+            is_starter       False for bench and IR, True otherwise
+            injury_status    ESPN's report string, "" when it says nothing
+            acquisition_type DRAFT / ADD / TRADE, as ESPN labels it
+            espn_player_id   ESPN's own id, for chasing a bad crosswalk hit
+
+        ``week`` asks for the lineup as it stood in that scoring period;
+        omitted, ESPN answers for the current one.
+        """
+        data = self._get(["mRoster", "mTeam"], scoringPeriodId=week)
+        players = self._players()
+        my_team_id = self._my_team_id_or_none()
+        names = _team_names(data)
+
+        rows: list[dict] = []
+        for team in data.get("teams") or []:
+            team_id = str(team.get("id") or "")
+            for entry in (team.get("roster") or {}).get("entries") or []:
+                row = self._roster_entry(entry, players)
+                row["team_id"] = team_id
+                row["team_name"] = names.get(team_id, "")
+                row["is_mine"] = bool(my_team_id and team_id == my_team_id)
+                rows.append(row)
+
+        return rows
+
+    # ------------------------------------------------------------------
+    # Weekly scoring
+    # ------------------------------------------------------------------
+
+    def fetch_boxscore(self, week: int) -> list[dict]:
+        """
+        Fetch one week's per-player scoring for every team.
+
+        Same keys as ``fetch_rosters``, plus:
+
+            week              the scoring period asked for
+            actual_points     what the player scored, None before he plays
+            projected_points  ESPN's own projection, None when it has none
+            team_points       the fantasy team's total for the week
+
+        ``actual_points`` is ESPN's scoring, not ours — it reflects that
+        league's ESPN settings, which is exactly what makes it useful as a
+        check on ``ScoringRules``. It is not a model input.
+        """
+        data = self._get(["mBoxscore", "mMatchupScore", "mTeam"], scoringPeriodId=week)
+        players = self._players()
+        my_team_id = self._my_team_id_or_none()
+        names = _team_names(data)
+
+        games = data.get("schedule") or []
+        # Matchup periods and scoring periods differ in a league with
+        # multi-week matchups, so fall back to the whole schedule rather than
+        # returning nothing. The dedupe below keeps that fallback honest.
+        in_week = [g for g in games if g.get("matchupPeriodId") == week] or games
+
+        rows: list[dict] = []
+        seen: set[tuple[str, Any]] = set()
+
+        for game in in_week:
+            for which in ("home", "away"):
+                side = game.get(which) or {}
+                team_id = str(side.get("teamId") or "")
+
+                # ESPN fills rosterForCurrentScoringPeriod only for the week
+                # named by scoringPeriodId; a completed week comes back under
+                # rosterForMatchupPeriod instead.
+                roster = (
+                    side.get("rosterForCurrentScoringPeriod")
+                    or side.get("rosterForMatchupPeriod")
+                    or {}
+                )
+
+                for entry in roster.get("entries") or []:
+                    row = self._roster_entry(entry, players)
+
+                    key = (team_id, row["espn_player_id"])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+
+                    player = (entry.get("playerPoolEntry") or {}).get("player") or {}
+                    actual, projected = _week_points(player, week)
+
+                    row.update(
+                        {
+                            "week": week,
+                            "team_id": team_id,
+                            "team_name": names.get(team_id, ""),
+                            "is_mine": bool(my_team_id and team_id == my_team_id),
+                            "actual_points": actual,
+                            "projected_points": projected,
+                            "team_points": side.get("totalPoints"),
+                        }
+                    )
+                    rows.append(row)
+
+        return rows
+
+    # ------------------------------------------------------------------
+    # Shared roster-entry parsing
+    # ------------------------------------------------------------------
+
+    def _roster_entry(self, entry: dict, players: dict[int, dict[str, str]]) -> dict:
+        """
+        Turn one ESPN roster entry into our vocabulary.
+
+        Identity comes from the ffverse crosswalk wherever it resolves, so
+        rosters join to the board on ``player_id`` exactly as picks do. Where
+        it misses — most reliably for D/ST, which has no gsis id at all —
+        ESPN's own name and eligible slots stand in.
+        """
+        espn_player_id = entry.get("playerId")
+        player = (entry.get("playerPoolEntry") or {}).get("player") or {}
+        info = players.get(int(espn_player_id)) if espn_player_id is not None else None
+
+        slot_id = entry.get("lineupSlotId")
+        position = _normalise_position((info or {}).get("position", ""))
+        if not position:
+            position = _position_from_slots(player.get("eligibleSlots"))
+
+        name = (
+            (info or {}).get("name")
+            or player.get("fullName")
+            or f"ESPN player {espn_player_id}"
+        )
+
+        return {
+            "espn_player_id": espn_player_id,
+            "player_name": name,
+            "player_id": (info or {}).get("player_id", ""),
+            "position": position,
+            "nfl_team": _normalise_team((info or {}).get("team", "")),
+            "lineup_slot": _LINEUP_SLOTS.get(slot_id, ""),
+            "is_starter": slot_id is not None and slot_id not in _BENCH_SLOTS,
+            "injury_status": player.get("injuryStatus") or "",
+            "acquisition_type": entry.get("acquisitionType") or "",
+        }
+
+    def _my_team_id_or_none(self) -> str | None:
+        """Our team id where it can be resolved; None is not an error here."""
+        import contextlib
+
+        with contextlib.suppress(EspnFantasyError):
+            return self.get_my_team_id()
+        return None
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _normalise_position(raw: str) -> str:
+    """Map ESPN's position label onto our board's vocabulary."""
+    raw = (raw or "").upper()
+    return _POSITION_MAP.get(raw, raw)
+
+
+def _normalise_team(raw: str) -> str:
+    """Map the crosswalk's team abbreviation onto nflverse's."""
+    raw = (raw or "").upper()
+    return _TEAM_MAP.get(raw, raw)
+
+
+def _position_from_slots(eligible: Any) -> str:
+    """
+    Infer a position from ESPN's ``eligibleSlots``.
+
+    ESPN lists a player's primary slot first, so the first entry naming
+    exactly one position is his. This deliberately avoids
+    ``defaultPositionId``, whose numbering is offset from the slot ids and is
+    a well-known source of silently wrong positions.
+    """
+    for slot_id in eligible or []:
+        if slot_id in _UNAMBIGUOUS_SLOTS:
+            return _LINEUP_SLOTS.get(slot_id, "")
+    return ""
+
+
+def _team_names(payload: dict) -> dict[str, str]:
+    """
+    Map team id -> display name from an ``mTeam`` payload.
+
+    ESPN moved to a single ``name`` field in 2023; older seasons split it
+    across ``location`` and ``nickname``.
+    """
+    names: dict[str, str] = {}
+    for team in payload.get("teams") or []:
+        name = team.get("name") or " ".join(
+            str(team.get(k) or "").strip() for k in ("location", "nickname")
+        )
+        names[str(team.get("id") or "")] = name.strip()
+    return names
+
+
+def _week_points(player: dict, week: int) -> tuple[float | None, float | None]:
+    """
+    Pull (actual, projected) fantasy points for one week out of ``stats[]``.
+
+    ESPN returns season totals and every week in the same list, separated
+    only by ``scoringPeriodId``; ``statSourceId`` then distinguishes the real
+    result from ESPN's projection.
+    """
+    actual: float | None = None
+    projected: float | None = None
+
+    for stat in player.get("stats") or []:
+        if stat.get("scoringPeriodId") != week:
+            continue
+        total = stat.get("appliedTotal")
+        if total is None:
+            continue
+        if stat.get("statSourceId") == _STAT_ACTUAL:
+            actual = float(total)
+        elif stat.get("statSourceId") == _STAT_PROJECTED:
+            projected = float(total)
+
+    return actual, projected
 
 
 def _normalise_swid(swid: str | None) -> str | None:
