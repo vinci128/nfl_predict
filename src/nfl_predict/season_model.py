@@ -530,6 +530,41 @@ def predict_season(
             else games.clip(lower=0, upper=MAX_GAMES).round(1).to_numpy()
         )
 
+    return _enforce_quantile_order(projections, quantiles)
+
+
+def _enforce_quantile_order(
+    projections: pd.DataFrame, quantiles: list[float]
+) -> pd.DataFrame:
+    """
+    Stop a low quantile predicting above a high one.
+
+    The three quantiles are separate models with no constraint between them,
+    so for a player they disagree about they can cross: Davante Adams came out
+    with a p90 below his p50, and he ranks inside the top 30 on every board --
+    a visible "ceiling lower than median" on the draft UI.
+
+    The median is what VOR ranks on and the only one walk-forward validated, so
+    it is left alone and the band is clamped around it. Sorting all three would
+    re-rank players on the say-so of the least reliable model.
+    """
+    if 0.5 not in quantiles:
+        return projections
+
+    for stat in ("proj", "proj_ppg", "proj_games"):
+        mid = f"{stat}_p50"
+        if mid not in projections.columns:
+            continue
+        for q in quantiles:
+            pct = int(q * 100)
+            col = f"{stat}_p{pct}"
+            if col == mid or col not in projections.columns:
+                continue
+            if q < 0.5:
+                projections[col] = projections[[col, mid]].min(axis=1)
+            else:
+                projections[col] = projections[[col, mid]].max(axis=1)
+
     return projections
 
 
