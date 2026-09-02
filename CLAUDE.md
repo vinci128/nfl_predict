@@ -153,6 +153,18 @@ PPR, verified category by category against both settings pages. They share one
 `ScoringRules` instance (`_ESPN_PPR_SCORING`), so a change meant for one would
 silently move the other; `TestRoyalRumbleScoring` asserts the sharing.
 
+Because the training target *is* fantasy points, identical scoring means an
+identical fit, so Royal Rumble declares `shares_artifacts_with="hoh"` and both
+read one feature table and one set of models (`profile.artifact_key`). Fitting
+twice was not just waste: the two runs disagreed on 288 of 690 players, by up
+to 28 points, so the same player was worth two different numbers depending on
+which league you asked. `_validate_shared_artifacts` refuses the declaration
+if the two leagues' scoring differs, and `artifact_keys()` is what a
+build-everything loop should iterate so no table is built twice.
+
+Boards and draft state stay per-league regardless — VOR depends on league size,
+and two drafts on one evening must not share a session file.
+
 What separates them is size. At 8 teams Royal Rumble has by far the deepest
 available pool, so replacement level is high and VOR gaps are much smaller —
 Chase Brown is worth 142 VOR in the 14-team league and 88 in the 8-team one,

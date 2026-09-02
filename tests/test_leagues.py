@@ -420,7 +420,13 @@ class TestRoyalRumbleScoring:
         assert "DST" in self.profile.roster.positions
         assert "LB" not in self.profile.roster.positions
 
-    def test_artifacts_are_namespaced_away_from_the_other_leagues(self) -> None:
-        assert self.profile.features_path != PROFILES["hoh"].features_path
+    def test_board_and_session_are_its_own(self) -> None:
+        """VOR depends on league size, and two drafts must not share a session."""
+        assert self.profile.board_path(2026) != PROFILES["hoh"].board_path(2026)
         assert self.profile.state_path != PROFILES["hoh"].state_path
         assert "rumble" in str(self.profile.board_path(2026))
+
+    def test_it_reuses_hell_or_highwaters_fit(self) -> None:
+        """Identical scoring means an identical training target — fit it once."""
+        assert self.profile.features_path == PROFILES["hoh"].features_path
+        assert self.profile.model_dir == PROFILES["hoh"].model_dir

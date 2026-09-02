@@ -252,6 +252,12 @@ class LeagueProfile:
     keepers_per_team: int = 0
     keepers_path: str | None = None
     dst_scoring: ScoringRules | None = None
+    # Another league whose feature table and models this one reuses. Valid only
+    # when the two score identically: the training target is fantasy points, so
+    # identical scoring means identical targets and there is nothing to gain
+    # from fitting the same model twice. Checked at import by
+    # _validate_shared_artifacts.
+    shares_artifacts_with: str | None = None
     # How deep to go at each position by the end of the draft. Sums to the
     # roster size, so a draft that hits every target fills the roster exactly.
     roster_targets: Mapping[str, int] = field(default_factory=dict)
@@ -270,12 +276,28 @@ class LeagueProfile:
     # not valid for another. Every generated artifact is namespaced by key.
 
     @property
+    def artifact_key(self) -> str:
+        """
+        Whose feature table and models this league uses.
+
+        Its own, unless it shares them with a league that scores identically.
+        Boards and draft state stay per-league regardless: those depend on
+        league size and on the session, not on the scoring.
+        """
+        return self.shares_artifacts_with or self.key
+
+    @property
     def features_path(self) -> Path:
-        return Path("data") / "processed" / self.key / "player_week_features.parquet"
+        return (
+            Path("data")
+            / "processed"
+            / self.artifact_key
+            / "player_week_features.parquet"
+        )
 
     @property
     def model_dir(self) -> Path:
-        return Path("models") / self.key
+        return Path("models") / self.artifact_key
 
     @property
     def registry_path(self) -> Path:
@@ -585,6 +607,10 @@ ROYAL_RUMBLE = LeagueProfile(
     },
     espn_league_id="1546288813",
     espn_team_id="12",
+    # Identical scoring to Hell or Highwater, so the feature table and the
+    # season models are the same fit. Only the board differs, because VOR
+    # depends on league size.
+    shares_artifacts_with="hoh",
     # 14 roster spots: 2+4+4+2+1+1.
     roster_targets={"QB": 2, "RB": 4, "WR": 4, "TE": 2, "DST": 1, "K": 1},
     # ESPN's own per-position maximums.
@@ -602,6 +628,33 @@ ROYAL_RUMBLE = LeagueProfile(
 PROFILES: dict[str, LeagueProfile] = {
     p.key: p for p in (LUDOPATHY, HELL_OR_HIGHWATER, ROYAL_RUMBLE)
 }
+
+
+def _validate_shared_artifacts() -> None:
+    """
+    A league may only borrow another's models if it scores identically.
+
+    Sharing is an optimisation, not a licence: a model trained on one scoring
+    system is confidently wrong for another, and the failure would be silent —
+    plausible-looking projections built from the wrong target.
+    """
+    for profile in PROFILES.values():
+        other = profile.shares_artifacts_with
+        if other is None:
+            continue
+        if other not in PROFILES:
+            raise ValueError(
+                f"{profile.key} shares artifacts with unknown league {other!r}"
+            )
+        if PROFILES[other].scoring != profile.scoring:
+            raise ValueError(
+                f"{profile.key} shares artifacts with {other} but they score "
+                "differently; models trained on one are invalid for the other"
+            )
+
+
+_validate_shared_artifacts()
+
 
 # Used when no league is named. Ludopathy is the league this repo's scoring was
 # originally written for, so it keeps historical behaviour the default.
@@ -681,6 +734,19 @@ def league_nav() -> dict:
         "name": active.name,
         "options": [(p.key, p.name) for p in PROFILES.values()],
     }
+
+
+def artifact_keys(keys: Sequence[str | None] | None = None) -> list[str]:
+    """
+    One league key per distinct feature table / model set.
+
+    Leagues that share scoring share those artifacts, so building "for every
+    league" must not build the same table twice under two names.
+    """
+    seen: dict[str, None] = {}
+    for key in keys if keys is not None else league_keys():
+        seen.setdefault(get_profile(key).artifact_key, None)
+    return list(seen)
 
 
 def league_keys() -> list[str]:

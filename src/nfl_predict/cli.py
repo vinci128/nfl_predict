@@ -46,9 +46,11 @@ def features_cmd(
     ),
 ) -> None:
     """Build the player-week feature table, scored under a league's rules."""
-    from nfl_predict.leagues import league_keys
+    from nfl_predict.leagues import artifact_keys
 
-    targets = league_keys() if all_leagues else [league]
+    # Leagues that score identically share one table, so build each distinct
+    # one once rather than twice under two names.
+    targets = artifact_keys() if all_leagues else artifact_keys([league])
     for key in targets:
         features.build_player_week_features(league=key)
 
@@ -73,14 +75,15 @@ def update_all(
     ),
 ) -> None:
     """Fetch data, build features, train models, and run predictions."""
-    from nfl_predict.leagues import get_profile, league_keys
+    from nfl_predict.leagues import artifact_keys, get_profile
 
     if fetch:
         print(">> Fetching raw NFL data...")
         fetch_nfl_data.main()
         print(">> Building features...")
-        # Raw data is shared; scoring is not. Each league gets its own table.
-        for key in league_keys() if all_leagues else [league]:
+        # Raw data is shared; scoring is not. Each distinct scoring system
+        # gets its own table — leagues that score alike share one.
+        for key in artifact_keys() if all_leagues else artifact_keys([league]):
             features.build_player_week_features(league=key)
 
     if train:
