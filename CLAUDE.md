@@ -139,8 +139,10 @@ live under. **Scoring is data, not code** — `ScoringRules` is applied by
 | Teams / roster | 10 / 21 (9 bench, 3 IR) | 14 / 16 (7 bench, 3 IR) |
 | Starters | QB1 RB2 WR2 TE1 FLEX1 **LB3 DL1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
 | Passing yards | **1 pt / 10 yds** (floored) | **0.04 / yd** |
-| Field goals | 3 / 3 / **0** by distance | 3 / 4 / 5 / 6, −1 missed |
-| 2-pt conversions | not scored | 2 |
+| Field goals | 3 / 3 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed |
+| 2-pt conversions | 2 (pass, rush) | 2 |
+| Interception thrown | **−4** | −2 |
+| Sack taken (QB) | **−0.5** | not scored |
 | Game bonuses | 400 pass, 100/200 rush, 100/200 rec | none |
 | Keepers | **6 per team** | none |
 | ESPN league id | 1773102615 | 581348581 |
@@ -161,21 +163,45 @@ form ("every 10 yards = 1"), which **floors** the remainder — 347 passing yard
 is 34 points, not 34.7. A stat scored under both would double-count, which
 `ScoringRules.__post_init__` rejects.
 
-### What ESPN's settings page does not show
-Categories worth zero are omitted from the summary, so an absent row means the
-category scores nothing. For Ludopathy that is real: no 50+ yard FG value, no
-missed-FG penalty, no 2-point conversions. **The 50+ FG being worth 0 is worth
-confirming with the league manager** — it is unusual enough to look like a
-misconfiguration.
+### Verify scoring against ESPN, not against assumption
+Both leagues' rules were checked against ESPN's settings page on 2026-09-02 and
+Ludopathy's were wrong in seven places, every one of them an assumption nobody
+had confirmed: 50-59 and 60+ field goals scored 0 rather than 5 and 6, missed
+field goals and 2-point conversions were missing entirely, an interception cost
+−2 rather than −4, the sack-taken penalty was absent, and the IDP categories
+used the D/ST values.
+
+Categories worth zero are omitted from ESPN's summary, so an absent row does
+mean the category scores nothing — but a *present* row is the only evidence
+that a value is what you think it is. Read the page:
+
+    https://fantasy.espn.com/football/league/settings?leagueId=<id>&view=scoring
+
+For a public league the same values come back from the API without a login,
+which is easier to diff:
+
+    view=mSettings -> settings.scoringSettings.scoringItems[]
+
+### D/ST and IDP score off different tables
+ESPN's settings page has a **Team Defense / Special Teams** section and a
+separate **Defensive Players** section, and their values differ. In Ludopathy a
+defender's sack is 4 where a defence's is 1, and his interception 5 where a
+defence's is 2. Scoring IDPs off the D/ST column understated every linebacker
+by more than half.
+
+ESPN also pays a tackle under two categories at once: Total Tackles (TK, 1)
+applies to every tackle, and Solo (TKS, 1.5) or Assisted (TKA, 0.5) applies on
+top — so a solo tackle is worth 2.5 and an assist 1.5. `_LUDOPATHY_SCORING`
+folds the pair together into one rate per stat.
 
 ### Known gaps
 - Ludopathy's 40+/50+ yard TD pass bonuses (PTD40 +2, PTD50 +3) need play-level
   data and are not modelled. They are declared in `ScoringRules.unmodelled` and
   printed by `nfl-predict leagues` rather than silently dropped.
-- Whether ESPN applies sacks/INTs/fumbles to *individual* defenders in
-  Ludopathy is assumed, not confirmed. The rules score them for IDPs on the
-  basis that ESPN applies categories by stat id rather than roster slot.
-  **Verify against a real box score after week 1.**
+- Ludopathy's IDP scoring is taken from ESPN's Defensive Players table and is
+  confirmed, but it has not yet been checked against a real box score. Do that
+  after week 1 — `EspnFantasyClient.fetch_boxscore` returns ESPN's own
+  `actual_points` per player, which is exactly the comparison to run.
 
 ---
 
@@ -325,9 +351,12 @@ mapping lives in `leagues.fantasy_position`; a position that maps to nothing
 (offensive line, long snapper, punter) is dropped — it cannot fill a slot in
 either league.
 
-Scale check against 2025: an elite LB is ~145 points and an elite DL ~80, next
-to ~740 for the top QB and ~180 for the top kicker. With 4 IDP slots of 12 they
-matter, but VOR correctly puts them well after the skill positions.
+Scale check against 2025 under the corrected rules: an elite LB is ~390 points
+and an elite DL ~230, next to ~600 for the top QB and ~190 for the top kicker.
+IDP is not a late-round afterthought in this league — the best linebacker
+ranks **26th overall** on the board and 15 of the top 60 are LB or DL. The
+earlier figures here (~145 LB, ~80 DL, "well after the skill positions") came
+from scoring IDPs off the D/ST table and are wrong.
 
 ### D/ST (Hell or Highwater only)
 `dst.py` is deliberately **not** a CatBoost quantile family. Two derived inputs

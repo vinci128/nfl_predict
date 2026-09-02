@@ -1,19 +1,68 @@
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from nfl_predict.draft_api import router as draft_router
+from nfl_predict.leagues import league_nav as _league_nav
 from nfl_predict.predict_week import get_default_season_and_week, run_predictions
 from nfl_predict.weekly_api import router as weekly_router
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+# The nav's league switcher is on every page, so the helper is a Jinja
+# global rather than something each endpoint has to remember to pass.
+# Jinja types this map from its own builtins, so it needs widening.
+_jinja_globals: dict[str, Any] = templates.env.globals
+_jinja_globals["league_nav"] = _league_nav
+
 app = FastAPI(title="nfl-predict API", version="0.1.0")
+
+
+@app.middleware("http")
+async def _apply_league_cookie(request: Request, call_next):
+    """
+    Pin each request to the viewer's chosen league.
+
+    Both leagues are served from one process, so the league cannot be a
+    process-wide setting: it is read per request and every get_profile() call
+    below picks it up without being passed it explicitly.
+    """
+    from nfl_predict.leagues import reset_active_league, set_active_league
+
+    token = set_active_league(request.cookies.get("league"))
+    try:
+        return await call_next(request)
+    finally:
+        reset_active_league(token)
+
+
+@app.get("/league/{key}")
+async def switch_league(key: str, request: Request):
+    """Switch the active league and return to the page the viewer came from."""
+    from urllib.parse import urlparse
+
+    from nfl_predict.leagues import get_profile
+
+    try:
+        profile = get_profile(key)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    # Only the path of the referer is reused, never its host, so this cannot
+    # be turned into an open redirect.
+    back = urlparse(request.headers.get("referer", "")).path or "/"
+    response = RedirectResponse(url=back, status_code=303)
+    response.set_cookie(
+        "league", profile.key, max_age=31_536_000, samesite="lax", httponly=True
+    )
+    return response
+
 
 # Draft UI router
 app.include_router(draft_router)

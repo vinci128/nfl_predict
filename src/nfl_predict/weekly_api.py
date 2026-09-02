@@ -22,6 +22,7 @@ import time
 import traceback
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Request
@@ -29,10 +30,17 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from nfl_predict.draft_assistant import _DEFAULT_SLOTS
+from nfl_predict.leagues import league_nav as _league_nav
 from nfl_predict.predict_week import get_default_season_and_week
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# The nav's league switcher is on every page, so the helper is a Jinja
+# global rather than something each endpoint has to remember to pass.
+# Jinja types this map from its own builtins, so it needs widening.
+_jinja_globals: dict[str, Any] = templates.env.globals
+_jinja_globals["league_nav"] = _league_nav
 
 
 def _lineup_slots() -> dict[str, int]:

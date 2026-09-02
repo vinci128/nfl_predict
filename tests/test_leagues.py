@@ -185,31 +185,56 @@ class TestFieldGoals:
 class TestLudopathyScoring:
     scoring = PROFILES["ludopathy"].scoring
 
-    def test_passing_is_a_tenth_of_a_point_per_yard_floored(self) -> None:
-        # 300 yards, 2 TD, 1 INT -> 30 + 8 - 2
+    def test_passing_is_a_point_per_ten_yards_floored(self) -> None:
+        # 300 yards, 2 TD, 1 INT -> 30 + 8 - 4. INT is -4 here, not the usual -2.
         df = frame(passing_yards=300, passing_tds=2, passing_interceptions=1)
-        assert self.scoring.score(df).iloc[0] == pytest.approx(36.0)
+        assert self.scoring.score(df).iloc[0] == pytest.approx(34.0)
 
-    def test_a_fifty_yard_field_goal_scores_nothing(self) -> None:
-        """Configured as zero in ESPN. Flagged to the league manager, not a bug."""
-        assert self.scoring.score(frame(fg_made_50_59=1)).iloc[0] == 0.0
+    def test_interception_costs_four(self) -> None:
+        assert self.scoring.score(frame(passing_interceptions=1)).iloc[0] == -4.0
+
+    def test_quarterback_is_charged_for_sacks_taken(self) -> None:
+        assert self.scoring.score(frame(sacks_suffered=4)).iloc[0] == pytest.approx(
+            -2.0
+        )
+
+    def test_long_field_goals_score(self) -> None:
+        """Verified on ESPN's settings page: 50-59 is 5 and 60+ is 6."""
+        assert self.scoring.score(frame(fg_made_50_59=1)).iloc[0] == 5.0
+        assert self.scoring.score(frame(fg_made_60_=1)).iloc[0] == 6.0
+
+    def test_forty_yard_field_goal_is_worth_the_same_as_a_short_one(self) -> None:
         assert self.scoring.score(frame(fg_made_40_49=1)).iloc[0] == 3.0
+        assert self.scoring.score(frame(fg_made_30_39=1)).iloc[0] == 3.0
 
-    def test_no_two_point_conversion_value(self) -> None:
-        assert self.scoring.score(frame(rushing_2pt_conversions=1)).iloc[0] == 0.0
+    def test_missed_field_goal_costs_a_point(self) -> None:
+        assert self.scoring.score(frame(fg_missed=1)).iloc[0] == -1.0
+
+    def test_two_point_conversions_score(self) -> None:
+        assert self.scoring.score(frame(rushing_2pt_conversions=1)).iloc[0] == 2.0
+        assert self.scoring.score(frame(passing_2pt_conversions=1)).iloc[0] == 2.0
 
     def test_four_hundred_yard_passing_game_bonus(self) -> None:
         plain = self.scoring.score(frame(passing_yards=399)).iloc[0]
         bonus = self.scoring.score(frame(passing_yards=400)).iloc[0]
         assert bonus - plain == pytest.approx(4.0 + 1.0)  # bonus + one increment
 
-    def test_idp_tackles_score_solo_full_and_assists_half(self) -> None:
+    def test_every_tackle_scores_twice(self) -> None:
+        """ESPN pays Total Tackles (1) on top of Solo (1.5) or Assisted (0.5)."""
         df = frame(def_tackles_solo=8, def_tackle_assists=4, def_pass_defended=2)
-        assert self.scoring.score(df).iloc[0] == pytest.approx(8 + 2 + 2)
+        assert self.scoring.score(df).iloc[0] == pytest.approx(8 * 2.5 + 4 * 1.5 + 2)
 
-    def test_a_linebacker_outscores_a_quiet_kicker(self) -> None:
+    def test_idp_uses_the_defensive_players_table_not_the_dst_one(self) -> None:
+        """A defender's sack is 4 and his interception 5; a defence's are 1 and 2."""
+        assert self.scoring.per_unit["def_sacks"] == 4.0
+        assert self.scoring.per_unit["def_interceptions"] == 5.0
+        assert self.scoring.per_unit["def_fumbles_forced"] == 4.0
+        assert self.scoring.per_unit["def_fumbles"] == 4.0
+
+    def test_a_starting_linebacker_is_a_real_fantasy_asset(self) -> None:
+        """10 solo, 6 assists, a sack: 25 + 9 + 4."""
         lb = frame(def_tackles_solo=10, def_tackle_assists=6, def_sacks=1)
-        assert self.scoring.score(lb).iloc[0] == pytest.approx(14.0)
+        assert self.scoring.score(lb).iloc[0] == pytest.approx(38.0)
 
     def test_unmodelled_bonuses_are_declared(self) -> None:
         """The long-TD bonuses need play-level data; the gap must stay visible."""

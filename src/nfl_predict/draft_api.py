@@ -35,9 +35,16 @@ from nfl_predict.draft_assistant import (
     suggest_best_available,
     undo_last_pick,
 )
+from nfl_predict.leagues import league_nav as _league_nav
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# The nav's league switcher is on every page, so the helper is a Jinja
+# global rather than something each endpoint has to remember to pass.
+# Jinja types this map from its own builtins, so it needs widening.
+_jinja_globals: dict[str, Any] = templates.env.globals
+_jinja_globals["league_nav"] = _league_nav
 
 BOARDS_GLOB = "outputs/draft_board_*.csv"
 STATES_GLOB = "outputs/draft_state_*.json"

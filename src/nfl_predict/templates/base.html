@@ -27,7 +27,25 @@
       {{ label }}
     </a>
     {% endfor %}
-    <span class="ml-auto text-xs text-gray-600">{% block nav_status %}{% endblock %}</span>
+    <span class="ml-auto text-xs text-gray-600 mr-3">{% block nav_status %}{% endblock %}</span>
+
+    {#
+      League switcher. Everything downstream — boards, models, draft state,
+      weekly lineups — is namespaced by league, so this one control changes
+      the whole app. It posts to /league/{key}, which sets a cookie and
+      returns here.
+    #}
+    {% set nav = league_nav() %}
+    {% if nav.options | length > 1 %}
+    <select onchange="location.href='/league/' + this.value"
+            title="Active league — changes boards, models, draft state and lineups"
+            class="bg-gray-800 border border-gray-700 rounded px-2 py-0.5 text-xs
+                   text-gray-300 focus:outline-none focus:border-green-500">
+      {% for key, label in nav.options %}
+      <option value="{{ key }}" {% if key == nav.active %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
   </nav>
 
   {% block content %}{% endblock %}

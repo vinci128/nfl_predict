@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 import os
 from collections.abc import Mapping, Sequence
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -327,35 +328,46 @@ _LUDOPATHY_SCORING = ScoringRules(
     },
     per_unit={
         "passing_tds": 4.0,
-        "passing_interceptions": -2.0,
+        # ESPN's INT setting for this league is -4, twice the usual penalty.
+        "passing_interceptions": -4.0,
+        # The QB is charged for taking a sack (SK, -0.5).
+        "sacks_suffered": -0.5,
         "rushing_tds": 6.0,
         "receptions": 1.0,
         "receiving_tds": 6.0,
+        "two_point_conversions": 2.0,
         "fumbles_lost": -2.0,
         "return_tds": 6.0,
         "fumble_recovery_tds": 6.0,
         "pat_made": 1.0,
-        # IDP. ESPN's TK is solo tackles, TKA assists at half value.
-        "def_tackles_solo": 1.0,
-        "def_tackle_assists": 0.5,
+        "fg_missed": -1.0,
+        # IDP, from ESPN's separate "Defensive Players" table. These are NOT
+        # the D/ST values — a defender's sack is worth 4 here against a
+        # defence's 1, and an interception 5 against 2.
+        #
+        # ESPN scores a tackle under two categories at once: Total Tackles (TK,
+        # 1) applies to every tackle, and Solo (TKS, 1.5) or Assisted (TKA,
+        # 0.5) applies on top. So a solo tackle is 2.5 and an assist 1.5, which
+        # is what these rates fold together.
+        "def_tackles_solo": 2.5,
+        "def_tackle_assists": 1.5,
         "def_pass_defended": 1.0,
-        # ESPN applies these stat categories by stat id, not by roster slot, so
-        # a linebacker's sack scores the same as a D/ST's. See notes below.
-        "def_sacks": 1.0,
-        "def_interceptions": 2.0,
-        "def_fumbles_forced": 2.0,
-        "def_fumbles": 2.0,
+        "def_sacks": 4.0,
+        "def_interceptions": 5.0,
+        "def_fumbles_forced": 4.0,
+        "def_fumbles": 4.0,
         "def_safeties": 2.0,
+        "def_blocks": 2.0,
         "def_tds": 6.0,
     },
     fg_buckets={
         "fg_made_0_19": 3.0,
         "fg_made_20_29": 3.0,
         "fg_made_30_39": 3.0,
+        # 40-49 is worth the same 3 as a short kick here, unlike most leagues.
         "fg_made_40_49": 3.0,
-        # 50+ carries no value in this league.
-        "fg_made_50_59": 0.0,
-        "fg_made_60_": 0.0,
+        "fg_made_50_59": 5.0,
+        "fg_made_60_": 6.0,
     },
     bonuses=(
         GameBonus("passing_yards", lo=400, points=4.0),
@@ -487,11 +499,10 @@ LUDOPATHY = LeagueProfile(
     notes=(
         "IDP: 3 LB + 1 DL start, 4 of 12 lineup slots.",
         "6 keepers per team (60 players) lock one hour before the draft.",
-        "A 50+ yard field goal scores 0 — confirm with the league manager, "
-        "it is unusual enough to look like a misconfiguration.",
-        "Sacks/INTs/fumbles are scored for individual defenders on the "
-        "assumption ESPN applies those categories by stat id rather than by "
-        "roster slot. Verify against a real box score after week 1.",
+        "IDP scores off ESPN's separate Defensive Players table, not the "
+        "D/ST one: sack 4, INT 5, fumble forced/recovered 4, and every tackle "
+        "counts twice (Total plus Solo or Assisted).",
+        "Interceptions thrown cost -4, and the QB loses 0.5 per sack taken.",
     ),
 )
 
@@ -553,17 +564,47 @@ _ALIASES = {
 }
 
 
+# The league a single web request is acting on. A ContextVar rather than a
+# global because the web UI serves both leagues from one process: each request
+# sets it from the viewer's cookie, so two people can browse different leagues
+# at once. Unset everywhere else, which leaves the CLI on $NFL_PREDICT_LEAGUE.
+_ACTIVE_LEAGUE: ContextVar[str | None] = ContextVar("active_league", default=None)
+
+
+def set_active_league(key: str | None) -> Token[str | None]:
+    """
+    Pin the league for the current context; returns a token to undo it.
+
+    An unknown or missing key resolves to no override rather than raising, so
+    a stale cookie degrades to the default league instead of a 500.
+    """
+    try:
+        resolved = get_profile(key).key if key else None
+    except KeyError:
+        resolved = None
+    return _ACTIVE_LEAGUE.set(resolved)
+
+
+def reset_active_league(token: Token[str | None]) -> None:
+    _ACTIVE_LEAGUE.reset(token)
+
+
 def get_profile(key: str | LeagueProfile | None = None) -> LeagueProfile:
     """
     Resolve a league profile by key.
 
-    Falls back to $NFL_PREDICT_LEAGUE, then to DEFAULT_LEAGUE, so a shell can
-    pin a league for a whole draft-day session without repeating the flag.
+    Falls back to the active request's league, then $NFL_PREDICT_LEAGUE, then
+    DEFAULT_LEAGUE — so a shell can pin a league for a whole draft-day session
+    without repeating the flag, and the web UI can switch per viewer.
     """
     if isinstance(key, LeagueProfile):
         return key
     if key is None:
-        key = os.environ.get("NFL_PREDICT_LEAGUE") or DEFAULT_LEAGUE
+        key = (
+            _ACTIVE_LEAGUE.get()
+            or os.environ.get("NFL_PREDICT_LEAGUE")
+            or DEFAULT_LEAGUE
+        )
 
     norm = key.strip().lower().replace("-", "_").replace(" ", "_")
     norm = _ALIASES.get(norm, norm)
@@ -571,6 +612,22 @@ def get_profile(key: str | LeagueProfile | None = None) -> LeagueProfile:
         known = ", ".join(sorted(PROFILES))
         raise KeyError(f"unknown league {key!r}. Known leagues: {known}")
     return PROFILES[norm]
+
+
+def league_nav() -> dict:
+    """
+    The active league plus every switchable option, for the web nav.
+
+    Exposed as a Jinja global rather than passed through every template
+    context: the nav is on every page, and the active league comes from the
+    request's ContextVar, so it must be read at render time.
+    """
+    active = get_profile()
+    return {
+        "active": active.key,
+        "name": active.name,
+        "options": [(p.key, p.name) for p in PROFILES.values()],
+    }
 
 
 def league_keys() -> list[str]:
