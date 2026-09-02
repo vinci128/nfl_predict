@@ -77,12 +77,17 @@ def get_default_season_and_week_from_data(df: pd.DataFrame):
 # -----------------------------------------------------------
 
 
-def load_features() -> pd.DataFrame:
-    path = PROCESSED_DIR / "player_week_features.parquet"
+def load_features(league: str | None = None) -> pd.DataFrame:
+    """Load the player-week feature table scored for `league`."""
+    from nfl_predict.leagues import resolve_features_path
+
+    path = resolve_features_path(league)
     if not path.exists():
-        raise FileNotFoundError(f"{path} not found. Have you already run features.py?")
-    df = pd.read_parquet(path)
-    return df
+        raise FileNotFoundError(
+            f"{path} not found — run `nfl-predict features --league "
+            f"{league or 'ludopathy'}` (or `update-all`)."
+        )
+    return pd.read_parquet(path)
 
 
 def load_model_and_meta(position: str = "WR"):

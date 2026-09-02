@@ -35,12 +35,12 @@ class DraftSyncClient(Protocol):
     def fetch_new_picks(self, already_recorded: int = 0) -> list[dict]: ...
 
 
-def available_providers() -> list[str]:
-    """Providers whose credentials are present in the environment."""
+def available_providers(league: str | None = None) -> list[str]:
+    """Providers configured for this league, or present in the environment."""
     from nfl_predict.espn_fantasy import EspnFantasyClient
 
     found = []
-    if EspnFantasyClient.credentials_available():
+    if EspnFantasyClient.credentials_available(league):
         found.append("espn")
     # Legacy NFL.com provider — included only if ESPN is not available,
     # so users with only NFL_FANTASY_* vars get a clear deprecation path.
@@ -56,7 +56,7 @@ def available_providers() -> list[str]:
     return found
 
 
-def make_client(provider: str = "auto") -> DraftSyncClient:
+def make_client(provider: str = "auto", league: str | None = None) -> DraftSyncClient:
     """
     Build a draft-sync client.
 
@@ -68,7 +68,7 @@ def make_client(provider: str = "auto") -> DraftSyncClient:
     provider = (provider or "auto").lower()
 
     if provider == "auto":
-        found = available_providers()
+        found = available_providers(league)
         if not found:
             raise DraftSyncError(
                 "No draft provider configured.\n"
@@ -97,7 +97,7 @@ def make_client(provider: str = "auto") -> DraftSyncClient:
 
     if provider == "espn":
         try:
-            return EspnFantasyClient.from_env()
+            return EspnFantasyClient.from_env(league)
         except EspnFantasyError as e:
             raise DraftSyncError(str(e)) from e
 

@@ -28,6 +28,7 @@ SCHEMA_REQUIREMENTS: dict[str, dict] = {
     "snap_counts": {"required_cols": ["season", "week"]},
     "schedules": {"required_cols": ["season", "week", "home_team", "away_team"]},
     "injuries": {"required_cols": ["season", "week", "gsis_id"]},
+    "team_stats": {"required_cols": ["season", "week", "team"]},
 }
 
 
@@ -131,6 +132,8 @@ _LOADERS = {
     "snap_counts": nfl.load_snap_counts,
     "schedules": nfl.load_schedules,
     "injuries": nfl.load_injuries,
+    # Team-level defensive stats — the D/ST projection's only source.
+    "team_stats": nfl.load_team_stats,
 }
 
 

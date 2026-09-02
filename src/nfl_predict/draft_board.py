@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from nfl_predict.season_model import POSITIONS, predict_season
+from nfl_predict.season_model import predict_season
 
 OUTPUT_DIR = Path("outputs")
 
@@ -47,6 +47,9 @@ class DraftSettings:
     te_starters: int = 1
     k_starters: int = 1
     flex_spots: int = 1  # RB / WR / TE eligible
+    # Slots outside the standard offensive set — IDP (LB/DL/DB) and D/ST.
+    # Kept as a mapping so a league can add a position without a new field.
+    extra_starters: dict[str, int] = field(default_factory=dict)
     # Extra buffer beyond the last starter (accounts for bye weeks / handcuffs)
     replacement_buffer: int = 3
     scoring: str = "custom"
@@ -73,13 +76,17 @@ class DraftSettings:
         n = self.league_size
         buf = self.replacement_buffer
         flex_share = self.flex_spots * n // 3  # approx flex distributed across RB/WR/TE
-        return {
+        ranks = {
             "QB": n * self.qb_starters + buf,
             "RB": n * self.rb_starters + flex_share + buf,
             "WR": n * self.wr_starters + flex_share + buf,
             "TE": n * self.te_starters + buf,
             "K": n * self.k_starters + buf,
         }
+        for pos, starters in self.extra_starters.items():
+            if starters > 0:
+                ranks[pos] = n * starters + buf
+        return {pos: rank for pos, rank in ranks.items() if rank > buf}
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +271,7 @@ def build_draft_board(
     adp_path: str | None = None,
     settings: DraftSettings | None = None,
     exclude: list[str] | None = None,
+    league: str | None = None,
 ) -> pd.DataFrame:
     """
     Build the full draft board from per-position season projections.
@@ -275,14 +283,20 @@ def build_draft_board(
     adp_path     : optional CSV path with ADP data (columns: player_name, adp)
     settings     : DraftSettings for VOR calculation
     exclude      : players unavailable to draft (keepers), by gsis ID or name
+    league       : league profile key; sets the default positions, the VOR
+                   settings, and which models are loaded
 
     Returns
     -------
     DataFrame sorted by VOR (descending), with overall_rank and pos_rank.
     """
-    pos_list = positions or POSITIONS
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    # D/ST is projected by a separate team-level path, not the player models.
+    pos_list = positions or [p for p in profile.roster.positions if p != "DST"]
     if settings is None:
-        settings = DraftSettings()
+        settings = profile.to_draft_settings()
 
     print(
         f"\nBuilding {as_of_season + 1} draft board (features from {as_of_season})..."
@@ -291,9 +305,17 @@ def build_draft_board(
     all_projs: list[pd.DataFrame] = []
     for pos in pos_list:
         print(f"  Projecting {pos}...")
-        proj = predict_season(pos, as_of_season=as_of_season)
+        proj = predict_season(pos, as_of_season=as_of_season, league=profile.key)
         if not proj.empty:
             all_projs.append(proj)
+
+    if "DST" in profile.roster.positions and (positions is None or "DST" in pos_list):
+        from nfl_predict.dst import project_dst
+
+        print("  Projecting DST...")
+        dst = project_dst(as_of_season, league=profile.key)
+        if not dst.empty:
+            all_projs.append(dst)
 
     if not all_projs:
         raise ValueError(

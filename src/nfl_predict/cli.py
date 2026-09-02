@@ -8,6 +8,51 @@ from nfl_predict import features, fetch_nfl_data, predict_week, train_model
 app = typer.Typer(help="NFL fantasy prediction pipeline CLI.")
 OUTPUT_DIR = Path("outputs")
 
+
+# ---------------------------------------------------------------------------
+# leagues: show the configured league profiles
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def leagues(
+    league: str | None = typer.Option(None, help="Show only this league."),
+) -> None:
+    """List configured leagues: scoring, roster and artifact paths."""
+    from nfl_predict.leagues import describe, get_profile, league_keys
+
+    keys = [get_profile(league).key] if league else league_keys()
+    for key in keys:
+        profile = get_profile(key)
+        print(describe(profile))
+        print(f"  features        {profile.features_path}")
+        print(f"  models          {profile.model_dir}")
+        print(f"  board           {profile.board_path(profile.season)}")
+        print()
+
+
+# ---------------------------------------------------------------------------
+# features: rebuild the player-week feature table for one league
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="features")
+def features_cmd(
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
+    all_leagues: bool = typer.Option(
+        False, "--all", help="Rebuild for every configured league."
+    ),
+) -> None:
+    """Build the player-week feature table, scored under a league's rules."""
+    from nfl_predict.leagues import league_keys
+
+    targets = league_keys() if all_leagues else [league]
+    for key in targets:
+        features.build_player_week_features(league=key)
+
+
 # ---------------------------------------------------------------------------
 # update-all: fetch → features → train → predict
 # ---------------------------------------------------------------------------
@@ -20,20 +65,31 @@ def update_all(
     position: str | None = typer.Option(
         None, help="Position for predictions (default: all main positions)."
     ),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
+    all_leagues: bool = typer.Option(
+        False, "--all", help="Build features for every configured league."
+    ),
 ) -> None:
     """Fetch data, build features, train models, and run predictions."""
+    from nfl_predict.leagues import get_profile, league_keys
+
     if fetch:
         print(">> Fetching raw NFL data...")
         fetch_nfl_data.main()
         print(">> Building features...")
-        features.build_player_week_features()
+        # Raw data is shared; scoring is not. Each league gets its own table.
+        for key in league_keys() if all_leagues else [league]:
+            features.build_player_week_features(league=key)
 
     if train:
         print(">> Training models...")
         train_model.main()
 
     print(">> Making predictions...")
-    main_positions = ["WR", "RB", "QB", "TE", "K"]
+    profile = get_profile(league)
+    main_positions = [p for p in profile.roster.positions if p != "DST"]
     targets = [position] if position else main_positions
     for pos in targets:
         print(f"   {pos}...")
@@ -193,13 +249,19 @@ def draft_prep(
         False, help="Skip model registry (plain file save)."
     ),
     iterations: int = typer.Option(500, help="CatBoost iterations per quantile model."),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
 ) -> None:
     """Train season-total projection models (p10/p50/p90) for drafts."""
     from nfl_predict.season_model import main as season_main
 
     positions = [position.upper()] if position else None
     season_main(
-        positions=positions, use_registry=not no_registry, iterations=iterations
+        positions=positions,
+        use_registry=not no_registry,
+        iterations=iterations,
+        league=league,
     )
 
 
@@ -216,17 +278,20 @@ def project_season(
         help="Season whose stats are used as features (default: most recent).",
     ),
     top: int = typer.Option(30, help="Number of players to display."),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
 ) -> None:
     """Show season projections (floor / median / ceiling) for a position."""
     from nfl_predict.season_features import load_features
     from nfl_predict.season_model import predict_season
 
     if season is None:
-        df = load_features()
+        df = load_features(league)
         season = int(df["season"].max())
         print(f"Using most recent season: {season}")
 
-    proj = predict_season(position.upper(), as_of_season=season)
+    proj = predict_season(position.upper(), as_of_season=season, league=league)
     if proj.empty:
         print("No projections available. Run `nfl-predict draft-prep` first.")
         raise typer.Exit(1)
@@ -261,7 +326,12 @@ def board(
     adp: str | None = typer.Option(
         None, help="Path to ADP CSV (columns: player_name, adp)."
     ),
-    league_size: int = typer.Option(12, help="Number of teams in the league."),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
+    league_size: int | None = typer.Option(
+        None, help="Override the league's team count."
+    ),
     fmt: str = typer.Option(
         "csv", help="Export format: 'csv', 'json', or 'table' (terminal preview only)."
     ),
@@ -269,9 +339,9 @@ def board(
     positions: str | None = typer.Option(
         None, help="Comma-separated positions to include (default: all)."
     ),
-    qb_scarcity: float = typer.Option(
-        0.7,
-        help="QB VOR scarcity multiplier (0.7 = standard 1-QB, 1.0 = superflex).",
+    qb_scarcity: float | None = typer.Option(
+        None,
+        help="Override the QB VOR scarcity multiplier (1.0 = superflex).",
     ),
     superflex: bool = typer.Option(
         False, help="Superflex league: sets --qb-scarcity 1.0 automatically."
@@ -280,45 +350,49 @@ def board(
         None,
         help=(
             "Path to a list of players who cannot be drafted (keepers): "
-            "one gsis ID or full name per line, # comments allowed."
+            "one gsis ID or full name per line, # comments allowed. "
+            "Defaults to the league profile's keeper file when it has one."
         ),
     ),
 ) -> None:
     """Build and export the full fantasy draft board with VOR and tiers."""
+    from dataclasses import replace as dc_replace
+
     from nfl_predict.draft_board import (
-        DraftSettings,
         build_draft_board,
         export_draft_board,
         load_exclusions,
     )
+    from nfl_predict.leagues import get_profile
     from nfl_predict.season_features import load_features
 
     if fmt not in ("csv", "json", "table"):
         print(f"Error: --fmt must be 'csv', 'json', or 'table'. Got: '{fmt}'")
         raise typer.Exit(1)
 
+    profile = get_profile(league)
+    print(f"League: {profile.name} [{profile.key}]")
+
     if season is None:
-        df = load_features()
+        df = load_features(profile.key)
         season = int(df["season"].max())
         print(f"Using most recent season as feature source: {season}")
 
     pos_list = [p.strip().upper() for p in positions.split(",")] if positions else None
 
-    effective_qb_scarcity = 1.0 if superflex else qb_scarcity
-    settings = DraftSettings(
-        league_size=league_size,
-        positional_scarcity={
-            "QB": effective_qb_scarcity,
-            "RB": 1.0,
-            "WR": 1.0,
-            "TE": 0.85,
-            "K": 0.5,
-        },
-    )
+    # Start from the league's own settings; the flags are overrides on top.
+    settings = profile.to_draft_settings()
+    if league_size is not None:
+        settings = dc_replace(settings, league_size=league_size)
+    if superflex or qb_scarcity is not None:
+        scarcity = dict(settings.positional_scarcity)
+        scarcity["QB"] = 1.0 if superflex else qb_scarcity
+        settings = dc_replace(settings, positional_scarcity=scarcity)
 
-    exclusions = load_exclusions(exclude) if exclude else None
+    exclude_path = exclude or profile.keepers_path
+    exclusions = load_exclusions(exclude_path) if exclude_path else None
     if exclusions is not None:
-        print(f"Loaded {len(exclusions)} exclusions from {exclude}")
+        print(f"Loaded {len(exclusions)} exclusions from {exclude_path}")
 
     draft_board = build_draft_board(
         as_of_season=season,
@@ -326,6 +400,7 @@ def board(
         adp_path=adp,
         settings=settings,
         exclude=exclusions,
+        league=profile.key,
     )
 
     table_cols = [
@@ -348,19 +423,23 @@ def board(
         n = 40
         print(
             f"\nTop {n} overall (VOR) — {season + 1} draft board "
-            f"[QB scarcity={effective_qb_scarcity}]:\n"
+            f"[QB scarcity={settings.positional_scarcity.get('QB', 1.0)}]:\n"
         )
         print(draft_board[table_cols].head(n).to_string(index=False))
         return
 
     export_path = export_draft_board(
-        draft_board, out_path=out, fmt=fmt, season=season + 1
+        draft_board,
+        out_path=out
+        or str(profile.board_path(season + 1, ".csv" if fmt == "csv" else ".json")),
+        fmt=fmt,
+        season=season + 1,
     )
 
     # Always print top 20 summary
     print(
         f"\nTop 20 overall (VOR) — {season + 1} draft board "
-        f"[QB scarcity={effective_qb_scarcity}]:\n"
+        f"[QB scarcity={settings.positional_scarcity.get('QB', 1.0)}]:\n"
     )
     print(draft_board[table_cols].head(20).to_string(index=False))
     print(f"\nFull board exported to: {export_path}")
@@ -377,7 +456,12 @@ def draft_start(
         None,
         help="Draft board season to load (default: most recent in outputs/).",
     ),
-    league_size: int = typer.Option(12, help="Number of teams in the league."),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
+    league_size: int | None = typer.Option(
+        None, help="Override the league's team count."
+    ),
     draft_position: int = typer.Option(1, help="Your draft slot (1-based)."),
     board_path: str | None = typer.Option(
         None, help="Path to draft board CSV (auto-detected if omitted)."
@@ -391,15 +475,22 @@ def draft_start(
     from pathlib import Path
 
     from nfl_predict.draft_assistant import init_draft_state, render_board, save_state
+    from nfl_predict.leagues import get_profile
 
-    # Locate board CSV
+    profile = get_profile(league)
+    print(f"League: {profile.name} [{profile.key}]")
+
+    # Locate board CSV — this league's, never another's.
     if board_path is None:
         if season is not None:
-            board_path = f"outputs/draft_board_{season}.csv"
+            board_path = str(profile.board_path(season))
         else:
-            csvs = sorted(_glob.glob("outputs/draft_board_*.csv"))
+            csvs = sorted(_glob.glob(f"outputs/draft_board_*_{profile.key}.csv"))
             if not csvs:
-                print("No draft board CSV found. Run `nfl-predict board` first.")
+                print(
+                    f"No draft board CSV found for {profile.key}. "
+                    f"Run `nfl-predict board --league {profile.key}` first."
+                )
                 raise typer.Exit(1)
             board_path = csvs[-1]  # most recent
             print(f"Using board: {board_path}")
@@ -417,6 +508,7 @@ def draft_start(
         league_size=league_size,
         draft_position=draft_position,
         state_path=sp,
+        league=profile.key,
     )
     save_state(state)
 
@@ -562,6 +654,9 @@ def nfl_sync_cmd(
         "auto",
         help="Draft provider: 'espn' or 'auto'.",
     ),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
 ) -> None:
     """
     Poll the live draft and auto-record picks into the local state.
@@ -580,14 +675,18 @@ def nfl_sync_cmd(
         state_lock,
     )
     from nfl_predict.draft_sync import DraftSyncError, make_client, poll_draft
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    print(f"League: {profile.name} [{profile.key}]")
 
     try:
-        client = make_client(provider)
+        client = make_client(provider, league=profile.key)
     except DraftSyncError as e:
         print(f"Error: {e}")
         raise typer.Exit(1) from e
 
-    state_path = OUTPUT_DIR / "draft_state.json"
+    state_path = profile.state_path
     if not state_path.exists():
         print("No active draft session. Run `nfl-predict draft-start` first.")
         raise typer.Exit(1)

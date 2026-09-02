@@ -70,12 +70,15 @@ _DNP_SEVERITY = 3.0
 # ---------------------------------------------------------------------------
 
 
-def load_features() -> pd.DataFrame:
-    """Load the player-week feature parquet produced by features.py."""
-    path = PROCESSED_DIR / "player_week_features.parquet"
+def load_features(league: str | None = None) -> pd.DataFrame:
+    """Load the player-week feature table scored for `league`."""
+    from nfl_predict.leagues import resolve_features_path
+
+    path = resolve_features_path(league)
     if not path.exists():
         raise FileNotFoundError(
-            f"{path} not found — run `nfl-predict update-all --no-train`"
+            f"{path} not found — run `nfl-predict features --league "
+            f"{league or 'ludopathy'}` (or `update-all`)."
         )
     return pd.read_parquet(path)
 

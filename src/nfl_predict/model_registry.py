@@ -47,21 +47,27 @@ class ModelRegistry:
     registry.promote("wr_20250101_120000_abc12345", "WR")
     """
 
-    def __init__(self) -> None:
-        MODEL_DIR.mkdir(exist_ok=True, parents=True)
-        VERSIONS_DIR.mkdir(exist_ok=True, parents=True)
+    def __init__(self, registry_path: Path | str | None = None) -> None:
+        # A registry is scoped to one model directory. Leagues score players
+        # differently, so their champions are tracked separately; passing a
+        # league's registry path roots the whole registry under that league.
+        self.registry_path = Path(registry_path) if registry_path else REGISTRY_PATH
+        self.model_dir = self.registry_path.parent
+        self.versions_dir = self.model_dir / "versions"
+        self.model_dir.mkdir(exist_ok=True, parents=True)
+        self.versions_dir.mkdir(exist_ok=True, parents=True)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     def _load(self) -> dict:
-        if REGISTRY_PATH.exists():
-            return json.loads(REGISTRY_PATH.read_text())
+        if self.registry_path.exists():
+            return json.loads(self.registry_path.read_text())
         return {}
 
     def _save(self, registry: dict) -> None:
-        REGISTRY_PATH.write_text(json.dumps(registry, indent=2))
+        self.registry_path.write_text(json.dumps(registry, indent=2))
 
     # ------------------------------------------------------------------
     # Public API
@@ -92,7 +98,7 @@ class ModelRegistry:
         version_id : str
         """
         version_id = _make_version_id(position)
-        version_dir = VERSIONS_DIR / version_id
+        version_dir = self.versions_dir / version_id
         version_dir.mkdir(parents=True, exist_ok=True)
 
         model_path = version_dir / "model.cbm"
@@ -146,7 +152,7 @@ class ModelRegistry:
         Copies model.cbm and meta.json to the flat models/ path so that
         existing code (predict_week, CLI) continues to work unchanged.
         """
-        version_dir = VERSIONS_DIR / version_id
+        version_dir = self.versions_dir / version_id
         src_model = version_dir / "model.cbm"
         src_meta = version_dir / "meta.json"
 
@@ -154,8 +160,8 @@ class ModelRegistry:
             raise FileNotFoundError(f"Version {version_id} not found at {src_model}")
 
         pos = position.lower()
-        shutil.copy2(src_model, MODEL_DIR / f"{pos}_catboost.cbm")
-        shutil.copy2(src_meta, MODEL_DIR / f"{pos}_catboost_meta.json")
+        shutil.copy2(src_model, self.model_dir / f"{pos}_catboost.cbm")
+        shutil.copy2(src_meta, self.model_dir / f"{pos}_catboost_meta.json")
 
         registry = self._load()
         registry.setdefault(position.upper(), {"champion": None, "versions": []})[
@@ -177,7 +183,7 @@ class ModelRegistry:
         self._save(registry)
 
         # Also update the versioned meta.json
-        meta_path = VERSIONS_DIR / version_id / "meta.json"
+        meta_path = self.versions_dir / version_id / "meta.json"
         if meta_path.exists():
             meta = json.loads(meta_path.read_text())
             meta["backtest"] = backtest_metrics

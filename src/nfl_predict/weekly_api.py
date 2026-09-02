@@ -35,6 +35,20 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+def _lineup_slots() -> dict[str, int]:
+    """Starting slots for the active league, FLEX last.
+
+    FLEX is filled after the fixed slots, from whatever RB/WR/TE is left.
+    """
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile()
+    slots = {p: n for p, n in profile.roster.starters.items() if n > 0}
+    if profile.roster.flex_spots:
+        slots["FLEX"] = profile.roster.flex_spots
+    return slots or dict(_DEFAULT_SLOTS)
+
+
 def _timeago(ts: float | None) -> str:
     """Render a unix timestamp as a short relative age (`4m ago`)."""
     if not ts:
@@ -61,8 +75,16 @@ router = APIRouter(prefix="/weekly", tags=["weekly"])
 # Data refresh
 # ---------------------------------------------------------------------------
 
-# Positions the weekly page needs a prediction file for.
-UPDATE_POSITIONS = ("QB", "RB", "WR", "TE", "K")
+
+# Positions the weekly page needs a prediction file for. Follows the active
+# league, so an IDP league refreshes LB/DL too.
+def _update_positions() -> tuple[str, ...]:
+    from nfl_predict.leagues import get_profile
+
+    return tuple(p for p in get_profile().roster.positions if p != "DST")
+
+
+UPDATE_POSITIONS = _update_positions()
 
 # Progress of the refresh, shared between the worker thread and the pollers.
 # A refresh takes minutes, so the request that starts it cannot wait for it.
@@ -234,18 +256,22 @@ def _load_latest_predictions() -> pd.DataFrame:
 
 
 def _build_lineup(merged: pd.DataFrame) -> tuple[list[dict], list[dict], float]:
-    """Greedy optimal-lineup selection using _DEFAULT_SLOTS (QB1/RB2/WR2/TE1/FLEX1/K1).
+    """Greedy optimal-lineup selection using the active league's starting slots.
 
     Fills required single-position slots first (highest expected points),
-    then fills FLEX from the best remaining RB/WR/TE, then bench = everyone
-    else. Returns (starters, bench, total_starter_points).
+    then fills FLEX from the best remaining flex-eligible player, then
+    bench = everyone else. Returns (starters, bench, total_starter_points).
     """
+    from nfl_predict.leagues import get_profile
+
     remaining = merged.sort_values("expected_ppr_points", ascending=False).copy()
     starters: list[dict] = []
     used_index: set[int] = set()
 
-    for pos in ("QB", "RB", "WR", "TE", "K"):
-        n = _DEFAULT_SLOTS.get(pos, 0)
+    slots = _lineup_slots()
+    flex_n = slots.pop("FLEX", 0)
+
+    for pos, n in slots.items():
         pool = remaining[
             (remaining["position"] == pos) & (~remaining.index.isin(used_index))
         ]
@@ -253,10 +279,9 @@ def _build_lineup(merged: pd.DataFrame) -> tuple[list[dict], list[dict], float]:
             starters.append({**row.to_dict(), "slot": pos})
             used_index.add(row.name)
 
-    flex_n = _DEFAULT_SLOTS.get("FLEX", 0)
+    flex_eligible = list(get_profile().roster.flex_positions)
     flex_pool = remaining[
-        remaining["position"].isin(["RB", "WR", "TE"])
-        & (~remaining.index.isin(used_index))
+        remaining["position"].isin(flex_eligible) & (~remaining.index.isin(used_index))
     ]
     for _, row in flex_pool.head(flex_n).iterrows():
         starters.append({**row.to_dict(), "slot": "FLEX"})

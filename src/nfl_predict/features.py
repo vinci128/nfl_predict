@@ -121,20 +121,29 @@ def prepare_base_weekly(
 
     df.drop(columns=[c for c in ["position_roster"] if c in df.columns], inplace=True)
 
-    # Filter only offensive roles for fantasy (QB, RB, WR, TE, K)
+    # Reduce raw roster positions to fantasy slots (DE/DT -> DL, ILB -> LB,
+    # ...). Anything that maps to nothing — offensive line, long snappers,
+    # punters — cannot be started in either league and is dropped.
+    from nfl_predict.leagues import fantasy_position
+
+    # `position` becomes the slot, because that is what every model, board and
+    # roster check downstream compares against. The raw label is kept beside it
+    # for display — an ILB and an edge rusher are both "LB" to ESPN but read
+    # very differently on a draft board.
+    df["position_raw"] = df["position"]
+    df["position"] = df["position"].map(fantasy_position)
+
     if offensive_only:
         df = df[df["position"].isin(["QB", "RB", "WR", "TE"])].copy()
     else:
-        print(
-            "Keeping all positions (filtering positions that have no fantasy points)."
-        )
-        df = df[~df["position"].isin(["LS", "NT", "DL", "OL"])].copy()
+        print("Keeping every position that can fill a fantasy slot.")
+        df = df[df["position"].notna()].copy()
 
     # --- Merge with snap counts (if available) ---
     if snaps is not None:
         if "player_id" in snaps.columns:
             snap_cols = ["season", "week", "player_id"]
-            for c in ["offense_snaps", "offense_pct"]:
+            for c in ["offense_snaps", "offense_pct", "defense_snaps", "defense_pct"]:
                 if c in snaps.columns:
                     snap_cols.append(c)
             snaps_min = snaps[snap_cols].copy()
@@ -143,6 +152,10 @@ def prepare_base_weekly(
                 df.rename(columns={"offense_pct": "snap_pct_offense"}, inplace=True)
             if "offense_snaps" in df.columns:
                 df.rename(columns={"offense_snaps": "snaps_offense"}, inplace=True)
+            if "defense_pct" in df.columns:
+                df.rename(columns={"defense_pct": "snap_pct_defense"}, inplace=True)
+            if "defense_snaps" in df.columns:
+                df.rename(columns={"defense_snaps": "snaps_defense"}, inplace=True)
     else:
         print("snap_counts not available — skipping snap features")
 
@@ -173,12 +186,26 @@ def _select_stat_columns(df: pd.DataFrame) -> list[str]:
         "targets",
         # ball security
         "fumbles_lost",
+        # defensive (IDP) production — the LB/DL slots score off these
+        "def_tackles_solo",
+        "def_tackle_assists",
+        "def_tackles_with_assist",
+        "def_tackles_for_loss",
+        "def_sacks",
+        "def_qb_hits",
+        "def_interceptions",
+        "def_pass_defended",
+        "def_fumbles_forced",
+        "def_fumbles",
+        "def_tds",
         # fantasy (both PPR and custom — lag of custom is the ideal baseline)
         "fantasy_points_ppr",
         "fantasy_points_custom",
         # usage from snaps
         "snaps_offense",
         "snap_pct_offense",
+        "snaps_defense",
+        "snap_pct_defense",
         # kicking
         "fg_made",
         "fg_att",
@@ -282,91 +309,27 @@ def add_simple_season_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def add_custom_league_points(df: pd.DataFrame) -> pd.DataFrame:
+def add_custom_league_points(
+    df: pd.DataFrame,
+    profile: "str | None" = None,
+    column: str = "fantasy_points_custom",
+) -> pd.DataFrame:
     """
-    Calculate fantasy points per custom NFL.com league scoring:
+    Score every player-game under one league's rules.
 
-    Passing: 0.1 pts/yd, 4 pts/TD, -2 pts/INT
-    Rushing: 0.1 pts/yd, 6 pts/TD
-    Receiving: 1 pt/rec, 0.1 pts/yd, 6 pts/TD
-    Return/Fumble TDs: 6 pts
-    Fumbles lost: -2 pts
-    2-pt conversions: 2 pts
-    PAT made: 1 pt
-    FG 0-39: 3 pts, FG 40-49: 4 pts, FG 50+: 5 pts
+    The rules themselves live in `leagues.py` as data. They are applied here,
+    at weekly grain, because ESPN's threshold bonuses ("100-199 yard rushing
+    game") are per-game awards — scoring a pre-aggregated season total would
+    pay each bonus once for the whole year.
+
+    The output column keeps its historical name so the rest of the pipeline is
+    unchanged, but its *values* are league-specific: a model trained on one
+    league's points is not valid for another.
     """
-    pts = pd.Series(0.0, index=df.index, dtype="float64")
+    from nfl_predict.leagues import get_profile
 
-    def col(name: str) -> pd.Series:
-        if name in df.columns:
-            return df[name].fillna(0)
-        return pd.Series(0, index=df.index, dtype="float64")
-
-    # Passing
-    pts += 0.1 * col("passing_yards")
-    pts += 4.0 * col("passing_tds")
-    pts += -2.0 * (col("interceptions") + col("passing_interceptions"))
-
-    # Rushing
-    pts += 0.1 * col("rushing_yards")
-    pts += 6.0 * col("rushing_tds")
-
-    # Receiving
-    pts += 1.0 * col("receptions")
-    pts += 0.1 * col("receiving_yards")
-    pts += 6.0 * col("receiving_tds")
-
-    # Return TDs
-    pts += 6.0 * (
-        col("kick_return_tds") + col("punt_return_tds") + col("special_teams_tds")
-    )
-
-    # Fumble recovery TDs
-    pts += 6.0 * (col("fumble_recovery_tds") + col("defense_tds"))
-
-    # Fumbles lost
-    fumbles_lost = (
-        col("fumbles_lost")
-        + col("rushing_fumbles_lost")
-        + col("receiving_fumbles_lost")
-        + col("sack_fumbles_lost")
-    )
-    pts += -2.0 * fumbles_lost
-
-    # 2-point conversions
-    two_pt = (
-        col("passing_2pt_conversions")
-        + col("rushing_2pt_conversions")
-        + col("receiving_2pt_conversions")
-        + col("two_point_conversions")
-    )
-    pts += 2.0 * two_pt
-
-    # Kicking — prefer distance buckets, fall back to fg_long
-    fg_made = col("field_goals_made") + col("fg_made") + col("fgm")
-    fg_long = col("field_goals_longest") + col("fg_long") + col("fg_longest")
-
-    fg0 = col("fg_made_0_19")
-    fg20 = col("fg_made_20_29")
-    fg30 = col("fg_made_30_39")
-    fg40 = col("fg_made_40_49")
-    fg50 = col("fg_made_50_59")
-    fg60 = col("fg_made_60_")
-
-    if (fg0.sum() + fg20.sum() + fg30.sum() + fg40.sum() + fg50.sum() + fg60.sum()) > 0:
-        fg_points = 3 * (fg0 + fg20 + fg30) + 4 * fg40 + 5 * (fg50 + fg60)
-    else:
-        fg_points = pd.Series(0.0, index=df.index)
-        fg_points[fg_long >= 50] = 5 * fg_made[fg_long >= 50]
-        fg_points[(fg_long >= 40) & (fg_long < 50)] = (
-            4 * fg_made[(fg_long >= 40) & (fg_long < 50)]
-        )
-        fg_points[fg_long < 40] = 3 * fg_made[fg_long < 40]
-
-    pts += fg_points
-    pts += (col("extra_points_made") + col("xpmade") + col("pat_made")) * 1
-
-    df["fantasy_points_custom"] = pts
+    prof = get_profile(profile)
+    df[column] = prof.scoring.score(df)
     return df
 
 
@@ -663,12 +626,14 @@ def validate_features(df: pd.DataFrame) -> None:
     print("=== End Report ===\n")
 
 
-def build_player_week_features(save: bool = True) -> pd.DataFrame:
+def build_player_week_features(
+    save: bool = True, league: str | None = None
+) -> pd.DataFrame:
     """
     Full pipeline:
     1. Load raw parquets
     2. Build base player-week table
-    3. Add custom fantasy points
+    3. Add fantasy points under this league's scoring rules
     4. Add opponent defense features
     5. Add game context (Vegas, weather, rest, bye week)
     6. Add injury features
@@ -676,10 +641,15 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
     8. Add season cumulative features
     9. Validate and optionally save
     """
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    print(f"Building features for {profile.name} [{profile.key}]")
+
     weekly, rosters, snaps, schedules, injuries = load_raw_data()
 
     df = prepare_base_weekly(weekly, rosters, snaps=snaps, offensive_only=False)
-    df = add_custom_league_points(df)
+    df = add_custom_league_points(df, profile=profile.key)
     df = add_opponent_defense_features(df)
 
     if schedules is not None:
@@ -700,8 +670,8 @@ def build_player_week_features(save: bool = True) -> pd.DataFrame:
     validate_features(df)
 
     if save:
-        OUT_DIR.mkdir(parents=True, exist_ok=True)
-        out_path = OUT_DIR / "player_week_features.parquet"
+        out_path = profile.features_path
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_parquet(out_path, index=False)
         print(f"Saved: {out_path} (shape={df.shape})")
 

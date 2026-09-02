@@ -22,25 +22,50 @@ cp .env.example .env          # fill in credentials (see below)
 
 ---
 
-## Scoring system
+## Leagues
 
-Custom league scoring (not standard PPR):
+This repo serves **two ESPN leagues with different rules**. Pick one with
+`--league` on any command, or pin it for a session with
+`export NFL_PREDICT_LEAGUE=hoh`. Run `nfl-predict leagues` to see the live
+configuration.
 
-| Stat | Points |
-|---|---|
-| Passing yard | 0.1 |
-| Passing TD | 4 |
-| Interception | -2 |
-| Rush/Rec yard | 0.1 |
-| Rush/Rec TD | 6 |
-| Reception | 1 (PPR) |
-| Fumble lost | -2 |
-| FG 0–39 yd | 3 |
-| FG 40–49 yd | 4 |
-| FG 50+ yd | 5 |
-| PAT | 1 |
+| | **Ludopathy Bowl** (`ludopathy`) | **Hell or Highwater** (`hoh`) |
+|---|---|---|
+| Teams | 10 | 14 |
+| Roster | 21 (9 bench, 3 IR) | 16 (7 bench, 3 IR) |
+| Starters | QB1 RB2 WR2 TE1 FLEX1 **LB3 DL1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
+| Keepers | 6 per team | none |
 
-Passing at 0.1 pts/yard (vs standard 0.04) makes QBs ~2.5× more valuable. Elite QB season totals of 500–750 pts are expected and correct.
+### Scoring
+
+| Stat | Ludopathy | Hell or Highwater |
+|---|---|---|
+| Passing yards | 1 per 10 (floored) | 0.04 per yard |
+| Passing TD / INT | 4 / −2 | 4 / −2 |
+| Rush/Rec yards | 1 per 10 (floored) | 0.1 per yard |
+| Rush/Rec TD | 6 | 6 |
+| Reception | 1 (PPR) | 1 (PPR) |
+| Fumble lost | −2 | −2 |
+| 2-pt conversion | — | 2 |
+| FG 0–39 / 40–49 / 50+ | 3 / 3 / **0** | 3 / 4 / 5 (6 at 60+) |
+| Missed FG | — | −1 |
+| PAT | 1 | 1 |
+| Game bonuses | 400 pass +4; 100/200 rush +2/+3; 100/200 rec +2/+3 | — |
+| IDP | tackle 1, assist 0.5, PD 1 | not scored |
+
+The passing rate is the difference that matters. At 0.1/yard Ludopathy makes
+QBs ~2.5× more valuable than standard, and elite QB season totals of 500–750
+are correct there. The same seasons land near 300–430 in Hell or Highwater.
+
+**A model trained on one league's scoring is confidently wrong for the other**,
+so feature tables, models, boards and draft state are all namespaced by league:
+
+```
+data/processed/{league}/player_week_features.parquet
+models/{league}/…
+outputs/draft_board_{season}_{league}.csv
+outputs/draft_state_{league}.json
+```
 
 ---
 
@@ -67,36 +92,43 @@ uv run nfl-predict predict --position WR --season 2025 --week 12
 ### Draft preparation
 
 ```bash
-# Run once before draft day (trains total / rate / games models, p10/p50/p90 each)
-uv run nfl-predict draft-prep
+# Show configured leagues
+uv run nfl-predict leagues
 
-# Pull ADP
+# Build a feature table per league (raw data is shared, scoring is not)
+uv run nfl-predict features --all
+
+# Run once before draft day, per league
+# (trains total / rate / games models, p10/p50/p90 each)
+uv run nfl-predict draft-prep --league hoh
+
+# Pull ADP (shared across leagues)
 uv run nfl-predict fetch-adp --source sleeper --scoring half
 
-# Build the draft board
-uv run nfl-predict board --league-size 12 --adp data/adp_current.csv --fmt csv
-uv run nfl-predict board --fmt table           # quick terminal preview
-uv run nfl-predict board --fmt table --superflex
+# Build the draft board — team count and scarcity come from the league
+uv run nfl-predict board --league hoh --adp data/adp_current.csv --fmt csv
+uv run nfl-predict board --league ludopathy --fmt table   # terminal preview
 
 # Season projections (terminal)
-uv run nfl-predict project-season --position QB --top 20
+uv run nfl-predict project-season --league hoh --position QB --top 20
 ```
 
 ### Live draft (terminal mode)
 
 ```bash
-uv run nfl-predict draft-start --league-size 12 --draft-position 5
+uv run nfl-predict draft-start --league hoh --draft-position 5
 uv run nfl-predict draft-pick "Bijan Robinson" --mine   # your pick
 uv run nfl-predict draft-pick "Drake Maye"              # opponent pick
 ```
 
-### NFL.com auto-sync
+### ESPN auto-sync
 
-Polls NFL.com and records picks automatically into `draft_state.json`:
+Polls ESPN and records picks automatically into the league's draft state.
+The league id comes from the profile; a **private** league also needs
+`ESPN_S2` and `ESPN_SWID` copied from a logged-in browser (they expire).
 
 ```bash
-# Requires: NFL_FANTASY_USERNAME, NFL_FANTASY_PASSWORD, NFL_FANTASY_LEAGUE_ID
-uv run nfl-predict nfl-sync --interval 20
+uv run nfl-predict nfl-sync --league hoh --interval 20
 ```
 
 ### Web UI
@@ -113,33 +145,42 @@ uvicorn nfl_predict.api:app --host 0.0.0.0 --port 8000
 ### Night before
 
 ```bash
-uv run nfl-predict update-all --no-train
-uv run nfl-predict draft-prep
+export LEAGUE=hoh          # or ludopathy
+
+uv run nfl-predict update-all --no-train --all
+uv run nfl-predict draft-prep --league $LEAGUE
 uv run nfl-predict fetch-adp --source sleeper --scoring half
-uv run nfl-predict board --league-size 12 --adp data/adp_current.csv
+uv run nfl-predict board --league $LEAGUE --adp data/adp_current.csv
 ```
+
+For **Ludopathy**, fill in `data/keepers_ludopathy_2026.txt` once ESPN locks
+keepers (one hour before the draft) and rebuild the board. `board` reads that
+file automatically from the league profile. With 60 players kept, replacement
+level moves a long way — the board is materially wrong without it.
 
 ### At the venue — three terminals
 
 ```
 Terminal 1 (once, before draft starts):
-  nfl-predict draft-start --league-size 12 --draft-position 5
+  nfl-predict draft-start --league hoh --draft-position 5
 
 Terminal 2 (runs all draft — mechanical pick recorder):
-  nfl-predict nfl-sync --interval 20
+  nfl-predict nfl-sync --league hoh --interval 20
 
 Terminal 3 (optional — web UI for you and friends on same WiFi):
   uvicorn nfl_predict.api:app --host 0.0.0.0 --port 8000
 ```
 
-`nfl-sync` is the sole process that writes picks to `draft_state.json`.
+`nfl-sync` is the sole process that writes picks to the league's
+`outputs/draft_state_{league}.json`.
 
 ### During the draft (web UI)
 
 - Type a player name and press Enter to record an opponent pick
 - Toggle **Mine** before submitting for your own picks
 - Click **↩ Undo** to reverse a miskey
-- Use position tabs (QB / RB / WR / TE / K) to filter the board
+- Use position tabs to filter the board — they follow the league, so Ludopathy
+  shows LB/DL and Hell or Highwater shows DST
 - **Rate** is projected points per game, **G** projected games played — a low `G`
   (amber under 13, red under 11) marks limited availability, and its tooltip shows
   last season's injury record. Note Rate x G does not equal Median; see CLAUDE.md
@@ -160,12 +201,24 @@ docker compose --profile draft up
 
 ## Environment variables
 
+Both leagues' ESPN ids, team slots and sizes live in the league profile, so
+nothing below is required to build boards. These are overrides and credentials.
+
 ```bash
-# NFL.com credentials (for nfl-sync and the draft UI's NFL Sync button)
-NFL_FANTASY_USERNAME=you@email.com
-NFL_FANTASY_PASSWORD=yourpassword
-NFL_FANTASY_LEAGUE_ID=12345678
-NFL_FANTASY_TEAM_ID=3            # your team slot (1-based)
+# Pin a league for the whole shell (otherwise pass --league)
+NFL_PREDICT_LEAGUE=hoh
+
+# Private leagues only. Ludopathy is private; Hell or Highwater is public and
+# needs neither. Copy from a logged-in browser (DevTools -> Application ->
+# Cookies -> fantasy.espn.com). They expire — refresh before draft day.
+ESPN_S2=...
+ESPN_SWID={...}
+
+# Optional overrides of the profile
+ESPN_LEAGUE_ID=1773102615
+ESPN_TEAM_ID=9
+ESPN_SEASON=2026
+ESPN_LEAGUE_SIZE=10
 ```
 
 ---

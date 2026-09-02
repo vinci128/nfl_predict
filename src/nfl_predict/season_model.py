@@ -68,6 +68,12 @@ _POS_PATTERNS: dict[str, list[str]] = {
     ],
     "TE": ["receiv", "target", "snap", "fantasy_points"],
     "K": ["fg_", "pat_", "fgm", "fg_long", "fg_made", "fg_att", "fantasy_points"],
+    # IDP. Tackle volume is the dominant term in this scoring, and tackle
+    # volume is mostly a function of snaps and role, so defensive snap share
+    # matters as much for a linebacker as target share does for a receiver.
+    "LB": ["def_", "tackle", "sack", "snap", "fantasy_points"],
+    "DL": ["def_", "tackle", "sack", "qb_hit", "snap", "fantasy_points"],
+    "DB": ["def_", "tackle", "pass_defended", "interception", "snap", "fantasy_points"],
 }
 
 _UNIVERSAL = ["age_at_season_start", "years_exp", "games_played"]
@@ -126,10 +132,25 @@ def _quantile_label(quantile: float | None) -> str:
     return f"p{int(quantile * 100)}" if quantile is not None else "rmse"
 
 
-def _model_paths(position: str, target: str, label: str) -> tuple[Path, Path]:
+def _model_dir(league: str | None = None) -> Path:
+    """Where this league's season models live.
+
+    Models are namespaced by league because the target — fantasy points under
+    that league's rules — differs between them. A model trained on one
+    league's scoring produces confidently wrong numbers for another.
+    """
+    from nfl_predict.leagues import get_profile
+
+    return get_profile(league).model_dir
+
+
+def _model_paths(
+    position: str, target: str, label: str, league: str | None = None
+) -> tuple[Path, Path]:
     """Return (model_path, meta_path) for a position/target/quantile."""
     stem = f"{position.lower()}_season_{_target_slug(target)}_{label}"
-    return MODEL_DIR / f"{stem}.cbm", MODEL_DIR / f"{stem}_meta.json"
+    d = _model_dir(league)
+    return d / f"{stem}.cbm", d / f"{stem}_meta.json"
 
 
 def _get_season_feature_cols(df: pd.DataFrame, position: str) -> list[str]:
@@ -180,6 +201,7 @@ def _get_season_feature_cols(df: pd.DataFrame, position: str) -> list[str]:
 
 def build_training_data(
     position: str,
+    league: str | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """
     Build train / validation DataFrames for the season model.
@@ -192,7 +214,7 @@ def build_training_data(
     -------
     df_train, df_valid, feature_cols
     """
-    df_weekly = load_features()
+    df_weekly = load_features(league)
     rosters = load_rosters()
     snapshot = build_season_snapshot(df_weekly, rosters=rosters)
 
@@ -231,6 +253,7 @@ def train_season_model(
     iterations: int = 500,
     depth: int = 4,
     target: str = PPG_TARGET,
+    league: str | None = None,
 ) -> str | None:
     """
     Train a CatBoost season model for a position.
@@ -254,7 +277,7 @@ def train_season_model(
     """
     _target_slug(target)  # validates
 
-    df_train, df_valid, feature_cols = build_training_data(position)
+    df_train, df_valid, feature_cols = build_training_data(position, league)
 
     X_train = df_train[feature_cols].fillna(0)
     y_train = df_train[target]
@@ -301,8 +324,8 @@ def train_season_model(
     # plus a meta sidecar recording the exact feature set the model was
     # trained on — predict_season must use this, not a freshly recomputed
     # feature list, or columns silently misalign after a data update.
-    MODEL_DIR.mkdir(exist_ok=True, parents=True)
-    flat_path, flat_meta_path = _model_paths(position, target, label)
+    _model_dir(league).mkdir(exist_ok=True, parents=True)
+    flat_path, flat_meta_path = _model_paths(position, target, label, league)
     model.save_model(str(flat_path))
     flat_meta_path.write_text(
         json.dumps(
@@ -348,6 +371,7 @@ def train_all_quantiles(
     position: str,
     registry: ModelRegistry | None = None,
     iterations: int = 500,
+    league: str | None = None,
 ) -> dict[str, str | None]:
     """
     Train p10/p50/p90 rate and availability models for a single position.
@@ -367,6 +391,7 @@ def train_all_quantiles(
                 registry=registry,
                 iterations=iterations,
                 target=target,
+                league=league,
             )
     return results
 
@@ -380,6 +405,7 @@ def predict_season(
     position: str,
     as_of_season: int,
     quantiles: list[float] | None = None,
+    league: str | None = None,
 ) -> pd.DataFrame:
     """
     Generate full-season projections for all active players of a position.
@@ -452,7 +478,7 @@ def predict_season(
     def _apply(target: str, q: float) -> pd.Series | None:
         nonlocal fallback_cols
         label = _quantile_label(q)
-        model_path, meta_path = _model_paths(position, target, label)
+        model_path, meta_path = _model_paths(position, target, label, league)
 
         if not model_path.exists():
             print(
@@ -469,7 +495,7 @@ def predict_season(
                     "columns from training data (retrain with `nfl-predict draft-prep` "
                     "to pin them)."
                 )
-                _, _, fallback_cols = build_training_data(position)
+                _, _, fallback_cols = build_training_data(position, league)
             feature_cols = fallback_cols
 
         missing = [c for c in feature_cols if c not in inference.columns]
@@ -516,16 +542,24 @@ def main(
     positions: list[str] | None = None,
     use_registry: bool = True,
     iterations: int = 500,
+    league: str | None = None,
 ) -> None:
     """Train season projection models for all (or selected) positions."""
-    registry = ModelRegistry() if use_registry else None
-    pos_list = positions or POSITIONS
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    registry = ModelRegistry(profile.registry_path) if use_registry else None
+    # Only train what this league can actually start.
+    pos_list = positions or [p for p in profile.roster.positions if p != "DST"]
+    print(f"Training season models for {profile.name} [{profile.key}]: {pos_list}")
 
     for pos in pos_list:
         print(f"\n{'=' * 50}")
         print(f"  Season model: {pos}")
         print(f"{'=' * 50}")
         try:
-            train_all_quantiles(pos, registry=registry, iterations=iterations)
+            train_all_quantiles(
+                pos, registry=registry, iterations=iterations, league=profile.key
+            )
         except ValueError as e:
             print(f"  Skipping {pos}: {e}")

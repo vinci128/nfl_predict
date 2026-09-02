@@ -413,11 +413,36 @@ class TestConfiguration:
             client = EspnFantasyClient.from_env()
         assert client.espn_s2 is None
 
-    def test_missing_league_id_raises(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
+    def test_missing_league_id_raises_when_the_profile_has_none(self) -> None:
+        """
+        With no id in the environment and none on the league profile there is
+        nothing to talk to, so the client must refuse rather than guess.
+        """
+        from dataclasses import replace
+
+        from nfl_predict import leagues
+
+        anonymous = replace(leagues.LUDOPATHY, espn_league_id=None)
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.dict(leagues.PROFILES, {"ludopathy": anonymous}),
+        ):
             assert EspnFantasyClient.credentials_available() is False
             with pytest.raises(EspnFantasyError, match="ESPN_LEAGUE_ID"):
                 EspnFantasyClient.from_env()
+
+    def test_league_profile_supplies_the_id_without_any_environment(self) -> None:
+        """A configured league needs no env vars at all for a public league."""
+        with patch.dict(os.environ, {}, clear=True):
+            c = EspnFantasyClient.from_env("hoh")
+        assert c.league_id == "581348581"
+        assert c.league_size == 14
+        assert c.team_id == "9"
+
+    def test_environment_overrides_the_profile(self) -> None:
+        with patch.dict(os.environ, {"ESPN_LEAGUE_ID": "999"}, clear=True):
+            c = EspnFantasyClient.from_env("hoh")
+        assert c.league_id == "999"
 
     @pytest.mark.parametrize(
         "raw", ["ABC-123", "{ABC-123}", "  {ABC-123}  ", "{ABC-123", "ABC-123}"]
@@ -481,15 +506,18 @@ class TestConfiguration:
         assert c.league_size == 10
 
     def test_from_env_defaults(self) -> None:
-        """Only ESPN_LEAGUE_ID is required; everything else has defaults."""
+        """
+        ESPN_LEAGUE_ID overrides the profile; the rest falls back to it.
+        Cookies are never stored in a profile — they are credentials.
+        """
         with patch.dict(os.environ, {"ESPN_LEAGUE_ID": "42"}, clear=True):
-            c = EspnFantasyClient.from_env()
+            c = EspnFantasyClient.from_env("ludopathy")
         assert c.league_id == "42"
-        assert c.season == 2026  # current year
+        assert c.season == 2026
         assert c.espn_s2 is None
         assert c.swid is None
-        assert c.team_id is None
-        assert c.league_size == 12
+        assert c.team_id == "9"  # from the profile
+        assert c.league_size == 10  # from the profile
 
     def test_from_env_empty_s2_becomes_none(self) -> None:
         """Empty ESPN_S2 string should be treated as None (public league)."""
@@ -965,21 +993,56 @@ class TestProviderSelection:
             assert available_providers() == ["espn", "nfl"]
             assert isinstance(make_client("auto"), EspnFantasyClient)
 
-    def test_auto_falls_back_to_nfl(self) -> None:
+    def test_auto_still_prefers_espn_when_nfl_is_also_configured(self) -> None:
+        """
+        Every configured league carries an ESPN id, so ESPN is always
+        available and auto always picks it. The deprecated NFL.com path is
+        reachable only by asking for it explicitly.
+        """
         env = {
             "NFL_FANTASY_USERNAME": "u",
             "NFL_FANTASY_PASSWORD": "p",
             "NFL_FANTASY_LEAGUE_ID": "9",
         }
         with patch.dict(os.environ, env, clear=True):
+            client = make_client("auto")
+        assert isinstance(client, EspnFantasyClient)
+
+    def test_auto_falls_back_to_nfl_only_without_any_espn_league(self) -> None:
+        from dataclasses import replace
+
+        from nfl_predict import leagues
+
+        anonymous = replace(leagues.LUDOPATHY, espn_league_id=None)
+        env = {
+            "NFL_FANTASY_USERNAME": "u",
+            "NFL_FANTASY_PASSWORD": "p",
+            "NFL_FANTASY_LEAGUE_ID": "9",
+        }
+        with (
+            patch.dict(os.environ, env, clear=True),
+            patch.dict(leagues.PROFILES, {"ludopathy": anonymous}),
+        ):
             from nfl_predict.nfl_fantasy import NflFantasyClient
 
             with pytest.warns(DeprecationWarning, match="deprecated"):
                 client = make_client("auto")
             assert isinstance(client, NflFantasyClient)
 
-    def test_nothing_configured_names_espn(self) -> None:
+    def test_a_configured_league_makes_espn_available_with_no_env(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
+            assert "espn" in available_providers()
+
+    def test_nothing_configured_names_espn(self) -> None:
+        from dataclasses import replace
+
+        from nfl_predict import leagues
+
+        anonymous = replace(leagues.LUDOPATHY, espn_league_id=None)
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.dict(leagues.PROFILES, {"ludopathy": anonymous}),
+        ):
             assert available_providers() == []
             with pytest.raises(DraftSyncError) as exc:
                 make_client("auto")
@@ -991,7 +1054,16 @@ class TestProviderSelection:
 
     def test_explicit_provider_error_is_wrapped(self) -> None:
         """Callers catch DraftSyncError, so provider errors must surface as it."""
-        with patch.dict(os.environ, {}, clear=True), pytest.raises(DraftSyncError):
+        from dataclasses import replace
+
+        from nfl_predict import leagues
+
+        anonymous = replace(leagues.LUDOPATHY, espn_league_id=None)
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.dict(leagues.PROFILES, {"ludopathy": anonymous}),
+            pytest.raises(DraftSyncError),
+        ):
             make_client("espn")
 
     def test_explicit_nfl_provider_warns(self) -> None:

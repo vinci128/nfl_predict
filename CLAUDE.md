@@ -11,6 +11,11 @@ This file gives Claude Code the context needed to work effectively in this repo.
 
 The stack: Python 3.12, CatBoost, pandas, FastAPI + htmx, Typer CLI, nflreadpy for data.
 
+It serves **two real ESPN leagues with incompatible rules**. Everything that
+depends on scoring — feature tables, models, boards, draft state — is
+namespaced by league. See "Leagues" below; run `nfl-predict leagues` for the
+current configuration.
+
 ---
 
 ## Repository layout
@@ -32,6 +37,8 @@ src/nfl_predict/
   draft_assistant.py   Live draft state — mark_drafted, undo, suggest, save/load JSON
   adp_fetch.py         ADP from Sleeper / FantasyPros / synthetic fallback
   nfl_fantasy.py       NFL.com OAuth2 client — live draft pick polling
+  leagues.py           League profiles — scoring rules, rosters, artifact paths
+  dst.py               Team defence / special teams projections (shrinkage)
   draft_api.py         FastAPI router (/draft/*) with htmx partials
   weekly_api.py        FastAPI router (/weekly/*) — season-long league beta
   lineup.py            Standalone `suggest` CLI — optimal lineup from predictions
@@ -57,6 +64,8 @@ data/
   processed/
     player_week_features.parquet  Engineered features (roll windows, cumulative)
   adp_current.csv         Most recent ADP fetch
+  team_stats.parquet      Team-level stats (the D/ST projection's only source)
+  keepers_ludopathy_2026.txt  Ludopathy keeper list (excluded from the board)
 
 outputs/
   draft_board_YYYY.csv    Current draft board (rebuilt each year)
@@ -118,74 +127,141 @@ Always commit `pyproject.toml` and `uv.lock` together.
 
 ---
 
-## Scoring system
+## Leagues
 
-The custom scoring (`add_custom_league_points` in `features.py`) uses:
-- **Passing: 0.1 pts/yard** (not the standard 0.04), 4 pts/TD, -2 pts/INT — the yardage rate makes QBs 2.5× more valuable than in standard PPR
-- Rushing: 0.1 pts/yard, 6 pts/TD
-- Receiving: 1 pt/rec (PPR), 0.1 pts/yard, 6 pts/TD
-- FG: 3/4/5 pts for 0–39/40–49/50+
+`leagues.py` holds one `LeagueProfile` per league: scoring rules, roster
+configuration, ESPN ids, keeper settings, and the artifact paths its outputs
+live under. **Scoring is data, not code** — `ScoringRules` is applied by
+`add_custom_league_points`, which no longer hardcodes any values.
 
-Consequence: elite QB season totals of 500–750 pts are correct for this system. The `positional_scarcity` multiplier in `DraftSettings` (default QB=0.7) adjusts the board for real draft dynamics in 1-QB leagues.
+| | **Ludopathy Bowl** (`ludopathy`) | **Hell or Highwater** (`hoh`) |
+|---|---|---|
+| Teams / roster | 10 / 21 (9 bench, 3 IR) | 14 / 16 (7 bench, 3 IR) |
+| Starters | QB1 RB2 WR2 TE1 FLEX1 **LB3 DL1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
+| Passing yards | **1 pt / 10 yds** (floored) | **0.04 / yd** |
+| Field goals | 3 / 3 / **0** by distance | 3 / 4 / 5 / 6, −1 missed |
+| 2-pt conversions | not scored | 2 |
+| Game bonuses | 400 pass, 100/200 rush, 100/200 rec | none |
+| Keepers | **6 per team** | none |
+| ESPN league id | 1773102615 | 581348581 |
+
+Consequence: elite QB season totals of 500–750 are correct for Ludopathy and
+wrong for Hell or Highwater, where the same season lands near 300–430. A model
+trained on one league's points is confidently wrong for the other, which is why
+`models/` and `data/processed/` are namespaced by league key.
+
+### Scoring rules are per-*game*, not per-season
+ESPN's threshold bonuses ("100–199 yard rushing game") are per-game awards, so
+`ScoringRules.score()` must run at weekly grain, before any aggregation.
+Scoring a pre-summed season total pays each bonus once for the whole year.
+
+### Two forms of yardage scoring
+`per_unit` is a continuous rate (0.04/yd). `per_increment` is ESPN's bucketed
+form ("every 10 yards = 1"), which **floors** the remainder — 347 passing yards
+is 34 points, not 34.7. A stat scored under both would double-count, which
+`ScoringRules.__post_init__` rejects.
+
+### What ESPN's settings page does not show
+Categories worth zero are omitted from the summary, so an absent row means the
+category scores nothing. For Ludopathy that is real: no 50+ yard FG value, no
+missed-FG penalty, no 2-point conversions. **The 50+ FG being worth 0 is worth
+confirming with the league manager** — it is unusual enough to look like a
+misconfiguration.
+
+### Known gaps
+- Ludopathy's 40+/50+ yard TD pass bonuses (PTD40 +2, PTD50 +3) need play-level
+  data and are not modelled. They are declared in `ScoringRules.unmodelled` and
+  printed by `nfl-predict leagues` rather than silently dropped.
+- Whether ESPN applies sacks/INTs/fumbles to *individual* defenders in
+  Ludopathy is assumed, not confirmed. The rules score them for IDPs on the
+  basis that ESPN applies categories by stat id rather than roster slot.
+  **Verify against a real box score after week 1.**
 
 ---
 
 ## Key CLI commands
 
-```bash
-# Full data refresh + retrain
-uv run nfl-predict update-all
+Almost every command takes `--league`. Omit it and the default (`ludopathy`)
+applies; export `NFL_PREDICT_LEAGUE=hoh` to pin one for a whole session.
 
-# Draft preparation (run once per season)
-uv run nfl-predict draft-prep                          # train season models
-uv run nfl-predict fetch-adp --source sleeper          # pull ADP
-uv run nfl-predict board --league-size 12 \
+```bash
+# What is configured
+uv run nfl-predict leagues
+
+# Full data refresh. Raw data is shared; scoring is not, so --all rebuilds
+# one feature table per league.
+uv run nfl-predict update-all --all
+uv run nfl-predict features --all                      # features only
+
+# Draft preparation (run once per season, per league)
+uv run nfl-predict draft-prep --league hoh             # train season models
+uv run nfl-predict fetch-adp --source sleeper          # pull ADP (shared)
+uv run nfl-predict board --league hoh \
        --adp data/adp_current.csv --fmt csv            # build board
-uv run nfl-predict board --fmt table                   # quick terminal preview
-uv run nfl-predict board --fmt table --superflex       # superflex league
+uv run nfl-predict board --league ludopathy --fmt table   # terminal preview
 
 # Season projections
-uv run nfl-predict project-season --position QB --top 20
+uv run nfl-predict project-season --league hoh --position QB --top 20
 
-# Live draft (terminal mode)
-uv run nfl-predict draft-start --league-size 12 --draft-position 5
+# Live draft (terminal mode) — team count comes from the league
+uv run nfl-predict draft-start --league hoh --draft-position 5
 uv run nfl-predict draft-pick "Bijan Robinson" --mine
 uv run nfl-predict draft-pick "Drake Maye"             # opponent pick
 
-# NFL Fantasy auto-sync (run in a second terminal during draft)
-# Requires: NFL_FANTASY_USERNAME, NFL_FANTASY_PASSWORD, NFL_FANTASY_LEAGUE_ID
-uv run nfl-predict nfl-sync --interval 30
+# ESPN auto-sync (run in a second terminal during the draft).
+# The league id comes from the profile; private leagues also need
+# ESPN_S2 and ESPN_SWID.
+uv run nfl-predict nfl-sync --league hoh --interval 30
 
 # Start the web UI
 uvicorn nfl_predict.api:app --host 0.0.0.0 --port 8000
 # → http://localhost:8000/draft
 ```
 
+Per-league artifacts:
+
+```
+data/processed/{league}/player_week_features.parquet
+models/{league}/{pos}_season_{target}_{q}.cbm
+outputs/draft_board_{season}_{league}.csv
+outputs/draft_state_{league}.json
+```
+
 ---
 
 ## Draft day workflow (real-world use)
 
+Set `LEAGUE` first — every command below reads it.
+
 ### Night before
 ```bash
-uv run nfl-predict update-all --no-train
-uv run nfl-predict draft-prep
+export LEAGUE=hoh          # or ludopathy
+
+uv run nfl-predict update-all --no-train --all
+uv run nfl-predict draft-prep --league $LEAGUE
 uv run nfl-predict fetch-adp --source sleeper --scoring half
-uv run nfl-predict board --league-size 12 --adp data/adp_current.csv
+uv run nfl-predict board --league $LEAGUE --adp data/adp_current.csv
 ```
+
+For **Ludopathy**, fill `data/keepers_ludopathy_2026.txt` once ESPN locks
+keepers (one hour before the draft) and rebuild the board — the `board`
+command picks that file up automatically from the profile. 60 of the player
+pool's best are gone, so replacement level moves a long way.
 
 ### At the venue
 ```bash
-export NFL_FANTASY_USERNAME=you@email.com
-export NFL_FANTASY_PASSWORD=yourpassword
-export NFL_FANTASY_LEAGUE_ID=12345678
-export NFL_FANTASY_TEAM_ID=3             # your team slot number
+export NFL_PREDICT_LEAGUE=hoh
+# Only needed for a private league — Hell or Highwater is public,
+# Ludopathy is not. Copy from a logged-in browser; these expire.
+export ESPN_S2=...
+export ESPN_SWID=...
 
 uvicorn nfl_predict.api:app --host 0.0.0.0 --port 8000
 # Open http://localhost:8000/draft in browser
 # Friends on same WiFi can view at http://<your-ip>:8000/draft
 
-# In a second terminal for auto-sync with NFL Fantasy:
-uv run nfl-predict nfl-sync --interval 30
+# In a second terminal for auto-sync with ESPN:
+uv run nfl-predict nfl-sync --league hoh --interval 30
 ```
 
 ### During the draft
@@ -193,8 +269,9 @@ uv run nfl-predict nfl-sync --interval 30
 - Toggle **Mine** checkbox before submitting for your own picks
 - Click a row's **Fill** or **Mine** button to pre-fill the input (also sets player_id for exact match)
 - Click **↩ Undo** to reverse the last pick (any miskey)
-- Use position filter tabs (QB / RB / WR / TE / K) to narrow the board
-- **NFL Sync** button appears when NFL Fantasy credentials are set — pulls picks automatically
+- Use position filter tabs to narrow the board — they follow the league, so
+  Ludopathy shows LB/DL and Hell or Highwater shows DST
+- **Sync** button appears when the league has an ESPN id — pulls picks automatically
 
 ---
 
@@ -238,6 +315,34 @@ The draft UI shows `Rate` and `G` columns on the board table (gated on the colum
 Walk-forward 2019–2024 found no incremental predictive value on any of the three targets: deltas within ±1.3% MAE, mostly slightly *worse*, and unchanged when restricted to established starters (≥10 games). `games_played_season` is already a feature and is itself the strong injury proxy; the report detail adds nothing on top. Multi-season durability history (lagged games played, career injury burden) was also tested and added nothing.
 
 Aggregate the report **directly**, never via the weekly feature table. The weekly merge in `features.py` attaches injury status to games the player *played*, so it structurally cannot see a week he was Out — 0% of `Out` rows have a weekly stat line, and only 50% of report rows are visible at all. `injury_status_season_cum` therefore means "played while listed", not "missed time". That weekly usage is still legitimate for the *weekly* model, where playing hurt predicts lower output.
+
+### IDP (Ludopathy only)
+`position` in the feature table carries the **fantasy slot**, not the raw
+roster label: DE/DT/NT collapse to `DL`, ILB/MLB/OLB to `LB`, and the raw value
+is kept beside it as `position_raw`. Everything downstream compares against the
+slot, so this mapping is what makes `LB` and `DL` models possible at all. The
+mapping lives in `leagues.fantasy_position`; a position that maps to nothing
+(offensive line, long snapper, punter) is dropped — it cannot fill a slot in
+either league.
+
+Scale check against 2025: an elite LB is ~145 points and an elite DL ~80, next
+to ~740 for the top QB and ~180 for the top kicker. With 4 IDP slots of 12 they
+matter, but VOR correctly puts them well after the skill positions.
+
+### D/ST (Hell or Highwater only)
+`dst.py` is deliberately **not** a CatBoost quantile family. Two derived inputs
+drive most of the scoring and neither is in any stats table directly: points
+allowed is the *opponent's* score (from `schedules`), and yards allowed are the
+*opponent's* gains (from `team_stats`, joined on `opponent_team`). Get either
+join backwards and the numbers still look plausible.
+
+Measured 2015–2024, a defence's fantasy points correlate **r = 0.32** with the
+next season's — about 10% of the variance, from 32 rows a year. So the
+projection is a shrinkage fit (`next ≈ 0.29 × prior + 50`) with the p10/p90
+band taken from the residual spread. The band (~82 points wide) is twice the
+spread between the best and worst projected defence (~43), which is the honest
+picture: the board will rank all 32 in a clump and let them fall to the end of
+the draft.
 
 ### Player name format
 Raw feature data uses abbreviated names (`J.Allen`, `B.Robinson`). Roster data uses full names (`Josh Allen`, `Bijan Robinson`). The join between them is on `player_id` / `gsis_id` — never on name alone. Two players with the same abbreviated name (e.g. Brian Robinson and Bijan Robinson both appear as `B.Robinson`) are correctly separated by their distinct `player_id`.

@@ -9,10 +9,9 @@
 # Jr/Sr/II/III/IV suffix. `nfl-predict board` prints a WARNING for any line
 # that matches nobody — check that warning is empty before drafting.
 #
-# Rebuild the board after filling this in:
-#   uv run nfl-predict board --league-size 10 \
-#     --exclude data/keepers_ludopathy_2026.txt \
-#     --out outputs/draft_board_2026_ludopathy.csv
+# Rebuild the board after filling this in. `board` reads this file
+# automatically from the league profile, so no --exclude flag is needed:
+#   uv run nfl-predict board --league ludopathy --adp data/adp_current.csv
 
 # Alessandrino Gamblers
 

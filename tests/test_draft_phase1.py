@@ -443,7 +443,7 @@ class TestBuildTrainingData:
         import nfl_predict.season_model as sm
 
         tiny_df = _make_weekly_df(n_players=2, seasons=[2021, 2022])
-        monkeypatch.setattr(sm, "load_features", lambda: tiny_df)
+        monkeypatch.setattr(sm, "load_features", lambda league=None: tiny_df)
         monkeypatch.setattr(sm, "load_rosters", lambda: None)
 
         with pytest.raises(ValueError, match="Not enough"):
@@ -457,7 +457,7 @@ class TestBuildTrainingData:
         df = _make_weekly_df(
             n_players=14, seasons=[2019, 2020, 2021, 2022, 2023], n_weeks=16
         )
-        monkeypatch.setattr(sm, "load_features", lambda: df)
+        monkeypatch.setattr(sm, "load_features", lambda league=None: df)
         monkeypatch.setattr(sm, "load_rosters", lambda: None)
 
         df_train, df_valid, _ = build_training_data("WR")
@@ -472,7 +472,7 @@ class TestBuildTrainingData:
         df = _make_weekly_df(
             n_players=14, seasons=[2019, 2020, 2021, 2022, 2023], n_weeks=16
         )
-        monkeypatch.setattr(sm, "load_features", lambda: df)
+        monkeypatch.setattr(sm, "load_features", lambda league=None: df)
         monkeypatch.setattr(sm, "load_rosters", lambda: None)
 
         df_train, _, feature_cols = build_training_data("WR")

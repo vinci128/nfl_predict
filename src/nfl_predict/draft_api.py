@@ -67,6 +67,34 @@ def _available_boards() -> list[str]:
     return sorted(glob.glob(BOARDS_GLOB))
 
 
+def _board_league(board_path: str) -> str:
+    """League key for a board file (`draft_board_{season}_{league}.csv`).
+
+    Boards are name-encoded with the league profile key, so the league a
+    session runs under is read back from the selected file rather than
+    hardcoded to the default. Falls back to the default league when the
+    filename doesn't match any known key.
+    """
+    from nfl_predict.leagues import DEFAULT_LEAGUE, league_keys
+
+    stem = Path(board_path).stem
+    for key in league_keys():
+        if stem.endswith(f"_{key}"):
+            return key
+    return DEFAULT_LEAGUE
+
+
+def _position_tabs(state) -> list[str]:
+    """Board filter tabs for this draft's league.
+
+    Driven by the league profile rather than a fixed list, so an IDP league
+    shows LB/DL tabs and a D/ST league shows DST.
+    """
+    from nfl_predict.leagues import get_profile
+
+    return ["ALL", *get_profile(getattr(state, "league", None)).roster.positions]
+
+
 def _state_to_dict(state: Any) -> dict:
     """Serialize key state info for templates."""
     needs = analyse_roster_needs(state)
@@ -221,6 +249,7 @@ async def draft_start(
         league_size=league_size,
         draft_position=draft_position,
         state_path=STATE_PATH,
+        league=_board_league(board_path),
     )
     with state_lock(STATE_PATH):
         save_state(state)
@@ -239,7 +268,7 @@ async def draft_board_page(request: Request, pos: str = "ALL"):
     ctx = _state_to_dict(state)
     ctx["board_rows"] = _board_rows(state, pos)
     ctx["pos_filter"] = pos
-    ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
+    ctx["positions"] = _position_tabs(state)
     return templates.TemplateResponse(
         "draft_board.html", {"request": request, "active_tab": "Draft", **ctx}
     )
@@ -327,7 +356,7 @@ async def draft_pick(
     ctx = _state_to_dict(state)
     ctx["board_rows"] = _board_rows(state, pos)
     ctx["pos_filter"] = pos
-    ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
+    ctx["positions"] = _position_tabs(state)
     ctx["request"] = request
 
     return templates.TemplateResponse("partials/pick_response.html", ctx)
@@ -367,7 +396,7 @@ async def draft_undo(request: Request, pos: str = Form("ALL")):
     ctx = _state_to_dict(state)
     ctx["board_rows"] = _board_rows(state, pos)
     ctx["pos_filter"] = pos
-    ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
+    ctx["positions"] = _position_tabs(state)
     ctx["request"] = request
 
     return templates.TemplateResponse("partials/pick_response.html", ctx)
@@ -468,7 +497,7 @@ async def nfl_sync(request: Request, pos: str = Form("ALL")):
     ctx = _state_to_dict(state)
     ctx["board_rows"] = _board_rows(state, pos)
     ctx["pos_filter"] = pos
-    ctx["positions"] = ["ALL", "QB", "RB", "WR", "TE", "K"]
+    ctx["positions"] = _position_tabs(state)
     ctx["request"] = request
     # Rendered as an out-of-band banner by pick_response.html. Without this
     # the board just changes under the user with no confirmation, and picks

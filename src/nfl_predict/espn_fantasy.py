@@ -126,45 +126,65 @@ class EspnFantasyClient:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_env(cls) -> EspnFantasyClient:
+    def from_env(cls, league: str | None = None) -> EspnFantasyClient:
         """
-        Create a client from environment variables.
+        Create a client from a league profile, with environment overrides.
 
-        Required: ESPN_LEAGUE_ID
-        Optional: ESPN_SEASON, ESPN_S2, ESPN_SWID (private leagues),
-                  ESPN_TEAM_ID, ESPN_LEAGUE_SIZE
+        The profile already knows each league's ESPN id, team id and size, so
+        only the private-league cookies normally need to be in the environment.
+        Every value can still be overridden:
+
+        ESPN_LEAGUE_ID, ESPN_SEASON, ESPN_TEAM_ID, ESPN_LEAGUE_SIZE, and
+        ESPN_S2 / ESPN_SWID (required for a private league, and never stored
+        in a profile — they are credentials and they expire).
         """
         import os
 
-        league_id = os.environ.get("ESPN_LEAGUE_ID", "")
+        from nfl_predict.leagues import get_profile
+
+        profile = get_profile(league)
+
+        league_id = os.environ.get("ESPN_LEAGUE_ID") or (profile.espn_league_id or "")
         if not league_id:
             raise EspnFantasyError(
-                "Set ESPN_LEAGUE_ID (the number in your league URL). "
-                "Private leagues also need ESPN_S2 and ESPN_SWID."
+                "Set ESPN_LEAGUE_ID (the number in your league URL), or pick a "
+                "league that has one configured. Private leagues also need "
+                "ESPN_S2 and ESPN_SWID."
             )
 
-        season = int(os.environ.get("ESPN_SEASON") or _dt.date.today().year)
+        season = int(
+            os.environ.get("ESPN_SEASON") or profile.season or _dt.date.today().year
+        )
+        size = os.environ.get("ESPN_LEAGUE_SIZE")
 
         return cls(
             league_id=league_id,
             season=season,
             espn_s2=os.environ.get("ESPN_S2") or None,
             swid=_normalise_swid(os.environ.get("ESPN_SWID")),
-            team_id=os.environ.get("ESPN_TEAM_ID") or None,
-            league_size=int(os.environ.get("ESPN_LEAGUE_SIZE", "12")),
+            team_id=os.environ.get("ESPN_TEAM_ID") or profile.espn_team_id or None,
+            league_size=int(size) if size else profile.roster.league_size,
         )
 
     @staticmethod
-    def credentials_available() -> bool:
+    def credentials_available(league: str | None = None) -> bool:
         """
         True if the client can be constructed.
 
         Only the league ID is required — public leagues need no cookies, so
-        demanding them would hide a working configuration.
+        demanding them would hide a working configuration. The ID may come
+        from the environment or from the league profile.
         """
         import os
 
-        return bool(os.environ.get("ESPN_LEAGUE_ID"))
+        from nfl_predict.leagues import get_profile
+
+        if os.environ.get("ESPN_LEAGUE_ID"):
+            return True
+        try:
+            return bool(get_profile(league).espn_league_id)
+        except KeyError:
+            return False
 
     # ------------------------------------------------------------------
     # Raw API helper

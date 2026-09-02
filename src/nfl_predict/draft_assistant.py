@@ -20,6 +20,8 @@ from typing import Any
 
 import pandas as pd
 
+from nfl_predict.leagues import DEFAULT_LEAGUE, get_profile
+
 OUTPUT_DIR = Path("outputs")
 
 # Default starter roster slots (standard ESPN/Yahoo)
@@ -62,6 +64,21 @@ _DEFAULT_ROSTER_CAPS: dict[str, int] = {
 _SUGGESTION_POS_LIMIT: dict[str, int] = {"K": 1}
 
 
+def _targets(state: DraftState) -> dict[str, int]:
+    """Roster depth targets for this draft's league."""
+    return dict(get_profile(state.league).roster_targets or _DEFAULT_ROSTER_TARGETS)
+
+
+def _caps(state: DraftState) -> dict[str, int]:
+    """Hard per-position roster caps for this draft's league."""
+    return dict(get_profile(state.league).roster_caps or _DEFAULT_ROSTER_CAPS)
+
+
+def _suggestion_limits(state: DraftState) -> dict[str, int]:
+    """Per-panel ceilings for positions whose VOR is not cross-comparable."""
+    return dict(get_profile(state.league).suggestion_limits or _SUGGESTION_POS_LIMIT)
+
+
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
@@ -94,6 +111,7 @@ class DraftState:
     picks           : All picks made so far (in order).
     my_picks        : Only the user's picks.
     my_roster       : {position: [player_name, ...]} for the user's team.
+    league          : League profile key; drives roster targets and caps.
     league_size     : Number of teams in the league.
     draft_position  : User's pick slot (1-based, for snake positioning).
     current_pick    : Overall pick number for the next pick.
@@ -107,6 +125,7 @@ class DraftState:
     my_roster: dict[str, list[str]] = field(
         default_factory=lambda: {pos: [] for pos in _DEFAULT_ROSTER_TARGETS}
     )
+    league: str = DEFAULT_LEAGUE
     league_size: int = 12
     draft_position: int = 1
     current_pick: int = 1
@@ -120,9 +139,10 @@ class DraftState:
 
 def init_draft_state(
     board: pd.DataFrame,
-    league_size: int = 12,
+    league_size: int | None = None,
     draft_position: int = 1,
     state_path: Path | None = None,
+    league: str | None = None,
 ) -> DraftState:
     """
     Initialise a fresh DraftState from a draft board.
@@ -130,19 +150,27 @@ def init_draft_state(
     Parameters
     ----------
     board          : DataFrame from build_draft_board()
-    league_size    : Number of teams
+    league_size    : Number of teams; defaults to the league profile's
     draft_position : User's draft slot (1 = first pick)
-    state_path     : Where to persist state; defaults to outputs/draft_state.json
+    state_path     : Where to persist state; defaults to the league's own path
+    league         : League profile key, which also supplies the roster
+                     targets and caps the suggestion panel works from
     """
+    profile = get_profile(league)
     if state_path is None:
-        state_path = OUTPUT_DIR / "draft_state.json"
+        state_path = profile.state_path
+    if league_size is None:
+        league_size = profile.roster.league_size
 
     return DraftState(
         board=board.copy(),
         available=board.copy(),
+        league=profile.key,
         league_size=league_size,
         draft_position=draft_position,
         state_path=state_path,
+        my_roster={pos: [] for pos in profile.roster_targets}
+        or {pos: [] for pos in _DEFAULT_ROSTER_TARGETS},
     )
 
 
@@ -342,14 +370,16 @@ def suggest_best_available(
     else:
         ordered = avail.sort_values("vor", ascending=False)
 
-    ordered = _apply_position_limits(ordered)
+    ordered = _apply_position_limits(ordered, _suggestion_limits(state))
 
     return ordered[display_cols].head(n).reset_index(drop=True)
 
 
-def _apply_position_limits(ordered: pd.DataFrame) -> pd.DataFrame:
+def _apply_position_limits(
+    ordered: pd.DataFrame, pos_limits: dict[str, int] | None = None
+) -> pd.DataFrame:
     """
-    Trim positions listed in ``_SUGGESTION_POS_LIMIT`` to their ceiling.
+    Trim the league's limited positions to their ceiling.
 
     ``ordered`` must already be in recommendation order; the highest-ranked
     rows of a limited position are the ones kept.
@@ -357,7 +387,7 @@ def _apply_position_limits(ordered: pd.DataFrame) -> pd.DataFrame:
     if "position" not in ordered.columns or ordered.empty:
         return ordered
 
-    limits = ordered["position"].map(_SUGGESTION_POS_LIMIT)
+    limits = ordered["position"].map(pos_limits or _SUGGESTION_POS_LIMIT)
     if limits.isna().all():
         return ordered
 
@@ -373,7 +403,7 @@ def analyse_roster_needs(state: DraftState) -> list[str]:
     Returns a list of positions (most urgent first) that still need filling.
     """
     needs: list[tuple[int, str]] = []
-    for pos, target in _DEFAULT_ROSTER_TARGETS.items():
+    for pos, target in _targets(state).items():
         current = len(state.my_roster.get(pos, []))
         deficit = target - current
         if deficit > 0:
@@ -393,7 +423,7 @@ def saturated_positions(state: DraftState) -> list[str]:
     """
     return [
         pos
-        for pos, cap in _DEFAULT_ROSTER_CAPS.items()
+        for pos, cap in _caps(state).items()
         if len(state.my_roster.get(pos, [])) >= cap
     ]
 
@@ -459,9 +489,10 @@ def render_board(
     lines.append("")
     lines.append("  MY ROSTER")
     lines.append("  " + "-" * 40)
-    for pos in ("QB", "RB", "WR", "TE", "K"):
+    targets = _targets(state)
+    for pos in targets:
         players = state.my_roster.get(pos, [])
-        target = _DEFAULT_ROSTER_TARGETS.get(pos, 0)
+        target = targets.get(pos, 0)
         status = "✓" if len(players) >= target else f"need {target - len(players)}"
         player_str = ", ".join(players) if players else "(empty)"
         lines.append(f"  {pos:<4} [{status}]  {player_str}")
@@ -516,6 +547,7 @@ def save_state(state: DraftState) -> None:
     """
     state.state_path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
+        "league": state.league,
         "league_size": state.league_size,
         "draft_position": state.draft_position,
         "current_pick": state.current_pick,
@@ -566,6 +598,9 @@ def load_state(path: Path | str | None = None) -> DraftState:
         picks=[PickRecord(**p) for p in payload["picks"]],
         my_picks=[PickRecord(**p) for p in payload["my_picks"]],
         my_roster=payload["my_roster"],
+        # Sessions saved before leagues existed carry no key; they were all
+        # played under the original scoring, which is the default league.
+        league=payload.get("league", DEFAULT_LEAGUE),
         league_size=payload["league_size"],
         draft_position=payload["draft_position"],
         current_pick=payload["current_pick"],

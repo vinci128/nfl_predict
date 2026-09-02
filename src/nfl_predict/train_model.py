@@ -73,6 +73,11 @@ _POSITION_PATTERNS: dict[str, list[str]] = {
         "fantasy_points",
     ],
     "DST": ["def_", "sack", "interception", "def_tds", "fantasy_points"],
+    # IDP. Tackle volume drives the scoring and tracks snaps and role, so
+    # defensive snap share matters the way target share does for a receiver.
+    "LB": ["def_", "tackle", "sack", "snap", "fantasy_points"],
+    "DL": ["def_", "tackle", "sack", "qb_hit", "snap", "fantasy_points"],
+    "DB": ["def_", "tackle", "pass_defended", "interception", "snap", "fantasy_points"],
 }
 
 # Columns always included regardless of position (excluding identifiers)
@@ -112,10 +117,16 @@ _DROP_EXACT = {
 }
 
 
-def load_features() -> pd.DataFrame:
-    path = PROCESSED_DIR / "player_week_features.parquet"
+def load_features(league: str | None = None) -> pd.DataFrame:
+    """Load the player-week feature table scored for `league`."""
+    from nfl_predict.leagues import resolve_features_path
+
+    path = resolve_features_path(league)
     if not path.exists():
-        raise FileNotFoundError(f"{path} not found. Run features.py first.")
+        raise FileNotFoundError(
+            f"{path} not found — run `nfl-predict features --league "
+            f"{league or 'ludopathy'}` (or `update-all`)."
+        )
     return pd.read_parquet(path)
 
 
