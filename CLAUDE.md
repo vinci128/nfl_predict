@@ -245,6 +245,11 @@ uv run nfl-predict draft-start --league hoh --draft-position 5
 uv run nfl-predict draft-pick "Bijan Robinson" --mine
 uv run nfl-predict draft-pick "Drake Maye"             # opponent pick
 
+# Store the cookies a private league needs. Prompts without echoing, writes
+# .env at mode 600, then checks every configured league. Cookies expire, so
+# run it near draft time.
+uv run nfl-predict espn-login
+
 # ESPN auto-sync (run in a second terminal during the draft).
 # The league id comes from the profile; private leagues also need
 # ESPN_S2 and ESPN_SWID.

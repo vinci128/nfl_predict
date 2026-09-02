@@ -725,5 +725,88 @@ def nfl_sync_cmd(
     )
 
 
+# ---------------------------------------------------------------------------
+# espn-login: store the session cookies a private league needs
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="espn-login")
+def espn_login(
+    env_path: str = typer.Option(".env", help="File to write the cookies into."),
+    check: bool = typer.Option(True, help="Try each private league afterwards."),
+) -> None:
+    """
+    Store the ESPN session cookies that private leagues need.
+
+    Prompts for `espn_s2` and `SWID` without echoing them, writes them to
+    `.env` with owner-only permissions, and prints nothing back but their
+    length. The values never reach the terminal scrollback, so they cannot be
+    scrolled back to, copied out of a screen share, or read from a log.
+
+    Get them from a logged-in browser: F12 -> Application -> Cookies ->
+    https://fantasy.espn.com. They expire, so refresh them near draft time.
+    """
+    import getpass
+    import os
+    import stat
+    from pathlib import Path as _Path
+
+    from nfl_predict.espn_fantasy import _normalise_swid
+    from nfl_predict.leagues import PROFILES
+
+    print("ESPN session cookies (input is hidden).")
+    print("  Chrome: F12 -> Application -> Cookies -> https://fantasy.espn.com\n")
+
+    s2 = getpass.getpass("  espn_s2 : ").strip()
+    swid = _normalise_swid(getpass.getpass("  SWID    : ").strip())
+
+    if not s2 or not swid:
+        print("\nBoth cookies are required; nothing was written.")
+        raise typer.Exit(code=1)
+
+    path = _Path(env_path)
+    lines = path.read_text().splitlines() if path.exists() else []
+    wanted = {"ESPN_S2": s2, "ESPN_SWID": swid}
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        key = line.split("=", 1)[0].strip()
+        if key in wanted:
+            out.append(f"{key}={wanted[key]}")
+            seen.add(key)
+        else:
+            out.append(line)
+    out += [f"{k}={v}" for k, v in wanted.items() if k not in seen]
+
+    path.write_text("\n".join(out) + "\n")
+    # The file now holds a live session token; keep it off other accounts.
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+    print(f"\n  Saved to {path} (mode 600)")
+    print(f"  espn_s2 {len(s2)} chars, SWID {len(swid)} chars")
+
+    if not check:
+        return
+
+    # The prompt only set the process environment for this run's children, so
+    # apply the values here to verify them without a reload.
+    os.environ["ESPN_S2"] = s2
+    os.environ["ESPN_SWID"] = swid
+
+    from nfl_predict.espn_fantasy import EspnFantasyClient, EspnFantasyError
+
+    print()
+    for profile in PROFILES.values():
+        if not profile.espn_league_id:
+            continue
+        try:
+            client = EspnFantasyClient.from_env(profile.key)
+            teams = len(client.get_league().get("teams") or [])
+            print(f"  OK    {profile.name}: {teams} teams")
+        except EspnFantasyError as e:
+            print(f"  FAIL  {profile.name}: {e}")
+
+
 if __name__ == "__main__":
     app()
