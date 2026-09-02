@@ -808,5 +808,43 @@ def espn_login(
             print(f"  FAIL  {profile.name}: {e}")
 
 
+# ---------------------------------------------------------------------------
+# queue: build an ESPN autodraft queue from the board
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="queue")
+def queue_cmd(
+    league: str | None = typer.Option(None, help="League profile key."),
+    board: str | None = typer.Option(None, help="Board CSV (default: the league's)."),
+    depth: int = typer.Option(75, help="How many players to queue."),
+    out: bool = typer.Option(True, help="Also write the queue CSV."),
+) -> None:
+    """
+    Build an ESPN autodraft queue so a missed pick still follows the model.
+
+    ESPN drafts from your queue when you are away and falls back to its own
+    rankings once it empties, so the queue is what stands in for you.
+    """
+    from pathlib import Path as _Path
+
+    import pandas as _pd
+
+    from nfl_predict.draft_queue import build_queue, render_queue, write_queue
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    path = _Path(board) if board else profile.board_path(profile.season)
+    if not path.exists():
+        print(f"No board at {path}. Run `nfl-predict board --league {profile.key}`.")
+        raise typer.Exit(code=1)
+
+    queue = build_queue(_pd.read_csv(path), profile, depth=depth)
+    print(render_queue(queue, profile))
+
+    if out:
+        print(f"\n  Saved {write_queue(queue, profile)}")
+
+
 if __name__ == "__main__":
     app()

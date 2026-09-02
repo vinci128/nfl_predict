@@ -240,6 +240,10 @@ uv run nfl-predict board --league ludopathy --fmt table   # terminal preview
 # Season projections
 uv run nfl-predict project-season --league hoh --position QB --top 20
 
+# Autodraft queue. ESPN drafts from your queue on a pick you miss, so this is
+# what stands in for you if two drafts overlap or you step away.
+uv run nfl-predict queue --league hoh
+
 # Live draft (terminal mode) — team count comes from the league
 uv run nfl-predict draft-start --league hoh --draft-position 5
 uv run nfl-predict draft-pick "Bijan Robinson" --mine
