@@ -467,7 +467,7 @@ def draft_start(
         None, help="Path to draft board CSV (auto-detected if omitted)."
     ),
     state_path: str | None = typer.Option(
-        None, help="Where to save draft state JSON (default: outputs/draft_state.json)."
+        None, help="Where to save draft state JSON (default: the league's)."
     ),
 ) -> None:
     """Initialise a live draft session from a draft board CSV."""
@@ -502,7 +502,7 @@ def draft_start(
     board = pd.read_csv(board_path)
     from pathlib import Path as _Path
 
-    sp = _Path(state_path) if state_path else None
+    sp = _Path(state_path) if state_path else profile.state_path
     state = init_draft_state(
         board,
         league_size=league_size,
@@ -527,9 +527,15 @@ def draft_pick(
     player: str = typer.Argument(
         help="Player name (or unique substring) being drafted."
     ),
+    mine: bool = typer.Option(
+        False, "--mine", help="Shorthand for --drafter me: this pick is yours."
+    ),
     drafter: str = typer.Option(
         "other",
         help="Who made the pick: 'me' for your pick, or any label for opponents.",
+    ),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
     ),
     needs: str | None = typer.Option(
         None,
@@ -543,7 +549,7 @@ def draft_pick(
         False, help="Redisplay the full board after the pick."
     ),
     state_path: str | None = typer.Option(
-        None, help="Draft state JSON path (default: outputs/draft_state.json)."
+        None, help="Draft state JSON path (default: the league's)."
     ),
 ) -> None:
     """Record a draft pick and show best-available suggestions."""
@@ -557,8 +563,16 @@ def draft_pick(
         save_state,
         suggest_best_available,
     )
+    from nfl_predict.leagues import get_profile
 
-    sp = _Path(state_path) if state_path else None
+    if mine:
+        drafter = "me"
+
+    # The session lives at the league's own path, which is what `draft-start`
+    # wrote and what `nfl-sync` reads. Defaulting to None sent this command to
+    # the old un-namespaced outputs/draft_state.json, so it could not see a
+    # session started for any league.
+    sp = _Path(state_path) if state_path else get_profile(league).state_path
     state = load_state(sp)
 
     # Mark the pick

@@ -141,7 +141,9 @@ class TestExport:
 
     def test_export_carries_what_you_need_at_the_table(self, tmp_path) -> None:
         profile = get_profile("hoh")
-        out = pd.read_csv(write_queue(build_queue(_board(), profile), profile, tmp_path))
+        out = pd.read_csv(
+            write_queue(build_queue(_board(), profile), profile, tmp_path)
+        )
         for col in ("queue_rank", "player_name", "position", "vor", "adp"):
             assert col in out.columns
 
