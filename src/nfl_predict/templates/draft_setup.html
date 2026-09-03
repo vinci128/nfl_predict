@@ -55,7 +55,7 @@
         </div>
 
         <!-- League size and draft slot: profile defaults, or read from ESPN -->
-        {% with draft_position = 1 %}
+        {% with draft_position = 1, auto_fetch = espn_available %}
           {% include "partials/espn_setup.html" %}
         {% endwith %}
 
@@ -67,7 +67,7 @@
                 hx-indicator="#espn-spin"
                 class="w-full border border-blue-500 text-blue-400 rounded px-3 py-1.5 text-xs
                        hover:bg-blue-500 hover:text-gray-950 transition">
-          Read size and draft slot from ESPN
+          Re-read from ESPN
           <span id="espn-spin" class="htmx-indicator">…</span>
         </button>
         {% endif %}

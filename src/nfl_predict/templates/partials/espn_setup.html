@@ -2,8 +2,18 @@
   League size and draft slot, read from ESPN. Swapped into the setup form in
   place of the hand-typed fields, so the two renders must agree on markup --
   draft_setup.html includes this same partial for the initial paint.
+
+  `auto_fetch` is set only on that first paint, so the fields render straight
+  away from the league profile and then replace themselves with ESPN's answer.
+  The response omits the flag, which is what stops the swap re-triggering
+  itself forever. Rendering the profile's values first also means the form
+  still submits if ESPN never answers.
 #}
-<div id="espn-setup" class="grid grid-cols-2 gap-4">
+<div id="espn-setup" class="grid grid-cols-2 gap-4"
+     {% if auto_fetch %}hx-get="/draft/espn-setup"
+     hx-trigger="load"
+     hx-target="this"
+     hx-swap="outerHTML"{% endif %}>
   <div>
     <label class="block text-sm text-gray-400 mb-1">League Size</label>
     <select name="league_size"
@@ -19,6 +29,10 @@
            min="1" max="{{ league_size }}"
            class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
   </div>
+
+  {% if auto_fetch %}
+  <p class="col-span-2 text-xs text-gray-500">Reading size and slot from ESPN…</p>
+  {% endif %}
 
   {% if error %}
   <p class="col-span-2 text-xs text-amber-400">

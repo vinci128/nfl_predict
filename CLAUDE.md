@@ -346,9 +346,14 @@ active league is a per-request cookie, so one server can run two drafts at once
 in two browser profiles and each keeps its own session file. `NFL_PREDICT_LEAGUE`
 still works and is what the CLI reads.
 
-**Read size and draft slot from ESPN** on the setup page rather than typing
-them — a mistyped draft position throws the snake order off from the first
-pick. `EspnFantasyClient.fetch_draft_setup` takes the size from
+**Size and draft slot come from ESPN automatically.** The setup page paints the
+league profile's own values, then replaces them with ESPN's on load — a
+mistyped draft position throws the snake order off from the first pick, so it
+is not left to typing. The `auto_fetch` flag is set only on that first paint;
+the swapped-in response omits it, which is what stops the load trigger firing
+forever. Rendering the profile's values first also means the form still
+submits if ESPN never answers. The button beside the fields is a manual
+re-read, for once a randomised order locks. `EspnFantasyClient.fetch_draft_setup` takes the size from
 `settings.size` and the slot from the index of your team in
 `draftSettings.pickOrder`. It also reports whether that slot is settled:
 `orderType` is MANUAL or PREDETERMINED once a commissioner has fixed the order

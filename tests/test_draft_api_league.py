@@ -320,3 +320,46 @@ class TestEspnSetupPartial:
         monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
         _write_board(workdir, "hoh")
         assert "/draft/espn-setup" in _client().get("/draft").text
+
+    def test_the_setup_page_reads_from_espn_without_being_asked(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """League size and slot should be automatic, not a button press."""
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        _write_board(workdir, "hoh")
+        body = " ".join(_client().get("/draft").text.split())
+        assert 'hx-get="/draft/espn-setup" hx-trigger="load"' in body
+
+    def test_the_fetched_response_does_not_trigger_itself_again(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without this the swap would re-fire on every load, forever."""
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        self._patch(monkeypatch)
+        assert 'hx-trigger="load"' not in _client().get("/draft/espn-setup").text
+
+    def test_the_form_is_usable_before_espn_answers(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The first paint carries the profile's own values, not empty fields."""
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        _write_board(workdir, "hoh")
+        body = _client().get("/draft").text
+        assert '<option value="14" selected>' in body
+        assert 'name="draft_position" value="1"' in body
+
+    def test_a_league_without_an_espn_id_does_not_auto_fetch(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from dataclasses import replace
+
+        from nfl_predict.leagues import PROFILES
+
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        _write_board(workdir, "hoh")
+        monkeypatch.setitem(
+            PROFILES, "hoh", replace(PROFILES["hoh"], espn_league_id=None)
+        )
+
+        body = _client().get("/draft").text
+        assert 'hx-trigger="load"' not in body
