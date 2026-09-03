@@ -157,8 +157,8 @@ live under. **Scoring is data, not code** — `ScoringRules` is applied by
 
 | | **Ludopathy Bowl** (`ludopathy`) | **Hell or Highwater** (`hoh`) | **Royal Rumble** (`rumble`) |
 |---|---|---|---|
-| Teams / roster | 10 / 21 (9 bench, 3 IR) | 14 / 16 (7 bench, 3 IR) | 8 / 14 (5 bench, 1 IR) |
-| Starters | QB1 RB2 WR2 TE1 FLEX1 **LB3 DL1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
+| Teams / roster | 10 / 23 (10 bench, 3 IR) | 14 / 16 (7 bench, 3 IR) | 8 / 14 (5 bench, 1 IR) |
+| Starters | QB1 RB2 WR2 TE1 FLEX1 **LB2 DL1 DB2** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
 | Passing yards | **1 pt / 10 yds** (floored) | **0.1 / yd** (continuous) | 0.04 / yd |
 | Field goals | 3 / 3 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed |
 | 2-pt conversions | 2 (pass, rush) | 2 | 2 |
@@ -474,8 +474,10 @@ Aggregate the report **directly**, never via the weekly feature table. The weekl
 
 ### IDP (Ludopathy only)
 `position` in the feature table carries the **fantasy slot**, not the raw
-roster label: DE/DT/NT collapse to `DL`, ILB/MLB/OLB to `LB`, and the raw value
-is kept beside it as `position_raw`. Everything downstream compares against the
+roster label: DE/DT/NT collapse to `DL`, ILB/MLB/OLB to `LB`, CB/S/FS/SS to
+`DB`, and the raw value is kept beside it as `position_raw`. A slot only
+reaches the board if a league starts it — DB mapped correctly for months but
+was dropped from every board until Ludopathy added the slot on 2026-09-03. Everything downstream compares against the
 slot, so this mapping is what makes `LB` and `DL` models possible at all. The
 mapping lives in `leagues.fantasy_position`; a position that maps to nothing
 (offensive line, long snapper, punter) is dropped — it cannot fill a slot in

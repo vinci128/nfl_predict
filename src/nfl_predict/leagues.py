@@ -521,17 +521,21 @@ LUDOPATHY = LeagueProfile(
     scoring=_LUDOPATHY_SCORING,
     roster=RosterConfig(
         league_size=10,
-        roster_size=21,
+        roster_size=23,
+        # Re-read from ESPN on 2026-09-03: a linebacker slot became two
+        # defensive backs, and the roster grew by two. DB was not a position
+        # this repo carried at all before that.
         starters={
             "QB": 1,
             "RB": 2,
             "WR": 2,
             "TE": 1,
-            "LB": 3,
+            "LB": 2,
             "DL": 1,
+            "DB": 2,
             "K": 1,
         },
-        bench=9,
+        bench=10,
         ir=3,
         flex_spots=1,
     ),
@@ -544,19 +548,29 @@ LUDOPATHY = LeagueProfile(
         "TE": 0.85,
         "LB": 1.0,
         "DL": 1.0,
+        "DB": 1.0,
         "K": 0.5,
     },
     espn_league_id="1773102615",
     espn_team_id="9",
     keepers_per_team=6,
     keepers_path="data/keepers_ludopathy_2026.txt",
-    # 21 roster spots: 2+5+5+2+4+2+1.
-    roster_targets={"QB": 2, "RB": 5, "WR": 5, "TE": 2, "LB": 4, "DL": 2, "K": 1},
+    # 23 roster spots: 2+5+5+2+3+2+3+1.
+    roster_targets={
+        "QB": 2,
+        "RB": 5,
+        "WR": 5,
+        "TE": 2,
+        "LB": 3,
+        "DL": 2,
+        "DB": 3,
+        "K": 1,
+    },
     # ESPN maximums, except LB/DL which ESPN leaves unlimited — capped just
     # above the target so the panel cannot bury the roster in linebackers.
-    roster_caps={"QB": 4, "RB": 8, "WR": 8, "TE": 3, "LB": 6, "DL": 4, "K": 1},
+    roster_caps={"QB": 4, "RB": 8, "WR": 8, "TE": 3, "LB": 5, "DL": 4, "DB": 5, "K": 1},
     notes=(
-        "IDP: 3 LB + 1 DL start, 4 of 12 lineup slots.",
+        "IDP: 2 LB + 1 DL + 2 DB start, 5 of 13 lineup slots.",
         "6 keepers per team (60 players) lock one hour before the draft.",
         "IDP scores off ESPN's separate Defensive Players table, not the "
         "D/ST one: sack 4, INT 5, fumble forced/recovered 4, and every tackle "

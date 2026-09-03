@@ -307,7 +307,7 @@ class TestTheTwoLeaguesDiffer:
 
 
 class TestRosterConfig:
-    @pytest.mark.parametrize("key,total", [("ludopathy", 12), ("hoh", 9)])
+    @pytest.mark.parametrize("key,total", [("ludopathy", 13), ("hoh", 9)])
     def test_starters_sum_to_the_total_espn_reports(self, key: str, total: int) -> None:
         r = get_profile(key).roster
         assert sum(r.starters.values()) + r.flex_spots == total
@@ -319,6 +319,7 @@ class TestRosterConfig:
             assert sum(r.starters.values()) + r.flex_spots + r.bench == r.roster_size
 
     def test_ludopathy_positions_include_idp(self) -> None:
+        """A defensive-back slot was added on 2026-09-03; DB is startable now."""
         assert set(get_profile("ludopathy").roster.positions) == {
             "QB",
             "RB",
@@ -326,6 +327,7 @@ class TestRosterConfig:
             "TE",
             "LB",
             "DL",
+            "DB",
             "K",
         }
 
@@ -338,9 +340,10 @@ class TestRosterConfig:
 class TestDraftSettingsFromProfile:
     def test_idp_slots_reach_the_replacement_ranks(self) -> None:
         ranks = get_profile("ludopathy").to_draft_settings().replacement_ranks()
-        # 3 LB starters x 10 teams + buffer
-        assert ranks["LB"] == 33
+        # starters x 10 teams + buffer, for each IDP slot
+        assert ranks["LB"] == 23
         assert ranks["DL"] == 13
+        assert ranks["DB"] == 23
 
     def test_league_size_drives_replacement_level(self) -> None:
         lud = get_profile("ludopathy").to_draft_settings().replacement_ranks()
@@ -361,9 +364,9 @@ class TestDraftSettingsFromProfile:
         )
         out = compute_vor(proj, settings)
         top_lb = out[out.position == "LB"].vor.max()
-        # Replacement LB is the 33rd, so the best LB clears it by ~32 points —
+        # Replacement LB is the 23rd, so the best LB clears it by ~22 points —
         # it is not compared against wide receivers.
-        assert 25 < top_lb < 40
+        assert 15 < top_lb < 30
 
 
 class TestFantasyPositionMapping:
