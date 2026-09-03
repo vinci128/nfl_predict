@@ -333,10 +333,19 @@ uv run nfl-predict fetch-adp --source sleeper --scoring half
 uv run nfl-predict board --league $LEAGUE --adp data/adp_current.csv
 ```
 
-For **Ludopathy**, fill `data/keepers_ludopathy_2026.txt` once ESPN locks
-keepers (one hour before the draft) and rebuild the board — the `board`
-command picks that file up automatically from the profile. 60 of the player
-pool's best are gone, so replacement level moves a long way.
+For **Ludopathy**, write the keeper list once ESPN locks it, one hour before
+the draft, and rebuild:
+
+```bash
+uv run nfl-predict keepers --league ludopathy     # reads ESPN, writes the file
+uv run nfl-predict board --league ludopathy --adp data/adp_current.csv
+```
+
+After the lock each team's roster *is* its keepers, which is what `keepers`
+reads. Before it, rosters still hold last season's full squads — the command
+counts players per team and refuses to write rather than dumping 220 names
+into an exclusion list that would empty the board. 60 of the pool's best go,
+so replacement level moves a long way; the board is wrong until you rebuild.
 
 ### At the venue
 ```bash

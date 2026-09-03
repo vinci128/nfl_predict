@@ -863,5 +863,86 @@ def queue_cmd(
         print(f"\n  Saved {write_queue(queue, profile)}")
 
 
+# ---------------------------------------------------------------------------
+# keepers: write the keeper list straight from ESPN
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="keepers")
+def keepers_cmd(
+    league: str | None = typer.Option(None, help="League profile key."),
+    write: bool = typer.Option(True, help="Write the profile's keeper file."),
+) -> None:
+    """
+    Read this league's keepers from ESPN and write the exclusion file.
+
+    ESPN locks keepers an hour before the draft, and from that moment each
+    team's roster *is* its keepers. Typing sixty names by hand in that hour is
+    the kind of job that goes wrong, so this reads them instead.
+
+    Run it after the lock. Before it, rosters still hold last season's full
+    squads and the count check below will say so.
+    """
+    from pathlib import Path as _Path
+
+    from nfl_predict.espn_fantasy import EspnFantasyClient, EspnFantasyError
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    if not profile.keepers_per_team:
+        print(f"{profile.name} has no keepers.")
+        raise typer.Exit()
+    if not profile.keepers_path:
+        print(f"{profile.name} has no keepers_path configured.")
+        raise typer.Exit(code=1)
+
+    try:
+        rosters = EspnFantasyClient.from_env(profile.key).fetch_rosters()
+    except EspnFantasyError as e:
+        print(f"Could not read rosters: {e}")
+        raise typer.Exit(code=1) from e
+
+    per_team: dict[str, list[str]] = {}
+    for row in rosters:
+        per_team.setdefault(row["team_name"] or row["team_id"], []).append(
+            row["player_name"]
+        )
+
+    expected = profile.keepers_per_team
+    total = sum(len(v) for v in per_team.values())
+    print(f"{profile.name}: {total} players across {len(per_team)} teams")
+    for team, names in sorted(per_team.items()):
+        flag = "" if len(names) == expected else f"  <- expected {expected}"
+        print(f"  {len(names):>3}  {team[:34]:<36}{flag}")
+
+    if any(len(v) != expected for v in per_team.values()):
+        print(
+            "\nSome teams do not hold exactly "
+            f"{expected} players. Keepers are probably not locked yet — "
+            "these are still full rosters. Re-run after the lock."
+        )
+        if write:
+            print("Nothing written.")
+        raise typer.Exit(code=1)
+
+    if not write:
+        return
+
+    path = _Path(profile.keepers_path)
+    header = [
+        f"# {profile.name} keepers, read from ESPN by `nfl-predict keepers`.",
+        f"# {expected} per team x {len(per_team)} teams = {total} players.",
+        "# These are excluded from the draft board.",
+        "",
+    ]
+    body = [n for names in per_team.values() for n in sorted(names)]
+    path.write_text("\n".join(header + sorted(body)) + "\n")
+    print(f"\nWrote {len(body)} names to {path}")
+    print(
+        f"Now rebuild: nfl-predict board --league {profile.key} "
+        "--adp data/adp_current.csv"
+    )
+
+
 if __name__ == "__main__":
     app()
