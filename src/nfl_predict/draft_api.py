@@ -47,6 +47,8 @@ _jinja_globals: dict[str, Any] = templates.env.globals
 _jinja_globals["league_nav"] = _league_nav
 
 BOARDS_GLOB = "outputs/draft_board_*.csv"
+# Offered in the setup form. ESPN's own value is preselected when it answers.
+_LEAGUE_SIZES = (8, 10, 12, 14, 16)
 STATES_GLOB = "outputs/draft_state_*.json"
 
 router = APIRouter(prefix="/draft", tags=["draft"])
@@ -275,9 +277,45 @@ async def draft_setup(request: Request):
             "selected_board": selected,
             "league_name": profile.name,
             "league_size": profile.roster.league_size,
+            "sizes": _LEAGUE_SIZES,
+            "espn_available": bool(profile.espn_league_id),
             "session_active": _state_exists(),
         },
     )
+
+
+@router.get("/espn-setup", response_class=HTMLResponse)
+async def espn_setup(request: Request):
+    """
+    Read league size and draft slot from ESPN and swap them into the form.
+
+    Both are values a person otherwise types, and a wrong draft position throws
+    the snake order off from the first pick. Rendered as a partial so a failure
+    here shows as a message on the form rather than an error page: the setup
+    screen must still work when ESPN is unreachable or a cookie has expired.
+    """
+    from nfl_predict.espn_fantasy import EspnFantasyClient, EspnFantasyError
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile()
+    context: dict[str, Any] = {
+        "request": request,
+        "league_size": profile.roster.league_size,
+        "draft_position": 1,
+        "sizes": _LEAGUE_SIZES,
+    }
+
+    try:
+        setup = EspnFantasyClient.from_env(profile.key).fetch_draft_setup()
+    except EspnFantasyError as e:
+        context["error"] = str(e)
+        return templates.TemplateResponse("partials/espn_setup.html", context)
+
+    context["league_size"] = setup["league_size"] or profile.roster.league_size
+    context["draft_position"] = setup["draft_position"] or 1
+    context["found_position"] = setup["draft_position"] is not None
+    context["order_is_final"] = setup["order_is_final"]
+    return templates.TemplateResponse("partials/espn_setup.html", context)
 
 
 # ---------------------------------------------------------------------------

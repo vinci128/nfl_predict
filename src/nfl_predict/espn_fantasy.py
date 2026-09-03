@@ -84,6 +84,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -231,6 +232,7 @@ class EspnFantasyClient:
 
         from nfl_predict.leagues import get_profile
 
+        _load_dotenv()
         profile = get_profile(league)
 
         league_id = os.environ.get("ESPN_LEAGUE_ID") or (profile.espn_league_id or "")
@@ -367,6 +369,43 @@ class EspnFantasyClient:
             f"No team in league {self.league_id} is owned by SWID {self.swid}. "
             "Set ESPN_TEAM_ID explicitly."
         )
+
+    def fetch_draft_setup(self) -> dict:
+        """
+        League size and your draft slot, as ESPN has them right now.
+
+        Both are things a person otherwise types in and can get wrong, and a
+        wrong draft position corrupts the snake maths from the first pick.
+
+        `order_is_final` says whether the slot can still change. ESPN's
+        `orderType` is MANUAL or PREDETERMINED once a commissioner has set the
+        order, and DRAFT_START when it is randomised as the draft begins --
+        in which case the order returned here is provisional and worth
+        re-reading close to the start.
+
+        Returns keys: league_size, draft_position, order_is_final, draft_type,
+        team_id. `draft_position` is None when our team is not in the order.
+        """
+        data = self._get(["mSettings"])
+        settings = data.get("settings") or {}
+        draft = settings.get("draftSettings") or {}
+
+        size = settings.get("size") or len(data.get("teams") or []) or None
+        if size:
+            self.league_size = int(size)
+
+        team_id = self._my_team_id_or_none()
+        order = [str(t) for t in (draft.get("pickOrder") or [])]
+        position = order.index(team_id) + 1 if team_id and team_id in order else None
+
+        order_type = str(draft.get("orderType") or "")
+        return {
+            "league_size": int(size) if size else None,
+            "draft_position": position,
+            "order_is_final": order_type in {"MANUAL", "PREDETERMINED"},
+            "draft_type": str(draft.get("type") or ""),
+            "team_id": team_id,
+        }
 
     # ------------------------------------------------------------------
     # Player identity
@@ -719,6 +758,25 @@ def _week_points(player: dict, week: int) -> tuple[float | None, float | None]:
             projected = float(total)
 
     return actual, projected
+
+
+def _load_dotenv() -> None:
+    """
+    Read `.env` before looking for credentials.
+
+    `espn-login` writes the ESPN cookies there, and nothing else in the process
+    reads that file -- so without this the command stored a credential no later
+    run could see, and a private league answered 401 with the cookies sitting
+    on disk. Real environment variables still win: dotenv does not override
+    what is already set, so an exported value beats the file.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:  # optional at runtime; the env may be set directly
+        return
+
+    # CWD-relative, matching every other path in this project.
+    load_dotenv(dotenv_path=Path(".env"), override=False)
 
 
 def _normalise_swid(swid: str | None) -> str | None:

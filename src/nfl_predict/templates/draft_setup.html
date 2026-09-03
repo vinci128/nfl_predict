@@ -54,23 +54,23 @@
           {% endif %}
         </div>
 
-        <!-- League size -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">League Size</label>
-            <select name="league_size"
-                    class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
-              {% for n in [8, 10, 12, 14, 16] %}
-              <option value="{{ n }}" {% if n == league_size %}selected{% endif %}>{{ n }} teams</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1">My Draft Position</label>
-            <input type="number" name="draft_position" value="1" min="1" max="{{ league_size }}"
-                   class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
-          </div>
-        </div>
+        <!-- League size and draft slot: profile defaults, or read from ESPN -->
+        {% with draft_position = 1 %}
+          {% include "partials/espn_setup.html" %}
+        {% endwith %}
+
+        {% if espn_available %}
+        <button type="button"
+                hx-get="/draft/espn-setup"
+                hx-target="#espn-setup"
+                hx-swap="outerHTML"
+                hx-indicator="#espn-spin"
+                class="w-full border border-blue-500 text-blue-400 rounded px-3 py-1.5 text-xs
+                       hover:bg-blue-500 hover:text-gray-950 transition">
+          Read size and draft slot from ESPN
+          <span id="espn-spin" class="htmx-indicator">…</span>
+        </button>
+        {% endif %}
 
         <!-- ADP hint (Phase 3) -->
         <div class="bg-gray-800 rounded p-3 text-xs text-gray-400">

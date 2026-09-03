@@ -1,0 +1,43 @@
+{#
+  League size and draft slot, read from ESPN. Swapped into the setup form in
+  place of the hand-typed fields, so the two renders must agree on markup --
+  draft_setup.html includes this same partial for the initial paint.
+#}
+<div id="espn-setup" class="grid grid-cols-2 gap-4">
+  <div>
+    <label class="block text-sm text-gray-400 mb-1">League Size</label>
+    <select name="league_size"
+            class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+      {% for n in sizes %}
+      <option value="{{ n }}" {% if n == league_size %}selected{% endif %}>{{ n }} teams</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm text-gray-400 mb-1">My Draft Position</label>
+    <input type="number" name="draft_position" value="{{ draft_position }}"
+           min="1" max="{{ league_size }}"
+           class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+  </div>
+
+  {% if error %}
+  <p class="col-span-2 text-xs text-amber-400">
+    ESPN: {{ error }} — values above are the league profile's defaults.
+  </p>
+  {% elif found_position is defined %}
+    {% if not found_position %}
+    <p class="col-span-2 text-xs text-amber-400">
+      ESPN has no draft order yet. Size is live; position is a guess.
+    </p>
+    {% elif not order_is_final %}
+    <p class="col-span-2 text-xs text-amber-400">
+      Slot {{ draft_position }} of {{ league_size }} — ESPN randomises the order
+      at draft start, so re-sync once it is locked.
+    </p>
+    {% else %}
+    <p class="col-span-2 text-xs text-green-400">
+      Slot {{ draft_position }} of {{ league_size }}, confirmed by ESPN.
+    </p>
+    {% endif %}
+  {% endif %}
+</div>

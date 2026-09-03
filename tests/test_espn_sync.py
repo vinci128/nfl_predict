@@ -79,6 +79,18 @@ _PLAYER_MAP = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _no_real_dotenv(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """
+    Keep the developer's real .env out of the suite.
+
+    `from_env` reads `.env` from the working directory, so a test asserting
+    "no cookies configured" would otherwise pick up live ESPN credentials --
+    and print them into the failure output.
+    """
+    monkeypatch.chdir(tmp_path)
+
+
 @pytest.fixture()
 def client() -> EspnFantasyClient:
     c = EspnFantasyClient(league_id="123", season=2026, team_id="3", league_size=12)
@@ -1715,3 +1727,135 @@ class TestTeamNormalisation:
         with patch.object(client, "_get", return_value=payload):
             (pick,) = client.fetch_all_picks()
         assert pick["nfl_team"] == "GB"
+
+
+# ---------------------------------------------------------------------------
+# Draft setup (?view=mSettings)
+# ---------------------------------------------------------------------------
+
+
+def _settings_payload(
+    size: int = 14,
+    order: list[int] | None = None,
+    order_type: str = "MANUAL",
+) -> dict:
+    """An mSettings response, shaped as ESPN returns it."""
+    return {
+        "settings": {
+            "size": size,
+            "draftSettings": {
+                "type": "SNAKE",
+                "orderType": order_type,
+                "pickOrder": [1, 2, 7, 3] if order is None else order,
+            },
+        }
+    }
+
+
+class TestFetchDraftSetup:
+    def test_league_size_comes_from_espn(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_settings_payload(size=14)):
+            assert client.fetch_draft_setup()["league_size"] == 14
+
+    def test_draft_position_is_our_slot_in_the_pick_order(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """The fixture client is team 3, third in this order."""
+        with patch.object(client, "_get", return_value=_settings_payload()):
+            assert client.fetch_draft_setup()["draft_position"] == 4
+
+    def test_position_is_one_based(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_settings_payload(order=[3, 1])):
+            assert client.fetch_draft_setup()["draft_position"] == 1
+
+    def test_a_manual_order_is_final(self, client: EspnFantasyClient) -> None:
+        with patch.object(
+            client, "_get", return_value=_settings_payload(order_type="MANUAL")
+        ):
+            assert client.fetch_draft_setup()["order_is_final"] is True
+
+    def test_an_order_randomised_at_start_is_not_final(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """Two of the three leagues randomise, so the slot is provisional."""
+        with patch.object(
+            client, "_get", return_value=_settings_payload(order_type="DRAFT_START")
+        ):
+            assert client.fetch_draft_setup()["order_is_final"] is False
+
+    def test_no_pick_order_yet(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value=_settings_payload(order=[])):
+            setup = client.fetch_draft_setup()
+        assert setup["draft_position"] is None
+        assert setup["league_size"] == 14
+
+    def test_our_team_absent_from_the_order(self, client: EspnFantasyClient) -> None:
+        with patch.object(
+            client, "_get", return_value=_settings_payload(order=[1, 2, 4])
+        ):
+            assert client.fetch_draft_setup()["draft_position"] is None
+
+    def test_size_falls_back_to_the_team_list(self, client: EspnFantasyClient) -> None:
+        payload = {
+            "settings": {"draftSettings": {}},
+            "teams": [{"id": i} for i in range(6)],
+        }
+        with patch.object(client, "_get", return_value=payload):
+            assert client.fetch_draft_setup()["league_size"] == 6
+
+    def test_it_updates_the_clients_league_size(
+        self, client: EspnFantasyClient
+    ) -> None:
+        """Round maths falls back on this when ESPN omits roundId."""
+        with patch.object(client, "_get", return_value=_settings_payload(size=10)):
+            client.fetch_draft_setup()
+        assert client.league_size == 10
+
+    def test_empty_payload_is_not_a_crash(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={}):
+            setup = client.fetch_draft_setup()
+        assert setup["league_size"] is None
+        assert setup["draft_position"] is None
+
+    def test_requests_only_the_settings_view(self, client: EspnFantasyClient) -> None:
+        with patch.object(client, "_get", return_value={}) as mock_get:
+            client.fetch_draft_setup()
+        assert mock_get.call_args[0][0] == ["mSettings"]
+
+
+class TestDotenvLoading:
+    """
+    `espn-login` writes .env and nothing else in the process read it, so a
+    private league answered 401 with working cookies sitting on disk.
+    """
+
+    def test_from_env_reads_a_dotenv_file(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("ESPN_S2", raising=False)
+        monkeypatch.delenv("ESPN_SWID", raising=False)
+        (tmp_path / ".env").write_text("ESPN_S2=from-file\nESPN_SWID={ABC}\n")
+
+        client = EspnFantasyClient.from_env("hoh")
+
+        assert client.espn_s2 == "from-file"
+        assert client.swid == "{ABC}"
+
+    def test_a_real_environment_variable_wins(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An exported value must beat the file, not the other way round."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / ".env").write_text("ESPN_S2=from-file\nESPN_SWID={ABC}\n")
+        monkeypatch.setenv("ESPN_S2", "exported")
+        monkeypatch.setenv("ESPN_SWID", "{XYZ}")
+
+        assert EspnFantasyClient.from_env("hoh").espn_s2 == "exported"
+
+    def test_no_dotenv_file_is_fine(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("ESPN_S2", raising=False)
+        assert EspnFantasyClient.from_env("hoh").espn_s2 is None

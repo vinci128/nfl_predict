@@ -346,6 +346,27 @@ active league is a per-request cookie, so one server can run two drafts at once
 in two browser profiles and each keeps its own session file. `NFL_PREDICT_LEAGUE`
 still works and is what the CLI reads.
 
+**Read size and draft slot from ESPN** on the setup page rather than typing
+them — a mistyped draft position throws the snake order off from the first
+pick. `EspnFantasyClient.fetch_draft_setup` takes the size from
+`settings.size` and the slot from the index of your team in
+`draftSettings.pickOrder`. It also reports whether that slot is settled:
+`orderType` is MANUAL or PREDETERMINED once a commissioner has fixed the order
+(Ludopathy), and DRAFT_START when ESPN randomises it as the draft begins (Hell
+or Highwater, Royal Rumble) — in which case re-read it once the draft opens.
+
+### `.env` is only read by `EspnFantasyClient.from_env`
+`espn-login` writes the ESPN cookies to `.env`, and for a while nothing read
+that file: a private league answered 401 with working credentials sitting on
+disk, and `espn-login --check` still passed because it had set them in its own
+process. `from_env` now calls `_load_dotenv()` first, with `override=False` so
+an exported variable still wins.
+
+Tests must not inherit that file. `test_espn_sync.py` has an autouse fixture
+that chdirs to a tmp directory, because a test asserting "no cookies
+configured" would otherwise pick up live credentials and print them into the
+failure output.
+
 Load the **autodraft queue** into ESPN before the clock starts, so a pick you
 miss still follows the board:
 

@@ -215,3 +215,108 @@ class TestNoLeakedScripts:
         assert "htmx:afterSettle" in board
         assert "nfl-sync-status" in board
         assert "player-input" in board
+
+
+class TestEspnSetupPartial:
+    """
+    Reading league size and draft slot from ESPN instead of typing them.
+
+    A wrong draft position throws the snake order off from the first pick, and
+    two of the three leagues randomise their order at draft start — so the
+    partial has to say whether the slot it found is settled.
+    """
+
+    @staticmethod
+    def _patch(monkeypatch: pytest.MonkeyPatch, **setup):
+        from nfl_predict import espn_fantasy
+
+        base = {
+            "league_size": 14,
+            "draft_position": 8,
+            "order_is_final": True,
+            "draft_type": "SNAKE",
+            "team_id": "9",
+        }
+        base.update(setup)
+
+        class _Fake:
+            @staticmethod
+            def from_env(_league=None):
+                class _C:
+                    @staticmethod
+                    def fetch_draft_setup():
+                        return base
+
+                return _C()
+
+        monkeypatch.setattr(espn_fantasy, "EspnFantasyClient", _Fake)
+
+    def test_it_preselects_the_size_espn_reports(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        self._patch(monkeypatch, league_size=12)
+        body = _client().get("/draft/espn-setup").text
+        assert '<option value="12" selected>' in body
+
+    def test_it_fills_the_draft_position(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        self._patch(monkeypatch, draft_position=8)
+        assert (
+            'name="draft_position" value="8"' in _client().get("/draft/espn-setup").text
+        )
+
+    def test_a_settled_order_is_reported_as_confirmed(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "ludopathy")
+        self._patch(monkeypatch, order_is_final=True, draft_position=3, league_size=10)
+        assert "confirmed by ESPN" in _client().get("/draft/espn-setup").text
+
+    def test_a_randomised_order_warns_that_the_slot_may_change(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        self._patch(monkeypatch, order_is_final=False)
+        # The template wraps the sentence, so compare on collapsed whitespace.
+        body = " ".join(_client().get("/draft/espn-setup").text.split())
+        assert "randomises the order at draft start" in body
+        assert "re-sync once it is locked" in body
+
+    def test_no_order_yet_says_so(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        self._patch(monkeypatch, draft_position=None)
+        body = _client().get("/draft/espn-setup").text
+        assert "no draft order yet" in body
+        assert 'name="draft_position" value="1"' in body
+
+    def test_an_espn_failure_degrades_to_profile_defaults(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The setup page must still work when ESPN is down or a cookie expired."""
+        from nfl_predict import espn_fantasy
+        from nfl_predict.espn_fantasy import EspnFantasyError
+
+        class _Boom:
+            @staticmethod
+            def from_env(_league=None):
+                raise EspnFantasyError("HTTP 401 for league 1773102615")
+
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        monkeypatch.setattr(espn_fantasy, "EspnFantasyClient", _Boom)
+
+        resp = _client().get("/draft/espn-setup")
+        assert resp.status_code == 200
+        assert "401" in resp.text
+        assert '<option value="14" selected>' in resp.text
+
+    def test_the_button_only_shows_for_a_league_with_an_espn_id(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        _write_board(workdir, "hoh")
+        assert "/draft/espn-setup" in _client().get("/draft").text
