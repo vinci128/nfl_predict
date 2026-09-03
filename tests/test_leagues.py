@@ -244,9 +244,19 @@ class TestLudopathyScoring:
 class TestHellOrHighwaterScoring:
     scoring = PROFILES["hoh"].scoring
 
-    def test_passing_uses_the_standard_rate(self) -> None:
+    def test_passing_is_a_tenth_a_yard_with_a_heavy_interception(self) -> None:
+        """
+        Re-read from ESPN on 2026-09-03, hours before the draft: the
+        commissioner moved passing from 0.04 to 0.1/yd, an interception from
+        -2 to -4, and added a -0.5 sack penalty.
+        """
         df = frame(passing_yards=300, passing_tds=2, passing_interceptions=1)
-        assert self.scoring.score(df).iloc[0] == pytest.approx(12.0 + 8 - 2)
+        assert self.scoring.score(df).iloc[0] == pytest.approx(30.0 + 8 - 4)
+
+    def test_the_quarterback_is_charged_for_sacks_taken(self) -> None:
+        assert self.scoring.score(frame(sacks_suffered=4)).iloc[0] == pytest.approx(
+            -2.0
+        )
 
     def test_a_missed_field_goal_costs_a_point(self) -> None:
         assert self.scoring.score(frame(fg_missed=2)).iloc[0] == pytest.approx(-2.0)
@@ -261,17 +271,28 @@ class TestHellOrHighwaterScoring:
 
 
 class TestTheTwoLeaguesDiffer:
-    def test_the_same_quarterback_game_is_worth_far_more_in_ludopathy(self) -> None:
+    def test_ludopathy_floors_passing_yards_where_hell_or_highwater_does_not(
+        self,
+    ) -> None:
         """
-        The single most consequential difference between the leagues: 0.1 vs
-        0.04 per passing yard. A board built for one is wrong for the other.
+        Both now pay a tenth a yard, but not the same way: Ludopathy buckets it
+        ("every 10 yards = 1", remainder dropped) while Hell or Highwater is a
+        continuous rate. 327 yards is 32 there and 32.7 here.
         """
-        game = frame(passing_yards=320, passing_tds=3, passing_interceptions=0)
+        game = frame(passing_yards=327, passing_tds=3, passing_interceptions=0)
         lud = PROFILES["ludopathy"].scoring.score(game).iloc[0]
         hoh = PROFILES["hoh"].scoring.score(game).iloc[0]
-        assert lud == pytest.approx(44.0)
-        assert hoh == pytest.approx(24.8)
-        assert lud > hoh * 1.5
+        assert lud == pytest.approx(32.0 + 12)
+        assert hoh == pytest.approx(32.7 + 12)
+
+    def test_royal_rumble_is_the_one_still_on_espn_defaults(self) -> None:
+        """Hell or Highwater moved off them on 2026-09-03; Royal Rumble did not."""
+        game = frame(passing_yards=320, passing_tds=3, passing_interceptions=1)
+        rumble = PROFILES["rumble"].scoring.score(game).iloc[0]
+        hoh = PROFILES["hoh"].scoring.score(game).iloc[0]
+        assert rumble == pytest.approx(12.8 + 12 - 2)
+        assert hoh == pytest.approx(32.0 + 12 - 4)
+        assert hoh > rumble
 
     def test_a_receiving_game_scores_almost_the_same_in_both(self) -> None:
         game = frame(receiving_yards=90, receptions=7, receiving_tds=1)
@@ -382,8 +403,16 @@ class TestRoyalRumbleScoring:
     profile = PROFILES["rumble"]
     scoring = profile.scoring
 
-    def test_scoring_is_identical_to_hell_or_highwater(self) -> None:
-        assert self.scoring is PROFILES["hoh"].scoring
+    def test_it_kept_espns_defaults_when_hell_or_highwater_left_them(self) -> None:
+        """
+        The two ran identical scoring until 2026-09-03, when Hell or Highwater
+        changed. Sharing a ScoringRules instance would now be a silent bug, so
+        this pins that they are separate.
+        """
+        assert self.scoring is not PROFILES["hoh"].scoring
+        assert self.scoring.per_unit["passing_yards"] == 0.04
+        assert PROFILES["hoh"].scoring.per_unit["passing_yards"] == 0.1
+        # D/ST is untouched and still shared.
         assert self.profile.dst_scoring is PROFILES["hoh"].dst_scoring
 
     def test_passing_is_four_hundredths_a_yard(self) -> None:
@@ -426,7 +455,8 @@ class TestRoyalRumbleScoring:
         assert self.profile.state_path != PROFILES["hoh"].state_path
         assert "rumble" in str(self.profile.board_path(2026))
 
-    def test_it_reuses_hell_or_highwaters_fit(self) -> None:
-        """Identical scoring means an identical training target — fit it once."""
-        assert self.profile.features_path == PROFILES["hoh"].features_path
-        assert self.profile.model_dir == PROFILES["hoh"].model_dir
+    def test_it_no_longer_shares_a_fit_with_hell_or_highwater(self) -> None:
+        """Different scoring is a different training target, so a separate fit."""
+        assert self.profile.shares_artifacts_with is None
+        assert self.profile.features_path != PROFILES["hoh"].features_path
+        assert self.profile.model_dir != PROFILES["hoh"].model_dir

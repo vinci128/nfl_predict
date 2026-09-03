@@ -137,10 +137,14 @@ class TestSharedArtifacts:
     were looking at.
     """
 
-    def test_rumble_reuses_hell_or_highwaters_fit(self) -> None:
-        assert get_profile("rumble").artifact_key == "hoh"
-        assert get_profile("rumble").features_path == get_profile("hoh").features_path
-        assert get_profile("rumble").model_dir == get_profile("hoh").model_dir
+    def test_every_league_now_has_its_own_fit(self) -> None:
+        """
+        Sharing was correct until Hell or Highwater changed its scoring on
+        2026-09-03. The mechanism stays — a profile may still declare
+        shares_artifacts_with — but no league currently uses it.
+        """
+        keys = {k: get_profile(k).artifact_key for k in ("hoh", "rumble", "ludopathy")}
+        assert keys == {"hoh": "hoh", "rumble": "rumble", "ludopathy": "ludopathy"}
 
     def test_a_league_with_its_own_scoring_keeps_its_own(self) -> None:
         ludo = get_profile("ludopathy")
@@ -153,11 +157,10 @@ class TestSharedArtifacts:
         assert hoh.board_path(2026) != rumble.board_path(2026)
         assert hoh.state_path != rumble.state_path
 
-    def test_building_every_league_builds_each_table_once(self) -> None:
+    def test_artifact_keys_covers_every_distinct_scoring(self) -> None:
         from nfl_predict.leagues import artifact_keys, league_keys
 
-        assert len(artifact_keys()) < len(league_keys())
-        assert set(artifact_keys()) == {"hoh", "ludopathy"}
+        assert set(artifact_keys()) == set(league_keys())
 
     def test_sharing_is_rejected_when_scoring_differs(self) -> None:
         """The guard that stops a model being used on the wrong target."""
@@ -190,11 +193,21 @@ class TestSharedArtifacts:
             PROFILES.clear()
             PROFILES.update(original)
 
-    def test_the_shared_leagues_project_identically(self) -> None:
-        """The whole point: one fit, one answer per player."""
+    def test_startable_quarterbacks_are_worth_far_more_in_hell_or_highwater(
+        self,
+    ) -> None:
+        """
+        0.1/yd passing against Royal Rumble's 0.04. Only the startable tier is
+        asserted: down the list the -4 interception and -0.5 sack penalties can
+        outweigh the extra yardage, so a low-volume backup is legitimately
+        worth less in Hell or Highwater despite the richer passing rate.
+        """
         h, r = _board("hoh"), _board("rumble")
         m = h.merge(r, on=["player_name", "position"], suffixes=("_h", "_r"))
-        assert (m.proj_p50_h == m.proj_p50_r).all()
+        qb = m[m.position == "QB"].nlargest(12, "proj_p50_h")
+
+        assert (qb.proj_p50_h > qb.proj_p50_r).all()
+        assert qb.proj_p50_h.max() > qb.proj_p50_r.max() * 1.4
 
     def test_but_their_vor_still_differs(self) -> None:
         """Same projections, different league size, so different value."""

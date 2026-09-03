@@ -159,20 +159,31 @@ live under. **Scoring is data, not code** — `ScoringRules` is applied by
 |---|---|---|---|
 | Teams / roster | 10 / 21 (9 bench, 3 IR) | 14 / 16 (7 bench, 3 IR) | 8 / 14 (5 bench, 1 IR) |
 | Starters | QB1 RB2 WR2 TE1 FLEX1 **LB3 DL1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 | QB1 RB2 WR2 TE1 FLEX1 **D/ST1** K1 |
-| Passing yards | **1 pt / 10 yds** (floored) | **0.04 / yd** | 0.04 / yd |
+| Passing yards | **1 pt / 10 yds** (floored) | **0.1 / yd** (continuous) | 0.04 / yd |
 | Field goals | 3 / 3 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed | 3 / 4 / 5 / 6, −1 missed |
 | 2-pt conversions | 2 (pass, rush) | 2 | 2 |
-| Interception thrown | **−4** | −2 | −2 |
-| Sack taken (QB) | **−0.5** | not scored | not scored |
+| Interception thrown | **−4** | **−4** | −2 |
+| Sack taken (QB) | **−0.5** | **−0.5** | not scored |
 | Game bonuses | 400 pass, 100/200 rush, 100/200 rec | none | none |
 | Keepers | **6 per team** | none | none |
 | ESPN league id | 1773102615 | 581348581 | 1546288813 |
 | Private? | yes (needs cookies) | **no** | yes (needs cookies) |
 
-**Hell or Highwater and Royal Rumble run identical scoring** — ESPN's default
-PPR, verified category by category against both settings pages. They share one
-`ScoringRules` instance (`_ESPN_PPR_SCORING`), so a change meant for one would
-silently move the other; `TestRoyalRumbleScoring` asserts the sharing.
+**They did until 2026-09-03.** Hell or Highwater and Royal Rumble ran ESPN's
+default PPR, shared one `ScoringRules` instance and therefore one fit. Hours
+before the draft the Hell or Highwater commissioner moved passing to 0.1/yd,
+an interception to −4, and added the −0.5 sack penalty. It now has its own
+`_HOH_SCORING`, its own feature table and its own models; Royal Rumble keeps
+`_ESPN_PPR_SCORING` and inherited the artifacts the two used to share.
+
+Note the passing rates only *look* alike: Hell or Highwater is a continuous
+0.1/yd, Ludopathy is the bucketed "every 10 yards = 1" that floors the
+remainder. 327 yards is 32.7 in one and 32 in the other.
+
+**Re-read the scoring on draft day.** A commissioner can change it at any
+time, and nothing announces it. `EspnFantasyClient` plus the stat-id table in
+this file is enough to diff it in a minute; doing that is what caught this,
+40 minutes before the draft.
 
 Because the training target *is* fantasy points, identical scoring means an
 identical fit, so Royal Rumble declares `shares_artifacts_with="hoh"` and both

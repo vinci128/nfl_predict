@@ -411,6 +411,40 @@ _LUDOPATHY_SCORING = ScoringRules(
 # ESPN's out-of-the-box PPR scoring, unmodified. Hell or Highwater and Royal
 # Rumble both run it, verified category by category against each league's
 # settings page — so they share these rules rather than restating them.
+# Hell or Highwater, re-read from ESPN on 2026-09-03, hours before the draft:
+# the commissioner moved passing to 0.1/yd, an interception to -4, and added
+# the -0.5 sack penalty. It no longer matches Royal Rumble, so the two can no
+# longer share a fit. Note this is a continuous 0.1/yd, NOT Ludopathy's
+# bucketed "1 point per 10 yards" -- 347 yards is 34.7 here and 34 there.
+_HOH_SCORING = ScoringRules(
+    per_unit={
+        "passing_yards": 0.1,
+        "passing_tds": 4.0,
+        "passing_interceptions": -4.0,
+        "sacks_suffered": -0.5,
+        "rushing_yards": 0.1,
+        "rushing_tds": 6.0,
+        "receiving_yards": 0.1,
+        "receptions": 1.0,
+        "receiving_tds": 6.0,
+        "two_point_conversions": 2.0,
+        "fumbles_lost": -2.0,
+        "fumble_recovery_tds": 6.0,
+        "return_tds": 6.0,
+        "pat_made": 1.0,
+        "fg_missed": -1.0,
+    },
+    fg_buckets={
+        "fg_made_0_19": 3.0,
+        "fg_made_20_29": 3.0,
+        "fg_made_30_39": 3.0,
+        "fg_made_40_49": 4.0,
+        "fg_made_50_59": 5.0,
+        "fg_made_60_": 6.0,
+    },
+)
+
+
 _ESPN_PPR_SCORING = ScoringRules(
     per_unit={
         "passing_yards": 0.04,
@@ -535,7 +569,7 @@ HELL_OR_HIGHWATER = LeagueProfile(
     key="hoh",
     name="Hell or Highwater",
     season=2026,
-    scoring=_ESPN_PPR_SCORING,
+    scoring=_HOH_SCORING,
     roster=RosterConfig(
         league_size=14,
         roster_size=16,
@@ -607,10 +641,6 @@ ROYAL_RUMBLE = LeagueProfile(
     },
     espn_league_id="1546288813",
     espn_team_id="12",
-    # Identical scoring to Hell or Highwater, so the feature table and the
-    # season models are the same fit. Only the board differs, because VOR
-    # depends on league size.
-    shares_artifacts_with="hoh",
     # 14 roster spots: 2+4+4+2+1+1.
     roster_targets={"QB": 2, "RB": 4, "WR": 4, "TE": 2, "DST": 1, "K": 1},
     # ESPN's own per-position maximums.
