@@ -49,7 +49,6 @@ _jinja_globals["league_nav"] = _league_nav
 BOARDS_GLOB = "outputs/draft_board_*.csv"
 # Offered in the setup form. ESPN's own value is preselected when it answers.
 _LEAGUE_SIZES = (8, 10, 12, 14, 16)
-STATES_GLOB = "outputs/draft_state_*.json"
 
 router = APIRouter(prefix="/draft", tags=["draft"])
 
@@ -72,18 +71,16 @@ def _state_path(league: str | None = None) -> Path:
 
 
 def _active_state_path() -> Path:
-    """The session this UI should act on.
-
-    Normally the active league's, which is what the draft-day workflow sets.
-    A session started from another league's board is still found, because the
-    board picker offers every board regardless of the active league.
     """
-    active = _state_path()
-    if active.exists():
-        return active
+    The session this UI should act on: the active league's, and only that.
 
-    existing = sorted(glob.glob(STATES_GLOB))
-    return Path(existing[0]) if len(existing) == 1 else active
+    An earlier version fell back to the sole session on disk when the active
+    league had none, to avoid a 404. That silently showed the wrong draft --
+    switch to Royal Rumble while a Hell or Highwater session exists and the nav
+    said one league while the board showed the other's 14-team slate. With two
+    drafts on one evening that is worse than no session at all.
+    """
+    return _state_path()
 
 
 def _state_exists() -> bool:
@@ -258,6 +255,11 @@ async def draft_setup(request: Request):
     """
     from nfl_predict.leagues import get_profile
 
+    # A live session for this league is the thing you came for: go straight to
+    # it. Switching league mid-evening then lands on that draft, not a form.
+    if _state_exists():
+        return RedirectResponse(url="/draft/board", status_code=303)
+
     profile = get_profile()
     boards = _available_boards()
 
@@ -362,7 +364,16 @@ async def draft_start(
 
 @router.get("/board", response_class=HTMLResponse)
 async def draft_board_page(request: Request, pos: str = "ALL"):
-    """Full draft board page."""
+    """
+    Full draft board page.
+
+    Sends you to setup rather than 404ing when this league has no session yet,
+    since the usual way to arrive here without one is switching league between
+    two drafts.
+    """
+    if not _state_exists():
+        return RedirectResponse(url="/draft", status_code=303)
+
     state = _load_or_404()
     ctx = _state_to_dict(state)
     ctx["board_rows"] = _board_rows(state, pos)

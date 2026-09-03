@@ -83,12 +83,19 @@ class TestStatePath:
         assert (workdir / "outputs/draft_state_hoh.json").exists()
         assert not (workdir / "outputs/draft_state.json").exists()
 
-    def test_a_session_started_from_another_leagues_board_is_still_found(
+    def test_another_leagues_session_is_not_shown_as_this_ones(
         self, workdir: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """The board picker offers every board, not just the active league's."""
+        """
+        Switching league must not surface the other draft.
+
+        An earlier fallback used the sole session on disk when the active
+        league had none, so with a Hell or Highwater draft running, switching
+        to Royal Rumble showed that 14-team slate under the Royal Rumble
+        heading. Two drafts in one evening makes that a real hazard.
+        """
         monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
-        board_path = _write_board(workdir, "ludopathy")
+        board_path = _write_board(workdir, "hoh")
 
         client = _client()
         client.post(
@@ -96,10 +103,14 @@ class TestStatePath:
             data={"board_path": board_path, "draft_position": "1"},
             follow_redirects=False,
         )
+        assert (workdir / "outputs/draft_state_hoh.json").exists()
 
-        assert (workdir / "outputs/draft_state_ludopathy.json").exists()
-        assert draft_api._state_exists()
-        assert client.get("/draft/board").status_code == 200
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "rumble")
+        assert not draft_api._state_exists()
+        assert (
+            _client().get("/draft/board", follow_redirects=False).headers["location"]
+            == "/draft"
+        )
 
     def test_no_session_is_not_a_session(self, workdir: Path) -> None:
         assert not draft_api._state_exists()
@@ -363,3 +374,69 @@ class TestEspnSetupPartial:
 
         body = _client().get("/draft").text
         assert 'hx-trigger="load"' not in body
+
+
+class TestAutomaticRouting:
+    """
+    Opening the app should land on the right board with no clicking.
+
+    Two drafts two hours apart means the league switcher gets used mid-evening,
+    and it has to put you on that league's draft rather than a form.
+    """
+
+    def _start(self, workdir: Path, league: str) -> None:
+        _write_board(workdir, league)
+        _client().post(
+            "/draft/start",
+            data={
+                "board_path": f"outputs/draft_board_2026_{league}.csv",
+                "draft_position": "1",
+            },
+            follow_redirects=False,
+        )
+
+    def test_setup_goes_straight_to_a_live_board(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        self._start(workdir, "hoh")
+
+        resp = _client().get("/draft", follow_redirects=False)
+
+        assert resp.status_code == 303
+        assert resp.headers["location"] == "/draft/board"
+
+    def test_setup_is_shown_when_there_is_no_session(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        _write_board(workdir, "hoh")
+
+        resp = _client().get("/draft", follow_redirects=False)
+
+        assert resp.status_code == 200
+        assert "New Draft Session" in resp.text
+
+    def test_the_board_sends_you_to_setup_rather_than_404ing(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+
+        resp = _client().get("/draft/board", follow_redirects=False)
+
+        assert resp.status_code == 303
+        assert resp.headers["location"] == "/draft"
+
+    def test_each_league_lands_on_its_own_draft(
+        self, workdir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The evening's actual shape: two sessions, switching between them."""
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "hoh")
+        self._start(workdir, "hoh")
+        monkeypatch.setenv("NFL_PREDICT_LEAGUE", "rumble")
+        self._start(workdir, "rumble")
+
+        for league, teams in (("hoh", 14), ("rumble", 8)):
+            monkeypatch.setenv("NFL_PREDICT_LEAGUE", league)
+            body = _client().get("/draft/board").text
+            assert f"{teams}-team league" in body

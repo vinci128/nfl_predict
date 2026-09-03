@@ -19,7 +19,16 @@ from nfl_predict.leagues import (
 
 
 @pytest.fixture()
-def client():
+def client(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """
+    Run against a throwaway outputs/.
+
+    /draft redirects to the board when the active league has a live session,
+    so a real session on disk would change what these tests are looking at.
+    """
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "outputs").mkdir()
+
     from fastapi.testclient import TestClient
 
     from nfl_predict.api import app

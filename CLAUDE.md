@@ -346,6 +346,14 @@ active league is a per-request cookie, so one server can run two drafts at once
 in two browser profiles and each keeps its own session file. `NFL_PREDICT_LEAGUE`
 still works and is what the CLI reads.
 
+**A session belongs to exactly one league.** `/draft` redirects to the board
+when the active league has one, and `/draft/board` redirects to setup when it
+does not, so switching league mid-evening lands on that league's draft rather
+than a form or a 404. `_active_state_path` deliberately has no fallback to
+"the only session on disk": it used to, and with a Hell or Highwater draft
+running, switching to Royal Rumble showed that 14-team slate under the Royal
+Rumble heading.
+
 **Size and draft slot come from ESPN automatically.** The setup page paints the
 league profile's own values, then replaces them with ESPN's on load — a
 mistyped draft position throws the snake order off from the first pick, so it
