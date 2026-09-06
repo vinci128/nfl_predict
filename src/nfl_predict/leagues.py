@@ -363,21 +363,30 @@ _LUDOPATHY_SCORING = ScoringRules(
         "fumble_recovery_tds": 6.0,
         "pat_made": 1.0,
         "fg_missed": -1.0,
-        # IDP, from ESPN's separate "Defensive Players" table. These are NOT
-        # the D/ST values — a defender's sack is worth 4 here against a
-        # defence's 1, and an interception 5 against 2.
+        # IDP. These are NOT the D/ST values — a defender's sack is worth 2
+        # here against a defence's 1.
         #
         # ESPN scores a tackle under two categories at once: Total Tackles (TK,
         # 1) applies to every tackle, and Solo (TKS, 1.5) or Assisted (TKA,
         # 0.5) applies on top. So a solo tackle is 2.5 and an assist 1.5, which
         # is what these rates fold together.
+        #
+        # The turnover and sack rates below are deliberately NOT the ones the
+        # settings page prints. Its "Defensive Players" table shows SK 4,
+        # INT 5, FR 4, FF 4 — ESPN does not apply those. The scoringItems
+        # carry a pointsOverrides map keyed by positionId, and 9-13 (DT, DE,
+        # LB, CB, S) all override to 2.0. Reconstructing ESPN's own projected
+        # appliedTotal from its raw projected stats matches the override
+        # values to eight significant figures and misses the printed ones by
+        # 15% on a pass rusher, so the overrides are what scores.
+        # See tests/test_leagues.py::test_ludopathy_idp_matches_espn_applied_total.
         "def_tackles_solo": 2.5,
         "def_tackle_assists": 1.5,
         "def_pass_defended": 1.0,
-        "def_sacks": 4.0,
-        "def_interceptions": 5.0,
-        "def_fumbles_forced": 4.0,
-        "def_fumbles": 4.0,
+        "def_sacks": 2.0,
+        "def_interceptions": 2.0,
+        "def_fumbles_forced": 2.0,
+        "def_fumbles": 2.0,
         "def_safeties": 2.0,
         "def_blocks": 2.0,
         "def_tds": 6.0,

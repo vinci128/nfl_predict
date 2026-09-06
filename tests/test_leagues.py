@@ -224,17 +224,87 @@ class TestLudopathyScoring:
         df = frame(def_tackles_solo=8, def_tackle_assists=4, def_pass_defended=2)
         assert self.scoring.score(df).iloc[0] == pytest.approx(8 * 2.5 + 4 * 1.5 + 2)
 
-    def test_idp_uses_the_defensive_players_table_not_the_dst_one(self) -> None:
-        """A defender's sack is 4 and his interception 5; a defence's are 1 and 2."""
-        assert self.scoring.per_unit["def_sacks"] == 4.0
-        assert self.scoring.per_unit["def_interceptions"] == 5.0
-        assert self.scoring.per_unit["def_fumbles_forced"] == 4.0
-        assert self.scoring.per_unit["def_fumbles"] == 4.0
+    def test_idp_turnovers_use_the_position_overrides_not_the_printed_table(
+        self,
+    ) -> None:
+        """
+        ESPN's settings page prints SK 4, INT 5, FR 4, FF 4 under "Defensive
+        Players" and then does not apply them. The scoringItems carry a
+        pointsOverrides map keyed by positionId, and 9-13 (DT, DE, LB, CB, S)
+        all override to 2.0. See the appliedTotal reconstruction below for
+        which of the two ESPN actually scores.
+        """
+        assert self.scoring.per_unit["def_sacks"] == 2.0
+        assert self.scoring.per_unit["def_interceptions"] == 2.0
+        assert self.scoring.per_unit["def_fumbles_forced"] == 2.0
+        assert self.scoring.per_unit["def_fumbles"] == 2.0
+
+    def test_idp_still_beats_the_dst_table(self) -> None:
+        """The override is 2.0; a defence's sack is still only 1.0."""
+        assert self.scoring.per_unit["def_sacks"] == 2.0
+        assert PROFILES["hoh"].scoring.per_unit.get("def_sacks", 0.0) == 0.0
 
     def test_a_starting_linebacker_is_a_real_fantasy_asset(self) -> None:
-        """10 solo, 6 assists, a sack: 25 + 9 + 4."""
+        """10 solo, 6 assists, a sack: 25 + 9 + 2."""
         lb = frame(def_tackles_solo=10, def_tackle_assists=6, def_sacks=1)
-        assert self.scoring.score(lb).iloc[0] == pytest.approx(38.0)
+        assert self.scoring.score(lb).iloc[0] == pytest.approx(36.0)
+
+    @pytest.mark.parametrize(
+        "name,stats,espn_applied_total",
+        [
+            # ESPN's own 2026 projected stat line and projected appliedTotal,
+            # read from kona_player_info for league 1773102615 on 2026-09-06.
+            (
+                "Maxx Crosby",
+                {
+                    "def_tackles_solo": 46.62130701,
+                    "def_tackle_assists": 34.22068481,
+                    "def_pass_defended": 1.602692809,
+                    "def_sacks": 10.83199794,
+                    "def_interceptions": 0.163222105,
+                    "def_fumbles": 1.397804869,
+                    "def_fumbles_forced": 2.150469029,
+                    "def_fg_blocks": 0.314132201,
+                    "def_safeties": 0.057114946,
+                    "def_tds": 0.151049275,
+                    "kick_return_tds": 0.017781068,
+                    "punt_return_tds": 0.0,
+                    "special_teams_tds": 0.057114946 + 0.076153261,
+                },
+                201.12906104,
+            ),
+            (
+                "Bobby Okereke",
+                {
+                    "def_tackles_solo": 61.78563004,
+                    "def_tackle_assists": 48.99968436,
+                    "def_pass_defended": 4.773681062,
+                    "def_sacks": 1.075837266,
+                    "def_interceptions": 0.875028576,
+                    "def_fumbles": 0.172396188,
+                    "def_fumbles_forced": 0.265224905,
+                    "def_fg_blocks": 0.012278931,
+                    "def_safeties": 0.012278931,
+                    "def_tds": 0.110510377,
+                    "kick_return_tds": 0.008185954,
+                    "punt_return_tds": 0.0,
+                    "special_teams_tds": 0.069580608 + 0.032743815,
+                },
+                238.88949682,
+            ),
+        ],
+    )
+    def test_idp_reproduces_espn_applied_total(
+        self, name: str, stats: dict[str, float], espn_applied_total: float
+    ) -> None:
+        """
+        The only check that distinguishes the printed table from the applied
+        overrides. Scoring ESPN's own projected stat line must land on ESPN's
+        own projected total. The printed values (SK 4, INT 5, FR/FF 4) miss
+        Crosby by 29 points; the overrides match to a hundredth.
+        """
+        got = self.scoring.score(frame(**stats)).iloc[0]
+        assert got == pytest.approx(espn_applied_total, abs=0.01), name
 
     def test_unmodelled_bonuses_are_declared(self) -> None:
         """The long-TD bonuses need play-level data; the gap must stay visible."""

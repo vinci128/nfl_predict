@@ -240,23 +240,52 @@ which is easier to diff:
 ### D/ST and IDP score off different tables
 ESPN's settings page has a **Team Defense / Special Teams** section and a
 separate **Defensive Players** section, and their values differ. In Ludopathy a
-defender's sack is 4 where a defence's is 1, and his interception 5 where a
-defence's is 2. Scoring IDPs off the D/ST column understated every linebacker
-by more than half.
+defender's sack is 2 where a defence's is 1. Scoring IDPs off the D/ST column
+understated every linebacker by more than half.
 
 ESPN also pays a tackle under two categories at once: Total Tackles (TK, 1)
 applies to every tackle, and Solo (TKS, 1.5) or Assisted (TKA, 0.5) applies on
 top — so a solo tackle is worth 2.5 and an assist 1.5. `_LUDOPATHY_SCORING`
 folds the pair together into one rate per stat.
 
+### The settings page lies about IDP turnovers — check appliedTotal
+**The printed "Defensive Players" table is not what ESPN applies.** It shows
+SK 4, INT 5, FR 4, FF 4 for Ludopathy. Those values score nothing. Each entry
+in `scoringSettings.scoringItems[]` may carry a `pointsOverrides` map keyed by
+**positionId**, and in Ludopathy every IDP position — 9 DT, 10 DE, 11 LB,
+12 CB, 13 S — overrides those four categories to **2.0**. (16 is D/ST, which is
+how the D/ST column is stored on the same rows.) Tackles and passes defensed
+carry no IDP override, so those *do* come from the printed table.
+
+Note the two enums differ: `pointsOverrides` keys are ESPN **positionId**s
+(9 DT, 10 DE, 11 LB, 12 CB, 13 S, 16 D/ST), not the lineup-slot ids that
+`espn_api`'s `POSITION_MAP` prints (where 10 is LB and 11 is DL). Reading one
+as the other is what makes the override map look like it covers an odd subset.
+
+The check that settles it needs no box score and works before week 1: pull a
+defender from `kona_player_info`, take the `statSourceId == 1` projection's raw
+`stats` map, score it with `ScoringRules.score`, and compare against the same
+entry's `appliedTotal`. On 2026-09-06 that reproduced ESPN to eight significant
+figures under the overrides (Crosby 201.129, Okereke 238.889) and missed by 29
+points on Crosby under the printed table. `appliedStats` is empty on
+projections, so the raw-stats reconstruction is the only route.
+
+This cost a whole draft-day rebuild: the wrong rates had been in
+`_LUDOPATHY_SCORING` since the 2026-09-02 settings-page read, and the fantasy
+points they produce **are the training target**, so the feature table, all nine
+season models and the board were all fit on inflated IDP numbers. Pass rushers
+were hit hardest (sacks are most of a DL's non-tackle scoring); linebackers
+barely moved, because tackles dominate and tackles were right.
+
 ### Known gaps
 - Ludopathy's 40+/50+ yard TD pass bonuses (PTD40 +2, PTD50 +3) need play-level
   data and are not modelled. They are declared in `ScoringRules.unmodelled` and
   printed by `nfl-predict leagues` rather than silently dropped.
-- Ludopathy's IDP scoring is taken from ESPN's Defensive Players table and is
-  confirmed, but it has not yet been checked against a real box score. Do that
-  after week 1 — `EspnFantasyClient.fetch_boxscore` returns ESPN's own
-  `actual_points` per player, which is exactly the comparison to run.
+- Ludopathy's IDP scoring is verified against ESPN's own projected
+  `appliedTotal` (see above), which pins the rates exactly. Re-run the same
+  comparison against a real box score after week 1 —
+  `EspnFantasyClient.fetch_boxscore` returns ESPN's `actual_points` per player
+  — to confirm the *actual* stat feed lines up the way the projected one does.
 
 ---
 
@@ -483,12 +512,22 @@ mapping lives in `leagues.fantasy_position`; a position that maps to nothing
 (offensive line, long snapper, punter) is dropped — it cannot fill a slot in
 either league.
 
-Scale check against 2025 under the corrected rules: an elite LB is ~390 points
-and an elite DL ~230, next to ~600 for the top QB and ~190 for the top kicker.
-IDP is not a late-round afterthought in this league — the best linebacker
-ranks **26th overall** on the board and 15 of the top 60 are LB or DL. The
-earlier figures here (~145 LB, ~80 DL, "well after the skill positions") came
-from scoring IDPs off the D/ST table and are wrong.
+Scale check against 2025 actuals under the rules as ESPN applies them: an
+elite LB is ~378 points, an elite DB ~267 and an elite DL ~179, next to ~599
+for the top QB and ~188 for the top kicker. IDP is not a late-round
+afterthought — the best linebacker ranks **26th overall** on the board and 10
+of the top 60 are LB or DB.
+
+**Tackles carry IDP; sacks do not.** Correcting the turnover and sack rates
+(4/5/4/4 to 2/2/2/2, see "The settings page lies about IDP turnovers") cost an
+elite LB only 2.3% and an elite DB 4.3%, because tackles dominate both and
+tackle rates were already right. It cost an elite DL **22.6%** — Myles
+Garrett's 2025 goes 230.5 to 178.5 — and pure pass rushers 30-52 points each.
+That is enough to empty the top 60 of DL entirely: the best one fell from
+overall 59 to 75. Two earlier revisions of this paragraph were wrong in the
+other direction (~145 LB / ~80 DL from the D/ST table, then ~390 LB / ~230 DL
+from the printed Defensive Players table); only the numbers above reproduce
+ESPN's own `appliedTotal`.
 
 ### D/ST (Hell or Highwater only)
 `dst.py` is deliberately **not** a CatBoost quantile family. Two derived inputs
