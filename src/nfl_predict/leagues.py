@@ -624,8 +624,10 @@ HELL_OR_HIGHWATER = LeagueProfile(
     roster_caps={"QB": 4, "RB": 8, "WR": 8, "TE": 3, "DST": 1, "K": 1},
     suggestion_limits={"K": 1, "DST": 1},
     notes=(
-        "Standard passing yardage (0.04/yd), not the 0.1 the other league "
-        "uses — QBs are worth far less here.",
+        "Passing is 0.1/yd continuous, an interception costs -4, and the QB "
+        "loses 0.5 per sack taken — changed by the commissioner on 2026-09-03 "
+        "and confirmed against ESPN on 2026-09-06. Royal Rumble still runs "
+        "0.04/yd and -2, so QBs are worth far more here than there.",
         "14 teams and a 16-man roster: the player pool runs thin, replacement "
         "level is much lower than in a 10-team league.",
         "1 D/ST starter, no keepers.",
@@ -636,7 +638,10 @@ ROYAL_RUMBLE = LeagueProfile(
     key="rumble",
     name="Royal Rumble",
     season=2026,
-    # Identical to Hell or Highwater, category for category.
+    # ESPN's stock PPR. This *was* identical to Hell or Highwater until
+    # 2026-09-03, when that league's commissioner moved passing to 0.1/yd, an
+    # interception to -4, and added a -0.5 sack penalty. The two no longer
+    # share a fit; see _HOH_SCORING.
     scoring=_ESPN_PPR_SCORING,
     dst_scoring=_ESPN_PPR_DST_SCORING,
     roster=RosterConfig(
@@ -670,9 +675,12 @@ ROYAL_RUMBLE = LeagueProfile(
     roster_caps={"QB": 4, "RB": 8, "WR": 8, "TE": 3, "DST": 3, "K": 3},
     suggestion_limits={"K": 1, "DST": 1},
     notes=(
-        "Same scoring as Hell or Highwater, but 8 teams to its 14: the "
-        "player pool is deep, replacement level is high, and VOR gaps at the "
-        "top matter far less than they do in the 14-team league.",
+        "ESPN's stock PPR: 0.04/yd passing, -2 per interception, no sack "
+        "penalty. Hell or Highwater ran the same rules until 2026-09-03 and "
+        "no longer does, so QB projections are not comparable between them.",
+        "8 teams to Hell or Highwater's 14: the player pool is deep, "
+        "replacement level is high, and VOR gaps at the top matter far less "
+        "than they do in the 14-team league.",
         "14-man rosters and only 5 bench spots — there is little room to stash upside.",
         "Waivers are a 1000-unit continuous free-agent budget, not priority.",
     ),
