@@ -1,0 +1,3062 @@
+{
+  "QB_SEASON_TOTAL_P10": {
+    "champion": "qb_season_total_p10_20260906_120923_9cf47377",
+    "versions": [
+      {
+        "version_id": "qb_season_total_p10_20260828_152140_2cd0230c",
+        "created_at": "2026-08-28T15:21:40.448359",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 168.04249640589575,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p10_20260828_152140_2cd0230c/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p10_20260828_152140_2cd0230c/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p10_20260902_203224_3874399d",
+        "created_at": "2026-09-02T20:32:24.400036",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 164.03466300571685,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p10_20260902_203224_3874399d/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p10_20260902_203224_3874399d/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p10_20260903_232056_2b458c42",
+        "created_at": "2026-09-03T23:20:56.160463",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 164.03466300571685,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p10_20260903_232056_2b458c42/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p10_20260903_232056_2b458c42/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p10_20260906_120923_9cf47377",
+        "created_at": "2026-09-06T12:09:23.761760",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 167.41351092606598,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p10_20260906_120923_9cf47377/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p10_20260906_120923_9cf47377/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_TOTAL_P50": {
+    "champion": "qb_season_total_p50_20260906_120924_3dfe0abc",
+    "versions": [
+      {
+        "version_id": "qb_season_total_p50_20260828_152141_f8981c6a",
+        "created_at": "2026-08-28T15:21:41.106834",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 103.35540141052232,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p50_20260828_152141_f8981c6a/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p50_20260828_152141_f8981c6a/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p50_20260902_203225_95ef73cd",
+        "created_at": "2026-09-02T20:32:25.030172",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 99.91311627836293,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p50_20260902_203225_95ef73cd/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p50_20260902_203225_95ef73cd/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p50_20260903_232056_70d84c78",
+        "created_at": "2026-09-03T23:20:56.853374",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 99.91311627836293,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p50_20260903_232056_70d84c78/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p50_20260903_232056_70d84c78/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p50_20260906_120924_3dfe0abc",
+        "created_at": "2026-09-06T12:09:24.407338",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 99.26569463959407,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p50_20260906_120924_3dfe0abc/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p50_20260906_120924_3dfe0abc/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_TOTAL_P90": {
+    "champion": "qb_season_total_p90_20260906_120925_f83a91f4",
+    "versions": [
+      {
+        "version_id": "qb_season_total_p90_20260828_152141_82078ca5",
+        "created_at": "2026-08-28T15:21:41.798415",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 176.88409488679443,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p90_20260828_152141_82078ca5/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p90_20260828_152141_82078ca5/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p90_20260902_203225_209083ba",
+        "created_at": "2026-09-02T20:32:25.706787",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 168.57928231811778,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p90_20260902_203225_209083ba/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p90_20260902_203225_209083ba/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p90_20260903_232057_6d78f9aa",
+        "created_at": "2026-09-03T23:20:57.568593",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 168.57928231811778,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p90_20260903_232057_6d78f9aa/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p90_20260903_232057_6d78f9aa/meta.json"
+      },
+      {
+        "version_id": "qb_season_total_p90_20260906_120925_f83a91f4",
+        "created_at": "2026-09-06T12:09:25.051535",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 180.72705948305432,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_total_p90_20260906_120925_f83a91f4/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_total_p90_20260906_120925_f83a91f4/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_PPG_P10": {
+    "champion": "qb_season_ppg_p10_20260906_120925_42672719",
+    "versions": [
+      {
+        "version_id": "qb_season_ppg_p10_20260828_152142_67fec12b",
+        "created_at": "2026-08-28T15:21:42.432565",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 8.934147503423139,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p10_20260828_152142_67fec12b/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p10_20260828_152142_67fec12b/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p10_20260902_203226_94e7c117",
+        "created_at": "2026-09-02T20:32:26.324578",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 8.286237983219523,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p10_20260902_203226_94e7c117/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p10_20260902_203226_94e7c117/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p10_20260903_232058_c2af2511",
+        "created_at": "2026-09-03T23:20:58.234382",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 8.286237983219523,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p10_20260903_232058_c2af2511/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p10_20260903_232058_c2af2511/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p10_20260906_120925_42672719",
+        "created_at": "2026-09-06T12:09:25.678929",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 8.243225900988906,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p10_20260906_120925_42672719/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p10_20260906_120925_42672719/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_PPG_P50": {
+    "champion": "qb_season_ppg_p50_20260906_120926_ad6bf4ef",
+    "versions": [
+      {
+        "version_id": "qb_season_ppg_p50_20260828_152143_6ed4a704",
+        "created_at": "2026-08-28T15:21:43.078295",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 6.222686081384986,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p50_20260828_152143_6ed4a704/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p50_20260828_152143_6ed4a704/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p50_20260902_203226_8aa1c33f",
+        "created_at": "2026-09-02T20:32:26.951291",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 5.889218631715233,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p50_20260902_203226_8aa1c33f/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p50_20260902_203226_8aa1c33f/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p50_20260903_232058_fb9de719",
+        "created_at": "2026-09-03T23:20:58.889559",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 5.889218631715233,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p50_20260903_232058_fb9de719/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p50_20260903_232058_fb9de719/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p50_20260906_120926_ad6bf4ef",
+        "created_at": "2026-09-06T12:09:26.306352",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 5.876601984486368,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p50_20260906_120926_ad6bf4ef/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p50_20260906_120926_ad6bf4ef/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_PPG_P90": {
+    "champion": "qb_season_ppg_p90_20260906_120926_449334c4",
+    "versions": [
+      {
+        "version_id": "qb_season_ppg_p90_20260828_152143_c6358995",
+        "created_at": "2026-08-28T15:21:43.703336",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 12.087963324952913,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p90_20260828_152143_c6358995/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p90_20260828_152143_c6358995/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p90_20260902_203227_555c9465",
+        "created_at": "2026-09-02T20:32:27.574605",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 10.650330610903417,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p90_20260902_203227_555c9465/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p90_20260902_203227_555c9465/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p90_20260903_232059_fafff5fd",
+        "created_at": "2026-09-03T23:20:59.538572",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 10.650330610903417,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p90_20260903_232059_fafff5fd/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p90_20260903_232059_fafff5fd/meta.json"
+      },
+      {
+        "version_id": "qb_season_ppg_p90_20260906_120926_449334c4",
+        "created_at": "2026-09-06T12:09:26.929932",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 10.955063906140408,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_ppg_p90_20260906_120926_449334c4/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_ppg_p90_20260906_120926_449334c4/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_GAMES_P10": {
+    "champion": "qb_season_games_p10_20260906_120927_24ee0ca2",
+    "versions": [
+      {
+        "version_id": "qb_season_games_p10_20260828_152144_2cd60b9d",
+        "created_at": "2026-08-28T15:21:44.346786",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.0603824367508015,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p10_20260828_152144_2cd60b9d/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p10_20260828_152144_2cd60b9d/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p10_20260902_203228_d97d7d8b",
+        "created_at": "2026-09-02T20:32:28.194286",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.923425689162861,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p10_20260902_203228_d97d7d8b/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p10_20260902_203228_d97d7d8b/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p10_20260903_232100_421a24cc",
+        "created_at": "2026-09-03T23:21:00.242755",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.923425689162861,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p10_20260903_232100_421a24cc/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p10_20260903_232100_421a24cc/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p10_20260906_120927_24ee0ca2",
+        "created_at": "2026-09-06T12:09:27.562526",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.861979358769235,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p10_20260906_120927_24ee0ca2/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p10_20260906_120927_24ee0ca2/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_GAMES_P50": {
+    "champion": "qb_season_games_p50_20260906_120928_29e1c0d5",
+    "versions": [
+      {
+        "version_id": "qb_season_games_p50_20260828_152144_af61d834",
+        "created_at": "2026-08-28T15:21:45.000064",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.9015012384757886,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p50_20260828_152144_af61d834/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p50_20260828_152144_af61d834/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p50_20260902_203228_8401f077",
+        "created_at": "2026-09-02T20:32:28.823715",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.8134354920840003,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p50_20260902_203228_8401f077/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p50_20260902_203228_8401f077/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p50_20260903_232100_3220215a",
+        "created_at": "2026-09-03T23:21:00.896157",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.8134354920840003,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p50_20260903_232100_3220215a/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p50_20260903_232100_3220215a/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p50_20260906_120928_29e1c0d5",
+        "created_at": "2026-09-06T12:09:28.208224",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.796872885228758,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p50_20260906_120928_29e1c0d5/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p50_20260906_120928_29e1c0d5/meta.json"
+      }
+    ]
+  },
+  "QB_SEASON_GAMES_P90": {
+    "champion": "qb_season_games_p90_20260906_120928_b13ca1f8",
+    "versions": [
+      {
+        "version_id": "qb_season_games_p90_20260828_152145_7d7f53f6",
+        "created_at": "2026-08-28T15:21:45.667759",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.847928386538292,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p90_20260828_152145_7d7f53f6/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p90_20260828_152145_7d7f53f6/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p90_20260902_203229_e6b45635",
+        "created_at": "2026-09-02T20:32:29.513313",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.680063495287378,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p90_20260902_203229_e6b45635/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p90_20260902_203229_e6b45635/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p90_20260903_232101_457542c6",
+        "created_at": "2026-09-03T23:21:01.634122",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.680063495287378,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p90_20260903_232101_457542c6/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p90_20260903_232101_457542c6/meta.json"
+      },
+      {
+        "version_id": "qb_season_games_p90_20260906_120928_b13ca1f8",
+        "created_at": "2026-09-06T12:09:28.857514",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.765055307163206,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_season_games_p90_20260906_120928_b13ca1f8/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_season_games_p90_20260906_120928_b13ca1f8/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_TOTAL_P10": {
+    "champion": "rb_season_total_p10_20260906_120929_46e344b7",
+    "versions": [
+      {
+        "version_id": "rb_season_total_p10_20260828_152146_da58be22",
+        "created_at": "2026-08-28T15:21:46.321496",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 67.15898153911884,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p10_20260828_152146_da58be22/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p10_20260828_152146_da58be22/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p10_20260902_203230_3401fb50",
+        "created_at": "2026-09-02T20:32:30.232895",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 64.91484999058738,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p10_20260902_203230_3401fb50/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p10_20260902_203230_3401fb50/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p10_20260903_232102_a1a2f4f4",
+        "created_at": "2026-09-03T23:21:02.386109",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 64.91484999058738,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p10_20260903_232102_a1a2f4f4/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p10_20260903_232102_a1a2f4f4/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p10_20260906_120929_46e344b7",
+        "created_at": "2026-09-06T12:09:29.520140",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 66.4597841334179,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p10_20260906_120929_46e344b7/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p10_20260906_120929_46e344b7/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_TOTAL_P50": {
+    "champion": "rb_season_total_p50_20260906_120930_d6e619c7",
+    "versions": [
+      {
+        "version_id": "rb_season_total_p50_20260828_152146_367e2abe",
+        "created_at": "2026-08-28T15:21:46.987531",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 42.21933601793809,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p50_20260828_152146_367e2abe/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p50_20260828_152146_367e2abe/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p50_20260902_203230_c12f8707",
+        "created_at": "2026-09-02T20:32:30.906190",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 43.75168311720832,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p50_20260902_203230_c12f8707/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p50_20260902_203230_c12f8707/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p50_20260903_232103_69a48f66",
+        "created_at": "2026-09-03T23:21:03.088621",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 43.75168311720832,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p50_20260903_232103_69a48f66/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p50_20260903_232103_69a48f66/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p50_20260906_120930_d6e619c7",
+        "created_at": "2026-09-06T12:09:30.196845",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 44.195909681083954,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p50_20260906_120930_d6e619c7/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p50_20260906_120930_d6e619c7/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_TOTAL_P90": {
+    "champion": "rb_season_total_p90_20260906_120930_8066d542",
+    "versions": [
+      {
+        "version_id": "rb_season_total_p90_20260828_152147_7538d0ae",
+        "created_at": "2026-08-28T15:21:47.638175",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 76.54657202563057,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p90_20260828_152147_7538d0ae/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p90_20260828_152147_7538d0ae/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p90_20260902_203231_c7bba2d4",
+        "created_at": "2026-09-02T20:32:31.545245",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 77.31349590545308,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p90_20260902_203231_c7bba2d4/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p90_20260902_203231_c7bba2d4/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p90_20260903_232103_02dffff8",
+        "created_at": "2026-09-03T23:21:03.745300",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 77.31349590545308,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p90_20260903_232103_02dffff8/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p90_20260903_232103_02dffff8/meta.json"
+      },
+      {
+        "version_id": "rb_season_total_p90_20260906_120930_8066d542",
+        "created_at": "2026-09-06T12:09:30.836457",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 76.08486212827302,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_total_p90_20260906_120930_8066d542/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_total_p90_20260906_120930_8066d542/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_PPG_P10": {
+    "champion": "rb_season_ppg_p10_20260906_120931_29b9eea5",
+    "versions": [
+      {
+        "version_id": "rb_season_ppg_p10_20260828_152148_d9ac31ea",
+        "created_at": "2026-08-28T15:21:48.352501",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.2292181915113827,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p10_20260828_152148_d9ac31ea/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p10_20260828_152148_d9ac31ea/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p10_20260902_203232_976dc73b",
+        "created_at": "2026-09-02T20:32:32.223540",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.43691848942229,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p10_20260902_203232_976dc73b/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p10_20260902_203232_976dc73b/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p10_20260903_232104_c4d42156",
+        "created_at": "2026-09-03T23:21:04.440321",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.43691848942229,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p10_20260903_232104_c4d42156/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p10_20260903_232104_c4d42156/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p10_20260906_120931_29b9eea5",
+        "created_at": "2026-09-06T12:09:31.564737",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.287955373831351,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p10_20260906_120931_29b9eea5/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p10_20260906_120931_29b9eea5/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_PPG_P50": {
+    "champion": "rb_season_ppg_p50_20260906_120932_0a9dd64f",
+    "versions": [
+      {
+        "version_id": "rb_season_ppg_p50_20260828_152149_3f693adb",
+        "created_at": "2026-08-28T15:21:49.060273",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.1612951106706344,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p50_20260828_152149_3f693adb/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p50_20260828_152149_3f693adb/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p50_20260902_203232_8823648b",
+        "created_at": "2026-09-02T20:32:32.876053",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.1784857468950594,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p50_20260902_203232_8823648b/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p50_20260902_203232_8823648b/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p50_20260903_232105_db86e2cd",
+        "created_at": "2026-09-03T23:21:05.127551",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.1784857468950594,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p50_20260903_232105_db86e2cd/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p50_20260903_232105_db86e2cd/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p50_20260906_120932_0a9dd64f",
+        "created_at": "2026-09-06T12:09:32.222047",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.2035347425295506,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p50_20260906_120932_0a9dd64f/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p50_20260906_120932_0a9dd64f/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_PPG_P90": {
+    "champion": "rb_season_ppg_p90_20260906_120932_5a5eab2e",
+    "versions": [
+      {
+        "version_id": "rb_season_ppg_p90_20260828_152149_fcb61505",
+        "created_at": "2026-08-28T15:21:49.769372",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.774744838241243,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p90_20260828_152149_fcb61505/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p90_20260828_152149_fcb61505/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p90_20260902_203233_a4b14a2b",
+        "created_at": "2026-09-02T20:32:33.526429",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.95671642960869,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p90_20260902_203233_a4b14a2b/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p90_20260902_203233_a4b14a2b/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p90_20260903_232105_63c71534",
+        "created_at": "2026-09-03T23:21:05.822549",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.95671642960869,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p90_20260903_232105_63c71534/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p90_20260903_232105_63c71534/meta.json"
+      },
+      {
+        "version_id": "rb_season_ppg_p90_20260906_120932_5a5eab2e",
+        "created_at": "2026-09-06T12:09:32.892514",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.919135513249947,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_ppg_p90_20260906_120932_5a5eab2e/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_ppg_p90_20260906_120932_5a5eab2e/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_GAMES_P10": {
+    "champion": "rb_season_games_p10_20260906_120933_5fae3f2b",
+    "versions": [
+      {
+        "version_id": "rb_season_games_p10_20260828_152150_33bb752e",
+        "created_at": "2026-08-28T15:21:50.441719",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.411870683056787,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p10_20260828_152150_33bb752e/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p10_20260828_152150_33bb752e/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p10_20260902_203234_d68a0a4c",
+        "created_at": "2026-09-02T20:32:34.169819",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.535736680043683,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p10_20260902_203234_d68a0a4c/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p10_20260902_203234_d68a0a4c/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p10_20260903_232106_16e32a03",
+        "created_at": "2026-09-03T23:21:06.503348",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.535736680043683,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p10_20260903_232106_16e32a03/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p10_20260903_232106_16e32a03/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p10_20260906_120933_5fae3f2b",
+        "created_at": "2026-09-06T12:09:33.579519",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.218464160743513,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p10_20260906_120933_5fae3f2b/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p10_20260906_120933_5fae3f2b/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_GAMES_P50": {
+    "champion": "rb_season_games_p50_20260906_120934_91d24fe3",
+    "versions": [
+      {
+        "version_id": "rb_season_games_p50_20260828_152151_aee9d4d6",
+        "created_at": "2026-08-28T15:21:51.101407",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.7811285943686217,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p50_20260828_152151_aee9d4d6/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p50_20260828_152151_aee9d4d6/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p50_20260902_203234_f352a8a3",
+        "created_at": "2026-09-02T20:32:34.813774",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.798733348971451,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p50_20260902_203234_f352a8a3/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p50_20260902_203234_f352a8a3/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p50_20260903_232107_4bf9d243",
+        "created_at": "2026-09-03T23:21:07.171609",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.798733348971451,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p50_20260903_232107_4bf9d243/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p50_20260903_232107_4bf9d243/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p50_20260906_120934_91d24fe3",
+        "created_at": "2026-09-06T12:09:34.243419",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.794843891060493,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p50_20260906_120934_91d24fe3/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p50_20260906_120934_91d24fe3/meta.json"
+      }
+    ]
+  },
+  "RB_SEASON_GAMES_P90": {
+    "champion": "rb_season_games_p90_20260906_120934_6771f926",
+    "versions": [
+      {
+        "version_id": "rb_season_games_p90_20260828_152151_f500601e",
+        "created_at": "2026-08-28T15:21:51.749865",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.459628414695749,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p90_20260828_152151_f500601e/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p90_20260828_152151_f500601e/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p90_20260902_203235_ad4a360b",
+        "created_at": "2026-09-02T20:32:35.438527",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.373392021532284,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p90_20260902_203235_ad4a360b/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p90_20260902_203235_ad4a360b/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p90_20260903_232107_1d769e0a",
+        "created_at": "2026-09-03T23:21:07.838950",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.373392021532284,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p90_20260903_232107_1d769e0a/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p90_20260903_232107_1d769e0a/meta.json"
+      },
+      {
+        "version_id": "rb_season_games_p90_20260906_120934_6771f926",
+        "created_at": "2026-09-06T12:09:34.881943",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.408692733278484,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_season_games_p90_20260906_120934_6771f926/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_season_games_p90_20260906_120934_6771f926/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_TOTAL_P10": {
+    "champion": "wr_season_total_p10_20260906_120935_044d04e8",
+    "versions": [
+      {
+        "version_id": "wr_season_total_p10_20260828_152152_fdddc08d",
+        "created_at": "2026-08-28T15:21:52.419018",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 58.01524836690741,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p10_20260828_152152_fdddc08d/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p10_20260828_152152_fdddc08d/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p10_20260902_203236_ed5c6ad3",
+        "created_at": "2026-09-02T20:32:36.068285",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 60.652923896574634,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p10_20260902_203236_ed5c6ad3/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p10_20260902_203236_ed5c6ad3/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p10_20260903_232108_7597cda8",
+        "created_at": "2026-09-03T23:21:08.502152",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 60.652923896574634,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p10_20260903_232108_7597cda8/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p10_20260903_232108_7597cda8/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p10_20260906_120935_044d04e8",
+        "created_at": "2026-09-06T12:09:35.527545",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 60.778645589678355,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p10_20260906_120935_044d04e8/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p10_20260906_120935_044d04e8/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_TOTAL_P50": {
+    "champion": "wr_season_total_p50_20260906_120936_e456d3b2",
+    "versions": [
+      {
+        "version_id": "wr_season_total_p50_20260828_152153_d037e97a",
+        "created_at": "2026-08-28T15:21:53.082518",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 35.51898676582726,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p50_20260828_152153_d037e97a/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p50_20260828_152153_d037e97a/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p50_20260902_203236_c682b28e",
+        "created_at": "2026-09-02T20:32:36.696141",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 37.034470856201004,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p50_20260902_203236_c682b28e/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p50_20260902_203236_c682b28e/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p50_20260903_232109_702048fe",
+        "created_at": "2026-09-03T23:21:09.174266",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 37.034470856201004,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p50_20260903_232109_702048fe/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p50_20260903_232109_702048fe/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p50_20260906_120936_e456d3b2",
+        "created_at": "2026-09-06T12:09:36.162904",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 37.00137370093591,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p50_20260906_120936_e456d3b2/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p50_20260906_120936_e456d3b2/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_TOTAL_P90": {
+    "champion": "wr_season_total_p90_20260906_120936_6893bbc6",
+    "versions": [
+      {
+        "version_id": "wr_season_total_p90_20260828_152153_a6538d78",
+        "created_at": "2026-08-28T15:21:53.835047",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 73.90224954970742,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p90_20260828_152153_a6538d78/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p90_20260828_152153_a6538d78/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p90_20260902_203237_259cf980",
+        "created_at": "2026-09-02T20:32:37.408677",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 75.13056961280058,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p90_20260902_203237_259cf980/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p90_20260902_203237_259cf980/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p90_20260903_232109_05d4cc81",
+        "created_at": "2026-09-03T23:21:09.925111",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 75.13056961280058,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p90_20260903_232109_05d4cc81/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p90_20260903_232109_05d4cc81/meta.json"
+      },
+      {
+        "version_id": "wr_season_total_p90_20260906_120936_6893bbc6",
+        "created_at": "2026-09-06T12:09:36.866635",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 76.00264857446473,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_total_p90_20260906_120936_6893bbc6/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_total_p90_20260906_120936_6893bbc6/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_PPG_P10": {
+    "champion": "wr_season_ppg_p10_20260906_120937_33bb7c09",
+    "versions": [
+      {
+        "version_id": "wr_season_ppg_p10_20260828_152154_944da3b7",
+        "created_at": "2026-08-28T15:21:54.474709",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.3861711087248083,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p10_20260828_152154_944da3b7/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p10_20260828_152154_944da3b7/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p10_20260902_203238_1d2f15c8",
+        "created_at": "2026-09-02T20:32:38.038074",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.3276808514839584,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p10_20260902_203238_1d2f15c8/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p10_20260902_203238_1d2f15c8/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p10_20260903_232110_9122f6ba",
+        "created_at": "2026-09-03T23:21:10.593394",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.3276808514839584,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p10_20260903_232110_9122f6ba/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p10_20260903_232110_9122f6ba/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p10_20260906_120937_33bb7c09",
+        "created_at": "2026-09-06T12:09:37.504744",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.4271363791717957,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p10_20260906_120937_33bb7c09/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p10_20260906_120937_33bb7c09/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_PPG_P50": {
+    "champion": "wr_season_ppg_p50_20260906_120938_fcbeb183",
+    "versions": [
+      {
+        "version_id": "wr_season_ppg_p50_20260828_152155_9fc25736",
+        "created_at": "2026-08-28T15:21:55.169873",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.0659062192775255,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p50_20260828_152155_9fc25736/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p50_20260828_152155_9fc25736/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p50_20260902_203238_0cbf3452",
+        "created_at": "2026-09-02T20:32:38.741266",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.102620676924849,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p50_20260902_203238_0cbf3452/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p50_20260902_203238_0cbf3452/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p50_20260903_232111_f7f69118",
+        "created_at": "2026-09-03T23:21:11.329887",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.102620676924849,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p50_20260903_232111_f7f69118/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p50_20260903_232111_f7f69118/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p50_20260906_120938_fcbeb183",
+        "created_at": "2026-09-06T12:09:38.201432",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.113300822264684,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p50_20260906_120938_fcbeb183/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p50_20260906_120938_fcbeb183/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_PPG_P90": {
+    "champion": "wr_season_ppg_p90_20260906_120938_ba82cb76",
+    "versions": [
+      {
+        "version_id": "wr_season_ppg_p90_20260828_152155_4484faf0",
+        "created_at": "2026-08-28T15:21:55.890304",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.529261981326378,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p90_20260828_152155_4484faf0/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p90_20260828_152155_4484faf0/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p90_20260902_203239_704b67e7",
+        "created_at": "2026-09-02T20:32:39.457347",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.5128024433463025,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p90_20260902_203239_704b67e7/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p90_20260902_203239_704b67e7/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p90_20260903_232112_1bebf487",
+        "created_at": "2026-09-03T23:21:12.085168",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.5128024433463025,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p90_20260903_232112_1bebf487/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p90_20260903_232112_1bebf487/meta.json"
+      },
+      {
+        "version_id": "wr_season_ppg_p90_20260906_120938_ba82cb76",
+        "created_at": "2026-09-06T12:09:38.908917",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.5448865758970936,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_ppg_p90_20260906_120938_ba82cb76/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_ppg_p90_20260906_120938_ba82cb76/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_GAMES_P10": {
+    "champion": "wr_season_games_p10_20260906_120939_c1f5da93",
+    "versions": [
+      {
+        "version_id": "wr_season_games_p10_20260828_152156_7103cf6e",
+        "created_at": "2026-08-28T15:21:56.547231",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.3504039951254265,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p10_20260828_152156_7103cf6e/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p10_20260828_152156_7103cf6e/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p10_20260902_203240_071ddb62",
+        "created_at": "2026-09-02T20:32:40.083922",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.646229381275959,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p10_20260902_203240_071ddb62/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p10_20260902_203240_071ddb62/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p10_20260903_232112_010cce74",
+        "created_at": "2026-09-03T23:21:12.748332",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.646229381275959,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p10_20260903_232112_010cce74/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p10_20260903_232112_010cce74/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p10_20260906_120939_c1f5da93",
+        "created_at": "2026-09-06T12:09:39.541627",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.524978641432897,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p10_20260906_120939_c1f5da93/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p10_20260906_120939_c1f5da93/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_GAMES_P50": {
+    "champion": "wr_season_games_p50_20260906_120940_1bfd4ccc",
+    "versions": [
+      {
+        "version_id": "wr_season_games_p50_20260828_152157_84dfecca",
+        "created_at": "2026-08-28T15:21:57.216177",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.2500218903327167,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p50_20260828_152157_84dfecca/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p50_20260828_152157_84dfecca/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p50_20260902_203240_c38f94ed",
+        "created_at": "2026-09-02T20:32:40.717003",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.240739784279822,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p50_20260902_203240_c38f94ed/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p50_20260902_203240_c38f94ed/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p50_20260903_232113_e681d952",
+        "created_at": "2026-09-03T23:21:13.423456",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.240739784279822,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p50_20260903_232113_e681d952/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p50_20260903_232113_e681d952/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p50_20260906_120940_1bfd4ccc",
+        "created_at": "2026-09-06T12:09:40.211416",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.233472400889029,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p50_20260906_120940_1bfd4ccc/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p50_20260906_120940_1bfd4ccc/meta.json"
+      }
+    ]
+  },
+  "WR_SEASON_GAMES_P90": {
+    "champion": "wr_season_games_p90_20260906_120940_8806c3df",
+    "versions": [
+      {
+        "version_id": "wr_season_games_p90_20260828_152157_83b600eb",
+        "created_at": "2026-08-28T15:21:57.875545",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.068823547101997,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p90_20260828_152157_83b600eb/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p90_20260828_152157_83b600eb/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p90_20260902_203241_98acddcd",
+        "created_at": "2026-09-02T20:32:41.352391",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.067297578627547,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p90_20260902_203241_98acddcd/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p90_20260902_203241_98acddcd/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p90_20260903_232114_e9082ca1",
+        "created_at": "2026-09-03T23:21:14.094389",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.067297578627547,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p90_20260903_232114_e9082ca1/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p90_20260903_232114_e9082ca1/meta.json"
+      },
+      {
+        "version_id": "wr_season_games_p90_20260906_120940_8806c3df",
+        "created_at": "2026-09-06T12:09:40.856834",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.08147413998176,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_season_games_p90_20260906_120940_8806c3df/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_season_games_p90_20260906_120940_8806c3df/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_TOTAL_P10": {
+    "champion": "te_season_total_p10_20260906_120941_f7fbd16b",
+    "versions": [
+      {
+        "version_id": "te_season_total_p10_20260828_152158_c6992c84",
+        "created_at": "2026-08-28T15:21:58.523276",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 39.957447838670234,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p10_20260828_152158_c6992c84/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p10_20260828_152158_c6992c84/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p10_20260902_203241_b38d1a9b",
+        "created_at": "2026-09-02T20:32:41.978524",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 41.42010963267678,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p10_20260902_203241_b38d1a9b/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p10_20260902_203241_b38d1a9b/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p10_20260903_232114_bcdbd311",
+        "created_at": "2026-09-03T23:21:14.751458",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 41.42010963267678,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p10_20260903_232114_bcdbd311/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p10_20260903_232114_bcdbd311/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p10_20260906_120941_f7fbd16b",
+        "created_at": "2026-09-06T12:09:41.498132",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 41.52684095491303,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p10_20260906_120941_f7fbd16b/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p10_20260906_120941_f7fbd16b/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_TOTAL_P50": {
+    "champion": "te_season_total_p50_20260906_120942_bc254003",
+    "versions": [
+      {
+        "version_id": "te_season_total_p50_20260828_152159_5c60ea67",
+        "created_at": "2026-08-28T15:21:59.192603",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 24.65784361234217,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p50_20260828_152159_5c60ea67/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p50_20260828_152159_5c60ea67/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p50_20260902_203242_3b108d9c",
+        "created_at": "2026-09-02T20:32:42.620696",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 25.51814195118194,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p50_20260902_203242_3b108d9c/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p50_20260902_203242_3b108d9c/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p50_20260903_232115_a4510865",
+        "created_at": "2026-09-03T23:21:15.416687",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 25.51814195118194,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p50_20260903_232115_a4510865/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p50_20260903_232115_a4510865/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p50_20260906_120942_bc254003",
+        "created_at": "2026-09-06T12:09:42.159403",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 25.674459676541478,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p50_20260906_120942_bc254003/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p50_20260906_120942_bc254003/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_TOTAL_P90": {
+    "champion": "te_season_total_p90_20260906_120942_67917c07",
+    "versions": [
+      {
+        "version_id": "te_season_total_p90_20260828_152159_66deb77f",
+        "created_at": "2026-08-28T15:21:59.850595",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 51.23919111826339,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p90_20260828_152159_66deb77f/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p90_20260828_152159_66deb77f/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p90_20260902_203243_517867ad",
+        "created_at": "2026-09-02T20:32:43.246698",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 52.53126775937613,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p90_20260902_203243_517867ad/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p90_20260902_203243_517867ad/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p90_20260903_232116_0b0d4340",
+        "created_at": "2026-09-03T23:21:16.059683",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 52.53126775937613,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p90_20260903_232116_0b0d4340/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p90_20260903_232116_0b0d4340/meta.json"
+      },
+      {
+        "version_id": "te_season_total_p90_20260906_120942_67917c07",
+        "created_at": "2026-09-06T12:09:42.798415",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 50.625663613453284,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_total_p90_20260906_120942_67917c07/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_total_p90_20260906_120942_67917c07/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_PPG_P10": {
+    "champion": "te_season_ppg_p10_20260906_120943_fbfad9f1",
+    "versions": [
+      {
+        "version_id": "te_season_ppg_p10_20260828_152200_11916a6d",
+        "created_at": "2026-08-28T15:22:00.488761",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.715845476805489,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p10_20260828_152200_11916a6d/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p10_20260828_152200_11916a6d/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p10_20260902_203243_b2587c09",
+        "created_at": "2026-09-02T20:32:43.875779",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.6794695716381765,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p10_20260902_203243_b2587c09/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p10_20260902_203243_b2587c09/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p10_20260903_232116_cf6d9f9d",
+        "created_at": "2026-09-03T23:21:16.716972",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.6794695716381765,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p10_20260903_232116_cf6d9f9d/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p10_20260903_232116_cf6d9f9d/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p10_20260906_120943_fbfad9f1",
+        "created_at": "2026-09-06T12:09:43.424415",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.7141272028610306,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p10_20260906_120943_fbfad9f1/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p10_20260906_120943_fbfad9f1/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_PPG_P50": {
+    "champion": "te_season_ppg_p50_20260906_120944_29aca052",
+    "versions": [
+      {
+        "version_id": "te_season_ppg_p50_20260828_152201_d408dbcb",
+        "created_at": "2026-08-28T15:22:01.159152",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.6867505733461847,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p50_20260828_152201_d408dbcb/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p50_20260828_152201_d408dbcb/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p50_20260902_203244_d7bd13d8",
+        "created_at": "2026-09-02T20:32:44.537585",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.6887491621105266,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p50_20260902_203244_d7bd13d8/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p50_20260902_203244_d7bd13d8/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p50_20260903_232117_2c95868f",
+        "created_at": "2026-09-03T23:21:17.427635",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.6887491621105266,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p50_20260903_232117_2c95868f/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p50_20260903_232117_2c95868f/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p50_20260906_120944_29aca052",
+        "created_at": "2026-09-06T12:09:44.107582",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.7077143220968565,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p50_20260906_120944_29aca052/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p50_20260906_120944_29aca052/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_PPG_P90": {
+    "champion": "te_season_ppg_p90_20260906_120944_a7a11fb1",
+    "versions": [
+      {
+        "version_id": "te_season_ppg_p90_20260828_152201_fb3e1fc9",
+        "created_at": "2026-08-28T15:22:01.812978",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.379614446309849,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p90_20260828_152201_fb3e1fc9/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p90_20260828_152201_fb3e1fc9/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p90_20260902_203245_572c9b09",
+        "created_at": "2026-09-02T20:32:45.175475",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.469768302586729,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p90_20260902_203245_572c9b09/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p90_20260902_203245_572c9b09/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p90_20260903_232118_74d0dc37",
+        "created_at": "2026-09-03T23:21:18.071996",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.469768302586729,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p90_20260903_232118_74d0dc37/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p90_20260903_232118_74d0dc37/meta.json"
+      },
+      {
+        "version_id": "te_season_ppg_p90_20260906_120944_a7a11fb1",
+        "created_at": "2026-09-06T12:09:44.778915",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.3615872585068587,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_ppg_p90_20260906_120944_a7a11fb1/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_ppg_p90_20260906_120944_a7a11fb1/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_GAMES_P10": {
+    "champion": "te_season_games_p10_20260906_120945_f8973531",
+    "versions": [
+      {
+        "version_id": "te_season_games_p10_20260828_152202_700a007a",
+        "created_at": "2026-08-28T15:22:02.476016",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.776196850393721,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p10_20260828_152202_700a007a/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p10_20260828_152202_700a007a/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p10_20260902_203245_015ac4e5",
+        "created_at": "2026-09-02T20:32:45.811095",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.901183350431034,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p10_20260902_203245_015ac4e5/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p10_20260902_203245_015ac4e5/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p10_20260903_232118_e92086ca",
+        "created_at": "2026-09-03T23:21:18.725975",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.901183350431034,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p10_20260903_232118_e92086ca/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p10_20260903_232118_e92086ca/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p10_20260906_120945_f8973531",
+        "created_at": "2026-09-06T12:09:45.419024",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.886640316240555,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p10_20260906_120945_f8973531/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p10_20260906_120945_f8973531/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_GAMES_P50": {
+    "champion": "te_season_games_p50_20260906_120946_7fb9d641",
+    "versions": [
+      {
+        "version_id": "te_season_games_p50_20260828_152203_09640a0d",
+        "created_at": "2026-08-28T15:22:03.142886",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.694673122883039,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p50_20260828_152203_09640a0d/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p50_20260828_152203_09640a0d/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p50_20260902_203246_63cc916d",
+        "created_at": "2026-09-02T20:32:46.479137",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.6793746149504876,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p50_20260902_203246_63cc916d/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p50_20260902_203246_63cc916d/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p50_20260903_232119_6c0537c8",
+        "created_at": "2026-09-03T23:21:19.414086",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.6793746149504876,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p50_20260903_232119_6c0537c8/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p50_20260903_232119_6c0537c8/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p50_20260906_120946_7fb9d641",
+        "created_at": "2026-09-06T12:09:46.094506",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.664609582368738,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p50_20260906_120946_7fb9d641/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p50_20260906_120946_7fb9d641/meta.json"
+      }
+    ]
+  },
+  "TE_SEASON_GAMES_P90": {
+    "champion": "te_season_games_p90_20260906_120946_e298ac93",
+    "versions": [
+      {
+        "version_id": "te_season_games_p90_20260828_152203_445d7131",
+        "created_at": "2026-08-28T15:22:03.827181",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.3881322604415125,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p90_20260828_152203_445d7131/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p90_20260828_152203_445d7131/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p90_20260902_203247_db80c0f4",
+        "created_at": "2026-09-02T20:32:47.150673",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.447180724376612,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p90_20260902_203247_db80c0f4/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p90_20260902_203247_db80c0f4/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p90_20260903_232120_228f24dc",
+        "created_at": "2026-09-03T23:21:20.109703",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.447180724376612,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p90_20260903_232120_228f24dc/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p90_20260903_232120_228f24dc/meta.json"
+      },
+      {
+        "version_id": "te_season_games_p90_20260906_120946_e298ac93",
+        "created_at": "2026-09-06T12:09:46.779792",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.424227942375326,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_season_games_p90_20260906_120946_e298ac93/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_season_games_p90_20260906_120946_e298ac93/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_TOTAL_P10": {
+    "champion": "lb_season_total_p10_20260906_120947_00942074",
+    "versions": [
+      {
+        "version_id": "lb_season_total_p10_20260828_152204_a62936c6",
+        "created_at": "2026-08-28T15:22:04.473426",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 32.80436804161319,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p10_20260828_152204_a62936c6/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p10_20260828_152204_a62936c6/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p10_20260902_203247_7d06f4e1",
+        "created_at": "2026-09-02T20:32:47.802145",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 85.61615973008088,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p10_20260902_203247_7d06f4e1/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p10_20260902_203247_7d06f4e1/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p10_20260903_232120_8179aa47",
+        "created_at": "2026-09-03T23:21:20.789841",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 85.61615973008088,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p10_20260903_232120_8179aa47/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p10_20260903_232120_8179aa47/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p10_20260906_120947_00942074",
+        "created_at": "2026-09-06T12:09:47.443522",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 81.48184199349569,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p10_20260906_120947_00942074/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p10_20260906_120947_00942074/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_TOTAL_P50": {
+    "champion": "lb_season_total_p50_20260906_120948_ce0e7752",
+    "versions": [
+      {
+        "version_id": "lb_season_total_p50_20260828_152205_72dba6fe",
+        "created_at": "2026-08-28T15:22:05.127269",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 18.297661978595315,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p50_20260828_152205_72dba6fe/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p50_20260828_152205_72dba6fe/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p50_20260902_203248_d79f3feb",
+        "created_at": "2026-09-02T20:32:48.447307",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 48.431305885909836,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p50_20260902_203248_d79f3feb/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p50_20260902_203248_d79f3feb/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p50_20260903_232121_e65cc7e1",
+        "created_at": "2026-09-03T23:21:21.464023",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 48.431305885909836,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p50_20260903_232121_e65cc7e1/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p50_20260903_232121_e65cc7e1/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p50_20260906_120948_ce0e7752",
+        "created_at": "2026-09-06T12:09:48.109094",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 45.76608408041804,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p50_20260906_120948_ce0e7752/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p50_20260906_120948_ce0e7752/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_TOTAL_P90": {
+    "champion": "lb_season_total_p90_20260906_120948_8619229e",
+    "versions": [
+      {
+        "version_id": "lb_season_total_p90_20260828_152205_0fd4203a",
+        "created_at": "2026-08-28T15:22:05.804781",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 32.252377923771384,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p90_20260828_152205_0fd4203a/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p90_20260828_152205_0fd4203a/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p90_20260902_203249_b90f5620",
+        "created_at": "2026-09-02T20:32:49.103392",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 84.53373104331126,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p90_20260902_203249_b90f5620/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p90_20260902_203249_b90f5620/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p90_20260903_232122_18d1e774",
+        "created_at": "2026-09-03T23:21:22.138922",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 84.53373104331126,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p90_20260903_232122_18d1e774/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p90_20260903_232122_18d1e774/meta.json"
+      },
+      {
+        "version_id": "lb_season_total_p90_20260906_120948_8619229e",
+        "created_at": "2026-09-06T12:09:48.782086",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 78.22875859355281,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_total_p90_20260906_120948_8619229e/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_total_p90_20260906_120948_8619229e/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_PPG_P10": {
+    "champion": "lb_season_ppg_p10_20260906_120949_bc656d72",
+    "versions": [
+      {
+        "version_id": "lb_season_ppg_p10_20260828_152206_91c9c50e",
+        "created_at": "2026-08-28T15:22:06.506008",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.611759057845598,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p10_20260828_152206_91c9c50e/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p10_20260828_152206_91c9c50e/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p10_20260902_203249_7fa37723",
+        "created_at": "2026-09-02T20:32:49.813386",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.195491708206499,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p10_20260902_203249_7fa37723/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p10_20260902_203249_7fa37723/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p10_20260903_232122_30fd5e0c",
+        "created_at": "2026-09-03T23:21:22.873854",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.195491708206499,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p10_20260903_232122_30fd5e0c/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p10_20260903_232122_30fd5e0c/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p10_20260906_120949_bc656d72",
+        "created_at": "2026-09-06T12:09:49.516794",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.883225715384446,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p10_20260906_120949_bc656d72/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p10_20260906_120949_bc656d72/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_PPG_P50": {
+    "champion": "lb_season_ppg_p50_20260906_120950_b6426f92",
+    "versions": [
+      {
+        "version_id": "lb_season_ppg_p50_20260828_152207_e26e0d65",
+        "created_at": "2026-08-28T15:22:07.158995",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.0079104816413444,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p50_20260828_152207_e26e0d65/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p50_20260828_152207_e26e0d65/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p50_20260902_203250_07799556",
+        "created_at": "2026-09-02T20:32:50.535527",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.6152044034007513,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p50_20260902_203250_07799556/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p50_20260902_203250_07799556/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p50_20260903_232123_82e03173",
+        "created_at": "2026-09-03T23:21:23.564347",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.6152044034007513,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p50_20260903_232123_82e03173/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p50_20260903_232123_82e03173/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p50_20260906_120950_b6426f92",
+        "created_at": "2026-09-06T12:09:50.182200",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.429252030856445,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p50_20260906_120950_b6426f92/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p50_20260906_120950_b6426f92/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_PPG_P90": {
+    "champion": "lb_season_ppg_p90_20260906_120950_46696b58",
+    "versions": [
+      {
+        "version_id": "lb_season_ppg_p90_20260828_152207_8f44e994",
+        "created_at": "2026-08-28T15:22:07.860709",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.0003199824978566,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p90_20260828_152207_8f44e994/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p90_20260828_152207_8f44e994/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p90_20260902_203251_2ff2cfd6",
+        "created_at": "2026-09-02T20:32:51.232883",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 5.012298031526142,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p90_20260902_203251_2ff2cfd6/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p90_20260902_203251_2ff2cfd6/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p90_20260903_232124_f2174160",
+        "created_at": "2026-09-03T23:21:24.295071",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 5.012298031526142,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p90_20260903_232124_f2174160/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p90_20260903_232124_f2174160/meta.json"
+      },
+      {
+        "version_id": "lb_season_ppg_p90_20260906_120950_46696b58",
+        "created_at": "2026-09-06T12:09:50.868197",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.735034436621743,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_ppg_p90_20260906_120950_46696b58/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_ppg_p90_20260906_120950_46696b58/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_GAMES_P10": {
+    "champion": "lb_season_games_p10_20260906_120951_ea43f587",
+    "versions": [
+      {
+        "version_id": "lb_season_games_p10_20260828_152208_f2629245",
+        "created_at": "2026-08-28T15:22:08.531992",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.565918851251942,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p10_20260828_152208_f2629245/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p10_20260828_152208_f2629245/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p10_20260902_203251_76da90f7",
+        "created_at": "2026-09-02T20:32:51.868250",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.7703931079137325,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p10_20260902_203251_76da90f7/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p10_20260902_203251_76da90f7/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p10_20260903_232124_0246dff5",
+        "created_at": "2026-09-03T23:21:24.944514",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.7703931079137325,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p10_20260903_232124_0246dff5/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p10_20260903_232124_0246dff5/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p10_20260906_120951_ea43f587",
+        "created_at": "2026-09-06T12:09:51.526828",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.722771268115712,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p10_20260906_120951_ea43f587/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p10_20260906_120951_ea43f587/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_GAMES_P50": {
+    "champion": "lb_season_games_p50_20260906_120952_b52ca511",
+    "versions": [
+      {
+        "version_id": "lb_season_games_p50_20260828_152209_3400c264",
+        "created_at": "2026-08-28T15:22:09.187100",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.5988968815805977,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p50_20260828_152209_3400c264/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p50_20260828_152209_3400c264/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p50_20260902_203252_1b1d0a88",
+        "created_at": "2026-09-02T20:32:52.516720",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.553244224030302,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p50_20260902_203252_1b1d0a88/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p50_20260902_203252_1b1d0a88/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p50_20260903_232125_28a0bab6",
+        "created_at": "2026-09-03T23:21:25.611247",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.553244224030302,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p50_20260903_232125_28a0bab6/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p50_20260903_232125_28a0bab6/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p50_20260906_120952_b52ca511",
+        "created_at": "2026-09-06T12:09:52.180021",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.6025202119782476,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p50_20260906_120952_b52ca511/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p50_20260906_120952_b52ca511/meta.json"
+      }
+    ]
+  },
+  "LB_SEASON_GAMES_P90": {
+    "champion": "lb_season_games_p90_20260906_120952_ba63c8a5",
+    "versions": [
+      {
+        "version_id": "lb_season_games_p90_20260828_152209_236e7ee1",
+        "created_at": "2026-08-28T15:22:09.828652",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.50671314777042,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p90_20260828_152209_236e7ee1/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p90_20260828_152209_236e7ee1/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p90_20260902_203253_fde21e21",
+        "created_at": "2026-09-02T20:32:53.147590",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.548353380526505,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p90_20260902_203253_fde21e21/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p90_20260902_203253_fde21e21/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p90_20260903_232126_944a19d5",
+        "created_at": "2026-09-03T23:21:26.244192",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.548353380526505,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p90_20260903_232126_944a19d5/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p90_20260903_232126_944a19d5/meta.json"
+      },
+      {
+        "version_id": "lb_season_games_p90_20260906_120952_ba63c8a5",
+        "created_at": "2026-09-06T12:09:52.823420",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 4.510540589628034,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_season_games_p90_20260906_120952_ba63c8a5/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_season_games_p90_20260906_120952_ba63c8a5/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_TOTAL_P10": {
+    "champion": "dl_season_total_p10_20260906_120953_709e6a80",
+    "versions": [
+      {
+        "version_id": "dl_season_total_p10_20260828_152210_15b0d50a",
+        "created_at": "2026-08-28T15:22:10.483355",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 16.98878746030198,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p10_20260828_152210_15b0d50a/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p10_20260828_152210_15b0d50a/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p10_20260902_203253_e653f0a7",
+        "created_at": "2026-09-02T20:32:53.814333",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 46.00671435769034,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p10_20260902_203253_e653f0a7/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p10_20260902_203253_e653f0a7/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p10_20260903_232126_0196e992",
+        "created_at": "2026-09-03T23:21:26.918604",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 46.00671435769034,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p10_20260903_232126_0196e992/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p10_20260903_232126_0196e992/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p10_20260906_120953_709e6a80",
+        "created_at": "2026-09-06T12:09:53.503203",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 42.06263030938168,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p10_20260906_120953_709e6a80/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p10_20260906_120953_709e6a80/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_TOTAL_P50": {
+    "champion": "dl_season_total_p50_20260906_120954_a6526d79",
+    "versions": [
+      {
+        "version_id": "dl_season_total_p50_20260828_152211_f189e560",
+        "created_at": "2026-08-28T15:22:11.174361",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 10.861935380669284,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p50_20260828_152211_f189e560/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p50_20260828_152211_f189e560/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p50_20260902_203254_d02f10b4",
+        "created_at": "2026-09-02T20:32:54.509936",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 29.508377589824324,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p50_20260902_203254_d02f10b4/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p50_20260902_203254_d02f10b4/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p50_20260903_232127_18536835",
+        "created_at": "2026-09-03T23:21:27.632708",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 29.508377589824324,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p50_20260903_232127_18536835/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p50_20260903_232127_18536835/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p50_20260906_120954_a6526d79",
+        "created_at": "2026-09-06T12:09:54.180278",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 26.385300898352327,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p50_20260906_120954_a6526d79/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p50_20260906_120954_a6526d79/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_TOTAL_P90": {
+    "champion": "dl_season_total_p90_20260906_120954_5d7b4270",
+    "versions": [
+      {
+        "version_id": "dl_season_total_p90_20260828_152211_5ff01cc2",
+        "created_at": "2026-08-28T15:22:11.830897",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 18.689737747503553,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p90_20260828_152211_5ff01cc2/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p90_20260828_152211_5ff01cc2/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p90_20260902_203255_ba7381d7",
+        "created_at": "2026-09-02T20:32:55.141725",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 53.66151847360948,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p90_20260902_203255_ba7381d7/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p90_20260902_203255_ba7381d7/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p90_20260903_232128_48db75cb",
+        "created_at": "2026-09-03T23:21:28.274523",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 53.66151847360948,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p90_20260903_232128_48db75cb/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p90_20260903_232128_48db75cb/meta.json"
+      },
+      {
+        "version_id": "dl_season_total_p90_20260906_120954_5d7b4270",
+        "created_at": "2026-09-06T12:09:54.820714",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 46.43265234457904,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_total_p90_20260906_120954_5d7b4270/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_total_p90_20260906_120954_5d7b4270/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_PPG_P10": {
+    "champion": "dl_season_ppg_p10_20260906_120955_46239666",
+    "versions": [
+      {
+        "version_id": "dl_season_ppg_p10_20260828_152212_d10f7e92",
+        "created_at": "2026-08-28T15:22:12.470787",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 0.9688493848078987,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p10_20260828_152212_d10f7e92/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p10_20260828_152212_d10f7e92/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p10_20260902_203255_9fac5f32",
+        "created_at": "2026-09-02T20:32:55.785074",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.6167894577451185,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p10_20260902_203255_9fac5f32/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p10_20260902_203255_9fac5f32/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p10_20260903_232128_306d3556",
+        "created_at": "2026-09-03T23:21:28.931421",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.6167894577451185,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p10_20260903_232128_306d3556/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p10_20260903_232128_306d3556/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p10_20260906_120955_46239666",
+        "created_at": "2026-09-06T12:09:55.472898",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.3206742106010774,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p10_20260906_120955_46239666/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p10_20260906_120955_46239666/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_PPG_P50": {
+    "champion": "dl_season_ppg_p50_20260906_120956_ec19c5b6",
+    "versions": [
+      {
+        "version_id": "dl_season_ppg_p50_20260828_152213_f9dfc2a8",
+        "created_at": "2026-08-28T15:22:13.162109",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 0.6271709537414095,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p50_20260828_152213_f9dfc2a8/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p50_20260828_152213_f9dfc2a8/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p50_20260902_203256_3dce541e",
+        "created_at": "2026-09-02T20:32:56.475130",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.6937357801321773,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p50_20260902_203256_3dce541e/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p50_20260902_203256_3dce541e/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p50_20260903_232129_a7745926",
+        "created_at": "2026-09-03T23:21:29.639739",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.6937357801321773,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p50_20260903_232129_a7745926/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p50_20260903_232129_a7745926/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p50_20260906_120956_ec19c5b6",
+        "created_at": "2026-09-06T12:09:56.166792",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.459587713907106,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p50_20260906_120956_ec19c5b6/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p50_20260906_120956_ec19c5b6/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_PPG_P90": {
+    "champion": "dl_season_ppg_p90_20260906_120956_fcb2dfd7",
+    "versions": [
+      {
+        "version_id": "dl_season_ppg_p90_20260828_152213_7772c5d3",
+        "created_at": "2026-08-28T15:22:13.807576",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.0708437971530902,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p90_20260828_152213_7772c5d3/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p90_20260828_152213_7772c5d3/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p90_20260902_203257_bb347963",
+        "created_at": "2026-09-02T20:32:57.113632",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.855580964120848,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p90_20260902_203257_bb347963/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p90_20260902_203257_bb347963/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p90_20260903_232130_331e93f6",
+        "created_at": "2026-09-03T23:21:30.292634",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.855580964120848,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p90_20260903_232130_331e93f6/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p90_20260903_232130_331e93f6/meta.json"
+      },
+      {
+        "version_id": "dl_season_ppg_p90_20260906_120956_fcb2dfd7",
+        "created_at": "2026-09-06T12:09:56.811827",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.466115592095083,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_ppg_p90_20260906_120956_fcb2dfd7/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_ppg_p90_20260906_120956_fcb2dfd7/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_GAMES_P10": {
+    "champion": "dl_season_games_p10_20260906_120957_3fdf9015",
+    "versions": [
+      {
+        "version_id": "dl_season_games_p10_20260828_152214_d2805f59",
+        "created_at": "2026-08-28T15:22:14.437649",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.268635397327832,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p10_20260828_152214_d2805f59/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p10_20260828_152214_d2805f59/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p10_20260902_203257_1d513822",
+        "created_at": "2026-09-02T20:32:57.739666",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.1807207518628156,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p10_20260902_203257_1d513822/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p10_20260902_203257_1d513822/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p10_20260903_232130_c7b6fe43",
+        "created_at": "2026-09-03T23:21:30.916593",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 7.1807207518628156,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p10_20260903_232130_c7b6fe43/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p10_20260903_232130_c7b6fe43/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p10_20260906_120957_3fdf9015",
+        "created_at": "2026-09-06T12:09:57.446545",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.898188927702273,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p10_20260906_120957_3fdf9015/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p10_20260906_120957_3fdf9015/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_GAMES_P50": {
+    "champion": "dl_season_games_p50_20260906_120958_5fdd6fec",
+    "versions": [
+      {
+        "version_id": "dl_season_games_p50_20260828_152215_a3fd08f3",
+        "created_at": "2026-08-28T15:22:15.091412",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.9396476002574037,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p50_20260828_152215_a3fd08f3/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p50_20260828_152215_a3fd08f3/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p50_20260902_203258_3bae9ab0",
+        "created_at": "2026-09-02T20:32:58.409435",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.952856096016419,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p50_20260902_203258_3bae9ab0/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p50_20260902_203258_3bae9ab0/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p50_20260903_232131_a65367a3",
+        "created_at": "2026-09-03T23:21:31.589357",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.952856096016419,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p50_20260903_232131_a65367a3/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p50_20260903_232131_a65367a3/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p50_20260906_120958_5fdd6fec",
+        "created_at": "2026-09-06T12:09:58.106155",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.952716681951753,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p50_20260906_120958_5fdd6fec/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p50_20260906_120958_5fdd6fec/meta.json"
+      }
+    ]
+  },
+  "DL_SEASON_GAMES_P90": {
+    "champion": "dl_season_games_p90_20260906_120958_dd70ed38",
+    "versions": [
+      {
+        "version_id": "dl_season_games_p90_20260828_152215_b1957e60",
+        "created_at": "2026-08-28T15:22:15.725823",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.3874050781165215,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p90_20260828_152215_b1957e60/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p90_20260828_152215_b1957e60/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p90_20260902_203259_84e928cf",
+        "created_at": "2026-09-02T20:32:59.047410",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.44499482477006,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p90_20260902_203259_84e928cf/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p90_20260902_203259_84e928cf/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p90_20260903_232132_58971bc8",
+        "created_at": "2026-09-03T23:21:32.228365",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.44499482477006,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p90_20260903_232132_58971bc8/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p90_20260903_232132_58971bc8/meta.json"
+      },
+      {
+        "version_id": "dl_season_games_p90_20260906_120958_dd70ed38",
+        "created_at": "2026-09-06T12:09:58.736507",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.420848555078718,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_season_games_p90_20260906_120958_dd70ed38/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_season_games_p90_20260906_120958_dd70ed38/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_TOTAL_P10": {
+    "champion": "k_season_total_p10_20260906_121005_b432ccf1",
+    "versions": [
+      {
+        "version_id": "k_season_total_p10_20260828_152216_edd5c790",
+        "created_at": "2026-08-28T15:22:16.376522",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 39.660012482878166,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p10_20260828_152216_edd5c790/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p10_20260828_152216_edd5c790/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p10_20260902_203259_812a3973",
+        "created_at": "2026-09-02T20:32:59.677167",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 65.00352532453446,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p10_20260902_203259_812a3973/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p10_20260902_203259_812a3973/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p10_20260903_232139_ade9d135",
+        "created_at": "2026-09-03T23:21:39.291483",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 65.00352532453446,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p10_20260903_232139_ade9d135/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p10_20260903_232139_ade9d135/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p10_20260906_121005_b432ccf1",
+        "created_at": "2026-09-06T12:10:05.909945",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 65.00655562760993,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p10_20260906_121005_b432ccf1/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p10_20260906_121005_b432ccf1/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_TOTAL_P50": {
+    "champion": "k_season_total_p50_20260906_121006_aede1928",
+    "versions": [
+      {
+        "version_id": "k_season_total_p50_20260828_152217_71110357",
+        "created_at": "2026-08-28T15:22:17.022534",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 22.045616070204755,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p50_20260828_152217_71110357/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p50_20260828_152217_71110357/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p50_20260902_203300_9d701ffe",
+        "created_at": "2026-09-02T20:33:00.316464",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 28.243286475807466,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p50_20260902_203300_9d701ffe/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p50_20260902_203300_9d701ffe/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p50_20260903_232139_01b05a81",
+        "created_at": "2026-09-03T23:21:39.955147",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 28.243286475807466,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p50_20260903_232139_01b05a81/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p50_20260903_232139_01b05a81/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p50_20260906_121006_aede1928",
+        "created_at": "2026-09-06T12:10:06.575583",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 28.8197685537179,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p50_20260906_121006_aede1928/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p50_20260906_121006_aede1928/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_TOTAL_P90": {
+    "champion": "k_season_total_p90_20260906_121007_a7995fef",
+    "versions": [
+      {
+        "version_id": "k_season_total_p90_20260828_152217_1f0d028e",
+        "created_at": "2026-08-28T15:22:17.641951",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 39.318772752961536,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p90_20260828_152217_1f0d028e/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p90_20260828_152217_1f0d028e/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p90_20260902_203300_ee3a26f1",
+        "created_at": "2026-09-02T20:33:00.945384",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 40.51141372862053,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p90_20260902_203300_ee3a26f1/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p90_20260902_203300_ee3a26f1/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p90_20260903_232140_7ab28ec7",
+        "created_at": "2026-09-03T23:21:40.604372",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 40.51141372862053,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p90_20260903_232140_7ab28ec7/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p90_20260903_232140_7ab28ec7/meta.json"
+      },
+      {
+        "version_id": "k_season_total_p90_20260906_121007_a7995fef",
+        "created_at": "2026-09-06T12:10:07.218376",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 40.50997053080212,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_total_p90_20260906_121007_a7995fef/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_total_p90_20260906_121007_a7995fef/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_PPG_P10": {
+    "champion": "k_season_ppg_p10_20260906_121007_a76a2e03",
+    "versions": [
+      {
+        "version_id": "k_season_ppg_p10_20260828_152218_0f226ff9",
+        "created_at": "2026-08-28T15:22:18.275498",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.5904098315127215,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p10_20260828_152218_0f226ff9/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p10_20260828_152218_0f226ff9/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p10_20260902_203301_45408585",
+        "created_at": "2026-09-02T20:33:01.635993",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.10194020411097,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p10_20260902_203301_45408585/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p10_20260902_203301_45408585/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p10_20260903_232141_5def2640",
+        "created_at": "2026-09-03T23:21:41.314941",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.10194020411097,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p10_20260903_232141_5def2640/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p10_20260903_232141_5def2640/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p10_20260906_121007_a76a2e03",
+        "created_at": "2026-09-06T12:10:07.922862",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.181583738500102,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p10_20260906_121007_a76a2e03/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p10_20260906_121007_a76a2e03/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_PPG_P50": {
+    "champion": "k_season_ppg_p50_20260906_121008_7accec7c",
+    "versions": [
+      {
+        "version_id": "k_season_ppg_p50_20260828_152218_1174af1d",
+        "created_at": "2026-08-28T15:22:18.896606",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 0.9839035074749817,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p50_20260828_152218_1174af1d/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p50_20260828_152218_1174af1d/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p50_20260902_203302_af5f9753",
+        "created_at": "2026-09-02T20:33:02.254004",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.3786229169487207,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p50_20260902_203302_af5f9753/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p50_20260902_203302_af5f9753/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p50_20260903_232141_630038f8",
+        "created_at": "2026-09-03T23:21:41.944495",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.3786229169487207,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p50_20260903_232141_630038f8/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p50_20260903_232141_630038f8/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p50_20260906_121008_7accec7c",
+        "created_at": "2026-09-06T12:10:08.556012",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.3786229169487207,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p50_20260906_121008_7accec7c/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p50_20260906_121008_7accec7c/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_PPG_P90": {
+    "champion": "k_season_ppg_p90_20260906_121009_3ee91558",
+    "versions": [
+      {
+        "version_id": "k_season_ppg_p90_20260828_152219_d7cc78c4",
+        "created_at": "2026-08-28T15:22:19.525057",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.7764309917704149,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p90_20260828_152219_d7cc78c4/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p90_20260828_152219_d7cc78c4/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p90_20260902_203302_f637d945",
+        "created_at": "2026-09-02T20:33:02.867082",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.8521009835728854,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p90_20260902_203302_f637d945/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p90_20260902_203302_f637d945/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p90_20260903_232142_c8501745",
+        "created_at": "2026-09-03T23:21:42.575927",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.8521009835728854,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p90_20260903_232142_c8501745/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p90_20260903_232142_c8501745/meta.json"
+      },
+      {
+        "version_id": "k_season_ppg_p90_20260906_121009_3ee91558",
+        "created_at": "2026-09-06T12:10:09.200020",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 1.8521009835728854,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_ppg_p90_20260906_121009_3ee91558/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_ppg_p90_20260906_121009_3ee91558/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_GAMES_P10": {
+    "champion": "k_season_games_p10_20260906_121009_780bc680",
+    "versions": [
+      {
+        "version_id": "k_season_games_p10_20260828_152220_37d01bb3",
+        "created_at": "2026-08-28T15:22:20.167080",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.789199455404344,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p10_20260828_152220_37d01bb3/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p10_20260828_152220_37d01bb3/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p10_20260902_203303_df5bc30e",
+        "created_at": "2026-09-02T20:33:03.494080",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.902395964543942,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p10_20260902_203303_df5bc30e/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p10_20260902_203303_df5bc30e/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p10_20260903_232143_aec6b544",
+        "created_at": "2026-09-03T23:21:43.207470",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.902395964543942,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p10_20260903_232143_aec6b544/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p10_20260903_232143_aec6b544/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p10_20260906_121009_780bc680",
+        "created_at": "2026-09-06T12:10:09.840285",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.902395964543942,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p10_20260906_121009_780bc680/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p10_20260906_121009_780bc680/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_GAMES_P50": {
+    "champion": "k_season_games_p50_20260906_121010_2388db78",
+    "versions": [
+      {
+        "version_id": "k_season_games_p50_20260828_152220_540e5137",
+        "created_at": "2026-08-28T15:22:20.808064",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.7611012776634785,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p50_20260828_152220_540e5137/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p50_20260828_152220_540e5137/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p50_20260902_203304_f7267999",
+        "created_at": "2026-09-02T20:33:04.119885",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.7384067999754094,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p50_20260902_203304_f7267999/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p50_20260902_203304_f7267999/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p50_20260903_232143_a9fc249f",
+        "created_at": "2026-09-03T23:21:43.869882",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.7384067999754094,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p50_20260903_232143_a9fc249f/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p50_20260903_232143_a9fc249f/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p50_20260906_121010_2388db78",
+        "created_at": "2026-09-06T12:10:10.487619",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 2.76205234277292,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p50_20260906_121010_2388db78/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p50_20260906_121010_2388db78/meta.json"
+      }
+    ]
+  },
+  "K_SEASON_GAMES_P90": {
+    "champion": "k_season_games_p90_20260906_121011_3a7469da",
+    "versions": [
+      {
+        "version_id": "k_season_games_p90_20260828_152221_39efe1ba",
+        "created_at": "2026-08-28T15:22:21.425774",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.515151342809954,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p90_20260828_152221_39efe1ba/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p90_20260828_152221_39efe1ba/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p90_20260902_203304_1b13d7f4",
+        "created_at": "2026-09-02T20:33:04.746002",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.515151342809954,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p90_20260902_203304_1b13d7f4/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p90_20260902_203304_1b13d7f4/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p90_20260903_232144_200c952b",
+        "created_at": "2026-09-03T23:21:44.487878",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.515151342809954,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p90_20260903_232144_200c952b/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p90_20260903_232144_200c952b/meta.json"
+      },
+      {
+        "version_id": "k_season_games_p90_20260906_121011_3a7469da",
+        "created_at": "2026-09-06T12:10:11.122580",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.515151342809954,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_season_games_p90_20260906_121011_3a7469da/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_season_games_p90_20260906_121011_3a7469da/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_TOTAL_P10": {
+    "champion": "db_season_total_p10_20260906_120959_fdfc079f",
+    "versions": [
+      {
+        "version_id": "db_season_total_p10_20260903_232132_e9469813",
+        "created_at": "2026-09-03T23:21:32.903735",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 71.93217244884525,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_total_p10_20260903_232132_e9469813/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_total_p10_20260903_232132_e9469813/meta.json"
+      },
+      {
+        "version_id": "db_season_total_p10_20260906_120959_fdfc079f",
+        "created_at": "2026-09-06T12:09:59.434086",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 68.53447279656118,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_total_p10_20260906_120959_fdfc079f/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_total_p10_20260906_120959_fdfc079f/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_TOTAL_P50": {
+    "champion": "db_season_total_p50_20260906_121000_7c5a41ae",
+    "versions": [
+      {
+        "version_id": "db_season_total_p50_20260903_232133_e9da3f1b",
+        "created_at": "2026-09-03T23:21:33.632289",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 40.95863403868138,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_total_p50_20260903_232133_e9da3f1b/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_total_p50_20260903_232133_e9da3f1b/meta.json"
+      },
+      {
+        "version_id": "db_season_total_p50_20260906_121000_7c5a41ae",
+        "created_at": "2026-09-06T12:10:00.140453",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 39.41467355793856,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_total_p50_20260906_121000_7c5a41ae/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_total_p50_20260906_121000_7c5a41ae/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_TOTAL_P90": {
+    "champion": "db_season_total_p90_20260906_121000_46e6e938",
+    "versions": [
+      {
+        "version_id": "db_season_total_p90_20260903_232134_b2861ed5",
+        "created_at": "2026-09-03T23:21:34.356658",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 78.51781582664717,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_total_p90_20260903_232134_b2861ed5/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_total_p90_20260903_232134_b2861ed5/meta.json"
+      },
+      {
+        "version_id": "db_season_total_p90_20260906_121000_46e6e938",
+        "created_at": "2026-09-06T12:10:00.886967",
+        "model_type": "season_total",
+        "valid_season": 2024,
+        "valid_mae": 73.6200404851162,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_total_p90_20260906_121000_46e6e938/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_total_p90_20260906_121000_46e6e938/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_PPG_P10": {
+    "champion": "db_season_ppg_p10_20260906_121001_d3559ee6",
+    "versions": [
+      {
+        "version_id": "db_season_ppg_p10_20260903_232135_6a1493db",
+        "created_at": "2026-09-03T23:21:35.172578",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.862798724449393,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_ppg_p10_20260903_232135_6a1493db/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_ppg_p10_20260903_232135_6a1493db/meta.json"
+      },
+      {
+        "version_id": "db_season_ppg_p10_20260906_121001_d3559ee6",
+        "created_at": "2026-09-06T12:10:01.714492",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 3.6748775354691396,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_ppg_p10_20260906_121001_d3559ee6/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_ppg_p10_20260906_121001_d3559ee6/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_PPG_P50": {
+    "champion": "db_season_ppg_p50_20260906_121002_a0c2abbe",
+    "versions": [
+      {
+        "version_id": "db_season_ppg_p50_20260903_232135_d5e6984f",
+        "created_at": "2026-09-03T23:21:35.907391",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.419911186248909,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_ppg_p50_20260903_232135_d5e6984f/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_ppg_p50_20260903_232135_d5e6984f/meta.json"
+      },
+      {
+        "version_id": "db_season_ppg_p50_20260906_121002_a0c2abbe",
+        "created_at": "2026-09-06T12:10:02.483296",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 2.3222721959767605,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_ppg_p50_20260906_121002_a0c2abbe/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_ppg_p50_20260906_121002_a0c2abbe/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_PPG_P90": {
+    "champion": "db_season_ppg_p90_20260906_121003_a8ecdc55",
+    "versions": [
+      {
+        "version_id": "db_season_ppg_p90_20260903_232136_2b8f4b68",
+        "created_at": "2026-09-03T23:21:36.594714",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.693250654778076,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_ppg_p90_20260903_232136_2b8f4b68/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_ppg_p90_20260903_232136_2b8f4b68/meta.json"
+      },
+      {
+        "version_id": "db_season_ppg_p90_20260906_121003_a8ecdc55",
+        "created_at": "2026-09-06T12:10:03.202316",
+        "model_type": "season_ppg",
+        "valid_season": 2024,
+        "valid_mae": 4.402934549832541,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_ppg_p90_20260906_121003_a8ecdc55/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_ppg_p90_20260906_121003_a8ecdc55/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_GAMES_P10": {
+    "champion": "db_season_games_p10_20260906_121003_8c9c81fb",
+    "versions": [
+      {
+        "version_id": "db_season_games_p10_20260903_232137_e6853ab6",
+        "created_at": "2026-09-03T23:21:37.271207",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.8410805132435915,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_games_p10_20260903_232137_e6853ab6/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_games_p10_20260903_232137_e6853ab6/meta.json"
+      },
+      {
+        "version_id": "db_season_games_p10_20260906_121003_8c9c81fb",
+        "created_at": "2026-09-06T12:10:03.890044",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 6.77790054543226,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_games_p10_20260906_121003_8c9c81fb/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_games_p10_20260906_121003_8c9c81fb/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_GAMES_P50": {
+    "champion": "db_season_games_p50_20260906_121004_b51669ee",
+    "versions": [
+      {
+        "version_id": "db_season_games_p50_20260903_232137_a7917553",
+        "created_at": "2026-09-03T23:21:37.962219",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.5406369387900027,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_games_p50_20260903_232137_a7917553/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_games_p50_20260903_232137_a7917553/meta.json"
+      },
+      {
+        "version_id": "db_season_games_p50_20260906_121004_b51669ee",
+        "created_at": "2026-09-06T12:10:04.596391",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 3.533601465081823,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_games_p50_20260906_121004_b51669ee/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_games_p50_20260906_121004_b51669ee/meta.json"
+      }
+    ]
+  },
+  "DB_SEASON_GAMES_P90": {
+    "champion": "db_season_games_p90_20260906_121005_0ad69ab9",
+    "versions": [
+      {
+        "version_id": "db_season_games_p90_20260903_232138_b52ad5bd",
+        "created_at": "2026-09-03T23:21:38.648040",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.1514162415074995,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_games_p90_20260903_232138_b52ad5bd/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_games_p90_20260903_232138_b52ad5bd/meta.json"
+      },
+      {
+        "version_id": "db_season_games_p90_20260906_121005_0ad69ab9",
+        "created_at": "2026-09-06T12:10:05.258441",
+        "model_type": "season_games",
+        "valid_season": 2024,
+        "valid_mae": 5.2780597650403305,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_season_games_p90_20260906_121005_0ad69ab9/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_season_games_p90_20260906_121005_0ad69ab9/meta.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "position": "WR",
+  "quantile": 0.9,
+  "target": "games_played_next",
+  "feature_cols": [
+    "age_at_season_start",
+    "fantasy_points_custom_roll8",
+    "fantasy_points_custom_season_cum",
+    "fantasy_points_custom_season_mean",
+    "fantasy_points_ppr_roll8",
+    "fantasy_points_ppr_season_cum",
+    "fantasy_points_ppr_season_mean",
+    "games_played_roll3",
+    "games_played_roll5",
+    "games_played_roll8",
+    "games_played_season",
+    "receiving_tds_roll8",
+    "receiving_tds_season_cum",
+    "receiving_tds_season_mean",
+    "receiving_yards_roll8",
+    "receiving_yards_season_cum",
+    "receiving_yards_season_mean",
+    "targets_roll8",
+    "targets_season_cum",
+    "targets_season_mean",
+    "years_exp"
+  ],
+  "valid_mae": 5.08147413998176,
+  "valid_rmse": 6.71000160262475
+}
