@@ -222,6 +222,39 @@ Terminal 3 (optional — web UI for you and friends on same WiFi):
 
 ---
 
+## Running from a second machine
+
+`outputs/`, `models/` and `data/*.parquet` are gitignored, so a plain clone
+cannot build a board. The artifacts a **Ludopathy** draft needs are committed
+anyway (board, queue, the 72 season models, the feature table, ADP, rosters
+and injuries), so a laptop is standalone for that league:
+
+```bash
+git clone <remote> && cd nfl_predict
+uv sync
+uv run nfl-predict espn-login          # .env is never committed — re-enter cookies here
+
+# after ESPN locks keepers:
+uv run nfl-predict keepers --league ludopathy
+uv run nfl-predict board --league ludopathy --adp data/adp_current.csv
+
+uvicorn nfl_predict.api:app --host 0.0.0.0 --port 8000
+```
+
+**Verify the clone before you rely on it.** Missing inputs do not raise —
+`load_rosters()` and `load_injuries()` return `None`, so a clone lacking
+`data/rosters.parquet` builds a complete board with silently different
+numbers. Build a board on the clone and diff `proj_p50`, `vor` and
+`overall_rank` against the machine that trained the models; they must match
+exactly, not approximately.
+
+A clone **cannot** run `features` or `update-all` (raw stats parquets are not
+shipped) and carries no Hell or Highwater / Royal Rumble models. Rebuilds
+from raw data have to happen on the machine that has `data/weekly_stats.parquet`,
+then be pushed.
+
+---
+
 ## Docker
 
 ```bash

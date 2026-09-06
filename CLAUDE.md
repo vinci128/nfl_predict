@@ -439,6 +439,66 @@ uv run nfl-predict queue --league hoh    # then paste the order into ESPN's Pick
 Verified against a live practice draft: ESPN drafts from the queue before
 falling back to its own rankings.
 
+### Running from a second machine (laptop at the venue)
+
+`outputs/`, `models/` and `data/*.parquet` are all gitignored, so a plain
+clone cannot build a board and cannot even *tell you* that it cannot. A
+specific subset is therefore force-added past `.gitignore`. As of
+2026-09-06 a clone carries everything needed to rebuild the **Ludopathy**
+board:
+
+```
+outputs/draft_board_2026_ludopathy.csv     the board itself (pre-keeper snapshot)
+outputs/draft_queue_2026_ludopathy.csv     autodraft queue
+outputs/draft_board_2026_hoh.csv           older, from 4b073bb
+models/ludopathy/                          the 72 promoted season models
+data/processed/ludopathy/player_week_features.parquet
+data/adp_current.csv
+data/rosters.parquet                       age_at_season_start, years_exp
+data/injuries.parquet                      the inj_* columns and the G tooltip
+```
+
+**A missing input does not raise — it silently changes every number.**
+`season_features.load_rosters()` and `load_injuries()` return `None` when
+their parquet is absent. Ship the models and the feature table but forget
+`rosters.parquet`, and a clone builds a complete, plausible, wrong board:
+measured on 2026-09-06, Ja'Marr Chase came out at 238.2 instead of 227.1,
+Jonathan Taylor at 215.3 instead of 195.3, and the whole WR order differed.
+No warning, no traceback. On a draft night that is the worst failure
+available — a second machine that looks like it works.
+
+So **never trust a clone you have not diffed.** The check is cheap:
+
+```bash
+git clone --depth 1 -b dev <remote> /tmp/laptoptest && cd /tmp/laptoptest
+uv sync
+uv run nfl-predict board --league ludopathy --adp data/adp_current.csv
+# then compare proj_p50 / vor / overall_rank against the same file on the
+# machine that trained the models — they must be identical, not close
+```
+
+What a clone still **cannot** do, by design:
+
+- `features` / `update-all` — `weekly_stats`, `schedules`, `snap_counts` and
+  `team_stats` are not shipped (~10MB more). A clone consumes the feature
+  table; it cannot rebuild one. If scoring changes again, the
+  features -> draft-prep -> board cycle has to run on the machine that has
+  the raw data, and the result gets pushed.
+- Hell or Highwater and Royal Rumble boards — their models and feature
+  tables are not shipped. Fine while only Ludopathy is drafting; revisit for
+  weekly scoring.
+- Anything needing credentials. `.env` is never committed; run
+  `nfl-predict espn-login` on the second machine.
+
+`models/{league}/versions/` is deliberately excluded too. It is the
+registry's archive of every past run, most of it trained under superseded
+scoring, so shipping it is both dead weight and a way to load a wrong model
+by accident. The promoted champions in `models/{league}/` are what loads.
+
+Do the clone and one practice `board` run **before leaving**, not at the
+venue: `uv sync` pulls a lot and CatBoost on an unknown connection is not
+something to discover an hour before the draft.
+
 ### During the draft
 - Type a player name (or substring) and press Enter to record an opponent pick
 - Toggle **Opponent/Mine** before submitting for your own picks; it resets to
