@@ -544,14 +544,29 @@ class EspnFantasyClient:
             injury_status    ESPN's report string, "" when it says nothing
             acquisition_type DRAFT / ADD / TRADE, as ESPN labels it
             espn_player_id   ESPN's own id, for chasing a bad crosswalk hit
+            week             the scoring period these numbers describe
+            projected_points ESPN's own projection, None when it has none
+            actual_points    what the player scored, None before he plays
 
         ``week`` asks for the lineup as it stood in that scoring period;
         omitted, ESPN answers for the current one.
+
+        The projection is read here rather than only in ``fetch_boxscore``
+        because that one needs ``schedule``, which an ESPN league leaves
+        empty until its matchups exist — Royal Rumble returned no rows at all
+        on 2026-09-09. A roster entry already carries the player's ``stats``,
+        so this route works whatever the matchup schedule is doing, and
+        ESPN's projection is the only week-1 number that knows about
+        depth charts and same-day injury news.
         """
         data = self._get(["mRoster", "mTeam"], scoringPeriodId=week)
         players = self._players()
         my_team_id = self._my_team_id_or_none()
         names = _team_names(data)
+
+        # ESPN echoes which period it answered for; trust that over `week`,
+        # which is None whenever the caller wanted "now".
+        effective_week = week if week is not None else data.get("scoringPeriodId")
 
         rows: list[dict] = []
         for team in data.get("teams") or []:
@@ -561,6 +576,14 @@ class EspnFantasyClient:
                 row["team_id"] = team_id
                 row["team_name"] = names.get(team_id, "")
                 row["is_mine"] = bool(my_team_id and team_id == my_team_id)
+
+                actual = projected = None
+                if effective_week is not None:
+                    player = (entry.get("playerPoolEntry") or {}).get("player") or {}
+                    actual, projected = _week_points(player, int(effective_week))
+                row["week"] = effective_week
+                row["actual_points"] = actual
+                row["projected_points"] = projected
                 rows.append(row)
 
         return rows

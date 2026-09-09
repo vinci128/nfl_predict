@@ -183,6 +183,25 @@ def predict(
     )
 
 
+@app.command(name="espn-lineup")
+def espn_lineup_cmd(
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
+    week: int | None = typer.Option(None, help="Scoring period (default: current)."),
+    all_leagues: bool = typer.Option(
+        False, "--all", help="Check every configured league."
+    ),
+) -> None:
+    """Best lineup by ESPN's own projections, and what to change to get it."""
+    from nfl_predict.leagues import league_keys
+    from nfl_predict.lineup import print_espn_lineup
+
+    keys = league_keys() if all_leagues else [league]
+    for key in keys:
+        print_espn_lineup(league=key, week=week)
+
+
 # ---------------------------------------------------------------------------
 # train: train models and register them
 # ---------------------------------------------------------------------------
