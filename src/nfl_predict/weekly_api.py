@@ -209,12 +209,25 @@ def _load_rosters() -> dict[str, list[dict]]:
 # ---------------------------------------------------------------------------
 
 
+def _predictions_dir() -> Path:
+    """Where the active league's prediction CSVs live.
+
+    Falls back to the flat `outputs/` only if that league has no directory
+    yet, so a set of CSVs written before predictions were namespaced still
+    renders instead of the page going blank.
+    """
+    from nfl_predict.leagues import get_profile
+
+    d = get_profile().predictions_dir
+    return d if d.exists() else OUT_DIR
+
+
 def _latest_prediction_files() -> list[Path]:
     """Same convention as lineup.py: predictions_<pos>_<season>_week<week>.csv,
     picking the most recent season/week per position."""
     import re
 
-    pred_files = list(OUT_DIR.glob("predictions_*.csv"))
+    pred_files = list(_predictions_dir().glob("predictions_*.csv"))
     pattern = re.compile(
         r"predictions_(?P<position>[A-Za-z]+)_(?P<season>\d{4})_week(?P<week>\d+)\.csv"
     )

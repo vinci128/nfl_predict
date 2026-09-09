@@ -12,6 +12,14 @@ PROCESSED_DIR = DATA_DIR / "processed"
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True, parents=True)
 
+
+def _model_dir(league: str | None = None) -> Path:
+    """Where this league's weekly models live."""
+    from nfl_predict.leagues import get_profile
+
+    return get_profile(league).model_dir
+
+
 # Context / injury feature patterns included for every position
 _CONTEXT_PATTERNS = [
     "total_line",
@@ -199,14 +207,19 @@ def train_position_model(
     df: pd.DataFrame,
     position: str,
     registry: ModelRegistry | None = None,
+    league: str | None = None,
 ) -> str | None:
     """
     Train a CatBoost model for a single position.
 
     Uses the last season as the validation set; all prior seasons for training.
     If a ModelRegistry is provided the model is versioned and the champion is
-    updated; otherwise the flat models/{pos}_catboost.cbm path is written
-    directly (backward-compatible fallback).
+    updated; otherwise the flat models/{league}/{pos}_catboost.cbm path is
+    written directly (backward-compatible fallback).
+
+    The target is fantasy points under `league`'s rules, so the model is
+    namespaced by league for the same reason the season models are: one
+    trained on another league's scoring is confidently wrong here.
 
     Returns the version_id string if registry is provided, else None.
     """
@@ -285,38 +298,53 @@ def train_position_model(
     if registry is not None:
         return registry.register(position, model, meta)
     else:
-        # Backward-compatible flat save
-        model_path = MODEL_DIR / f"{position.lower()}_catboost.cbm"
-        meta_path = MODEL_DIR / f"{position.lower()}_catboost_meta.json"
+        # Backward-compatible flat save, under this league's model directory
+        model_dir = _model_dir(league)
+        model_dir.mkdir(parents=True, exist_ok=True)
+        model_path = model_dir / f"{position.lower()}_catboost.cbm"
+        meta_path = model_dir / f"{position.lower()}_catboost_meta.json"
         model.save_model(str(model_path))
         pd.Series(meta).to_json(meta_path, indent=2)
         print(f"  Saved {model_path}")
         return None
 
 
-def main(positions: list[str] | None = None, use_registry: bool = True) -> None:
+def main(
+    positions: list[str] | None = None,
+    use_registry: bool = True,
+    league: str | None = None,
+) -> None:
     """
-    Train models for all (or specified) positions.
+    Train models for all (or specified) positions, for one league.
 
     Parameters
     ----------
-    positions    : list of positions to train; defaults to all in the data
+    positions    : list of positions to train; defaults to those the league
+                   actually starts, intersected with what the data has
     use_registry : if True, register each trained model in ModelRegistry
+    league       : league profile key; defaults to the active league
     """
-    df = load_features()
-    print("Loaded features:", df.shape)
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    df = load_features(profile.key)
+    print(f"Loaded features for {profile.name} [{profile.key}]:", df.shape)
 
     df = add_target_next_week(df)
     print("After adding target:", df.shape)
 
+    available = sorted(df["position"].dropna().unique().tolist())
     if positions is None:
-        positions = sorted(df["position"].dropna().unique().tolist())
+        # Only train what this league can start — an IDP league needs LB/DL,
+        # a D/ST one does not, and training the rest is wasted time.
+        wanted = [p for p in profile.roster.positions if p != "DST"]
+        positions = [p for p in wanted if p in available] or available
 
-    registry = ModelRegistry() if use_registry else None
+    registry = ModelRegistry(profile.registry_path) if use_registry else None
     print("Training models for positions:", positions)
 
     for pos in positions:
-        train_position_model(df, pos, registry=registry)
+        train_position_model(df, pos, registry=registry, league=profile.key)
 
     if registry is not None:
         print("\nFinal model registry:")

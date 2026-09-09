@@ -10,17 +10,30 @@ app = typer.Typer()
 OUT_DIR = Path("outputs")
 
 
-def _find_latest_prediction_files() -> list[Path]:
+def _predictions_dir(league: str | None = None) -> Path:
+    """Where this league's prediction CSVs live.
+
+    Falls back to the flat `outputs/` when the league has no directory yet,
+    so CSVs written before predictions were namespaced still resolve.
     """
-    Scans OUT_DIR for all predictions_*.csv files and for each position
-    picks the file with the most recent season/week.
+    from nfl_predict.leagues import get_profile
+
+    d = get_profile(league).predictions_dir
+    return d if d.exists() else OUT_DIR
+
+
+def _find_latest_prediction_files(league: str | None = None) -> list[Path]:
+    """
+    Scans this league's prediction directory for all predictions_*.csv files
+    and for each position picks the file with the most recent season/week.
 
     Expected name: predictions_<pos>_<season>_week<week>.csv
     e.g.: predictions_wr_2025_week12.csv
     """
-    pred_files = list(OUT_DIR.glob("predictions_*.csv"))
+    out_dir = _predictions_dir(league)
+    pred_files = list(out_dir.glob("predictions_*.csv"))
     if not pred_files:
-        raise FileNotFoundError(f"No predictions_*.csv files found in {OUT_DIR}")
+        raise FileNotFoundError(f"No predictions_*.csv files found in {out_dir}")
 
     pattern = re.compile(
         r"predictions_(?P<position>[A-Za-z]+)_(?P<season>\d{4})_week(?P<week>\d+)\.csv"
@@ -43,7 +56,7 @@ def _find_latest_prediction_files() -> list[Path]:
 
     if not records:
         raise RuntimeError(
-            f"Files found in {OUT_DIR}, but none matching the pattern "
+            f"Files found in {out_dir}, but none matching the pattern "
             "'predictions_<pos>_<season>_week<week>.csv'"
         )
 
@@ -60,13 +73,16 @@ def _find_latest_prediction_files() -> list[Path]:
 def suggest(
     roster_path: str = typer.Argument("my_roster.csv", help="CSV with your roster"),
     top_n: int = typer.Option(20, help="How many players to show"),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
 ):
     """
-    Reads the most recent predictions_*.csv for each position in outputs/
-    and shows your players ranked by expected PPR.
+    Reads the most recent predictions_*.csv for each position in this
+    league's output directory and shows your players ranked by expected PPR.
     """
     # --- find the most up-to-date prediction files ---
-    latest_files = _find_latest_prediction_files()
+    latest_files = _find_latest_prediction_files(league)
     typer.echo("Using the following most recent prediction files:")
     for p in latest_files:
         typer.echo(f"  - {p.name}")

@@ -168,7 +168,10 @@ class ModelRegistry:
             "champion"
         ] = version_id
         self._save(registry)
-        print(f"  Promoted {version_id} → models/{pos}_catboost.cbm")
+        # Print where the file actually went. This said "models/…" whatever
+        # the registry was rooted at, so three leagues training in a row all
+        # claimed to write the same path.
+        print(f"  Promoted {version_id} → {self.model_dir / f'{pos}_catboost.cbm'}")
 
     def update_backtest(
         self, version_id: str, position: str, backtest_metrics: dict

@@ -86,17 +86,22 @@ def update_all(
         for key in artifact_keys() if all_leagues else artifact_keys([league]):
             features.build_player_week_features(league=key)
 
+    keys = artifact_keys() if all_leagues else artifact_keys([league])
+
     if train:
         print(">> Training models...")
-        train_model.main()
+        for key in keys:
+            train_model.main(league=key)
 
     print(">> Making predictions...")
-    profile = get_profile(league)
-    main_positions = [p for p in profile.roster.positions if p != "DST"]
-    targets = [position] if position else main_positions
-    for pos in targets:
-        print(f"   {pos}...")
-        predict_week.run_predictions(position=pos)
+    for key in keys:
+        profile = get_profile(key)
+        main_positions = [p for p in profile.roster.positions if p != "DST"]
+        targets = [position] if position else main_positions
+        print(f"   {profile.name} [{key}]")
+        for pos in targets:
+            print(f"     {pos}...")
+            predict_week.run_predictions(position=pos, league=key)
 
 
 # ---------------------------------------------------------------------------
@@ -166,11 +171,16 @@ def predict(
     week: int | None = typer.Option(
         None, help="Week number (default: inferred from data)."
     ),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
 ) -> None:
     """Run weekly fantasy predictions for a position."""
     from nfl_predict import predict_week
 
-    predict_week.run_predictions(position=position, season=season, week=week)
+    predict_week.run_predictions(
+        position=position, season=season, week=week, league=league
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -186,10 +196,21 @@ def train(
     no_registry: bool = typer.Option(
         False, help="Skip model registry (plain file save)."
     ),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
+    all_leagues: bool = typer.Option(
+        False, "--all", help="Train models for every distinct scoring system."
+    ),
 ) -> None:
     """Train position models and register them in the model registry."""
+    from nfl_predict.leagues import artifact_keys
+
     positions = [position] if position else None
-    train_model.main(positions=positions, use_registry=not no_registry)
+    # One fit per distinct scoring system: leagues that score alike share a
+    # feature table and therefore share a model.
+    for key in artifact_keys() if all_leagues else artifact_keys([league]):
+        train_model.main(positions=positions, use_registry=not no_registry, league=key)
 
 
 # ---------------------------------------------------------------------------

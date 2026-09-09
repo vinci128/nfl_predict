@@ -303,6 +303,17 @@ class LeagueProfile:
     def registry_path(self) -> Path:
         return self.model_dir / "model_registry.json"
 
+    @property
+    def predictions_dir(self) -> Path:
+        """Where this league's weekly prediction CSVs live.
+
+        Keyed by `artifact_key`, like the models that produce them: the file
+        name carries only position, season and week, so three leagues writing
+        to a flat `outputs/` would silently overwrite each other and a lineup
+        would be scored under whichever scoring ran last.
+        """
+        return Path("outputs") / self.artifact_key
+
     def board_path(self, season: int, ext: str = ".csv") -> Path:
         return Path("outputs") / f"draft_board_{season}_{self.key}{ext}"
 

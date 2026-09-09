@@ -90,12 +90,25 @@ def load_features(league: str | None = None) -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
-def load_model_and_meta(position: str = "WR"):
-    model_path = MODEL_DIR / f"{position.lower()}_catboost.cbm"
-    meta_path = MODEL_DIR / f"{position.lower()}_catboost_meta.json"
+def load_model_and_meta(position: str = "WR", league: str | None = None):
+    """Load one league's champion weekly model for `position`.
+
+    The flat path is kept in sync with the registry champion by
+    `ModelRegistry.promote`, and is rooted at the league's model directory —
+    a model trained on another league's scoring predicts that league's
+    points, not this one's.
+    """
+    from nfl_predict.leagues import get_profile
+
+    model_dir = get_profile(league).model_dir
+    model_path = model_dir / f"{position.lower()}_catboost.cbm"
+    meta_path = model_dir / f"{position.lower()}_catboost_meta.json"
 
     if not model_path.exists():
-        raise FileNotFoundError(f"Model not found: {model_path}")
+        raise FileNotFoundError(
+            f"Model not found: {model_path} — run `nfl-predict train --league "
+            f"{get_profile(league).key}`."
+        )
     if not meta_path.exists():
         raise FileNotFoundError(f"Metadata not found: {meta_path}")
 
@@ -270,19 +283,23 @@ def run_predictions(
     week: int | None = None,
     position: str = "WR",
     write_csv: bool = True,
+    league: str | None = None,
 ):
     """
     Core function: runs predictions without depending on Typer.
     Can be called from the Typer CLI or from other Python modules.
     """
+    from nfl_predict.leagues import get_profile
 
     # Guard against OptionInfo in case of incorrect calls
     season = _clean_option(season)
     week = _clean_option(week)
     position = _clean_option(position) or "WR"
+    league = _clean_option(league)
+    profile = get_profile(league)
 
     # 1) Load features
-    df = load_features()
+    df = load_features(profile.key)
 
     # 2) If season/week are missing, use data-based defaults
     if season is None or week is None:
@@ -298,7 +315,9 @@ def run_predictions(
     print(f"Target week: {week} (uses week {week - 1} as feature)")
     print(f"Position: {position}\n")
 
-    model, feature_cols, cat_cols, meta = load_model_and_meta(position=position)
+    model, feature_cols, cat_cols, meta = load_model_and_meta(
+        position=position, league=profile.key
+    )
 
     df_feat, X, inferred_cat_cols = build_inference_dataset(
         df=df,
@@ -322,8 +341,9 @@ def run_predictions(
     )
 
     if write_csv:
-        OUT_DIR.mkdir(parents=True, exist_ok=True)
-        out_path = OUT_DIR / f"predictions_{position.lower()}_{season}_week{week}.csv"
+        out_dir = profile.predictions_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"predictions_{position.lower()}_{season}_week{week}.csv"
         preds.to_csv(out_path, index=False)
         print(f"\nSaved CSV to: {out_path}\n")
 
@@ -353,9 +373,12 @@ def predict(
         help="Week to predict. Default = next week relative to data.",
     ),
     position: str = typer.Option("WR", help="Position: WR, RB, QB, TE"),
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
 ):
     """Fantasy next-week prediction (Typer wrapper)."""
-    run_predictions(season=season, week=week, position=position)
+    run_predictions(season=season, week=week, position=position, league=league)
 
 
 if __name__ == "__main__":
