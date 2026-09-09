@@ -3058,5 +3058,125 @@
         "meta_path": "models/ludopathy/versions/db_season_games_p90_20260906_121005_0ad69ab9/meta.json"
       }
     ]
+  },
+  "QB": {
+    "champion": "qb_20260909_133547_967d4f49",
+    "versions": [
+      {
+        "version_id": "qb_20260909_133547_967d4f49",
+        "created_at": "2026-09-09T13:35:47.111282",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 9.9859792023471,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/qb_20260909_133547_967d4f49/model.cbm",
+        "meta_path": "models/ludopathy/versions/qb_20260909_133547_967d4f49/meta.json"
+      }
+    ]
+  },
+  "RB": {
+    "champion": "rb_20260909_133547_5b39160d",
+    "versions": [
+      {
+        "version_id": "rb_20260909_133547_5b39160d",
+        "created_at": "2026-09-09T13:35:47.823960",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 4.451175690123528,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/rb_20260909_133547_5b39160d/model.cbm",
+        "meta_path": "models/ludopathy/versions/rb_20260909_133547_5b39160d/meta.json"
+      }
+    ]
+  },
+  "WR": {
+    "champion": "wr_20260909_133548_31ffe004",
+    "versions": [
+      {
+        "version_id": "wr_20260909_133548_31ffe004",
+        "created_at": "2026-09-09T13:35:48.497094",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 4.487527840668168,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/wr_20260909_133548_31ffe004/model.cbm",
+        "meta_path": "models/ludopathy/versions/wr_20260909_133548_31ffe004/meta.json"
+      }
+    ]
+  },
+  "TE": {
+    "champion": "te_20260909_133548_1114521a",
+    "versions": [
+      {
+        "version_id": "te_20260909_133548_1114521a",
+        "created_at": "2026-09-09T13:35:48.914784",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 3.6566062239016968,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/te_20260909_133548_1114521a/model.cbm",
+        "meta_path": "models/ludopathy/versions/te_20260909_133548_1114521a/meta.json"
+      }
+    ]
+  },
+  "LB": {
+    "champion": "lb_20260909_133550_81f9f5fc",
+    "versions": [
+      {
+        "version_id": "lb_20260909_133550_81f9f5fc",
+        "created_at": "2026-09-09T13:35:50.234255",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 3.9293903458911372,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/lb_20260909_133550_81f9f5fc/model.cbm",
+        "meta_path": "models/ludopathy/versions/lb_20260909_133550_81f9f5fc/meta.json"
+      }
+    ]
+  },
+  "DL": {
+    "champion": "dl_20260909_133550_523a072b",
+    "versions": [
+      {
+        "version_id": "dl_20260909_133550_523a072b",
+        "created_at": "2026-09-09T13:35:50.804904",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 2.833756042865178,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/dl_20260909_133550_523a072b/model.cbm",
+        "meta_path": "models/ludopathy/versions/dl_20260909_133550_523a072b/meta.json"
+      }
+    ]
+  },
+  "DB": {
+    "champion": "db_20260909_133551_a5446b19",
+    "versions": [
+      {
+        "version_id": "db_20260909_133551_a5446b19",
+        "created_at": "2026-09-09T13:35:51.982161",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 3.9099452309747496,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/db_20260909_133551_a5446b19/model.cbm",
+        "meta_path": "models/ludopathy/versions/db_20260909_133551_a5446b19/meta.json"
+      }
+    ]
+  },
+  "K": {
+    "champion": "k_20260909_133552_6ab36909",
+    "versions": [
+      {
+        "version_id": "k_20260909_133552_6ab36909",
+        "created_at": "2026-09-09T13:35:52.471773",
+        "model_type": "week",
+        "valid_season": 2025,
+        "valid_mae": 3.7450921342850583,
+        "backtest_mae": null,
+        "model_path": "models/ludopathy/versions/k_20260909_133552_6ab36909/model.cbm",
+        "meta_path": "models/ludopathy/versions/k_20260909_133552_6ab36909/meta.json"
+      }
+    ]
   }
 }
