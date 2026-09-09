@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import datetime
 import json
 from pathlib import Path
@@ -152,8 +153,26 @@ def _update_manifest(name: str, seasons: list[int]) -> None:
 
 
 def get_seasons(first_season: int = 2015) -> list[int]:
-    """Compute the full list of seasons [first_season … current]."""
-    current_season = nfl.get_current_season()
+    """Compute the full list of seasons [first_season … current].
+
+    `nflreadpy.get_current_season()` rolls over later than the fantasy
+    calendar does: on 2026-09-09, with week 1 kicking off, it still answered
+    2025 while `get_current_season(roster=True)` answered 2026. Trusting it
+    alone makes the whole pipeline blind to the new season at exactly the
+    moment it matters — no 2026 schedule means no opponent, no Vegas line and
+    no bye week, and nothing raises, the columns just come back empty.
+
+    So take the later of the two nflreadpy answers and the project's own
+    fantasy calendar, which is the same definition `predict_week` uses to
+    decide which season it is predicting. Asking for a season the upstream
+    data does not have yet is harmless — it returns no rows.
+    """
+    from nfl_predict.predict_week import get_default_season_and_week
+
+    candidates = [nfl.get_current_season(), get_default_season_and_week()[0]]
+    with contextlib.suppress(TypeError):  # older nflreadpy lacks the keyword
+        candidates.append(nfl.get_current_season(roster=True))
+    current_season = max(candidates)
     seasons = list(range(first_season, current_season + 1))
     print(f"Using seasons: {seasons}")
     return seasons
@@ -176,6 +195,24 @@ _LOADERS = {
 }
 
 
+def _is_missing_season(exc: BaseException) -> bool:
+    """True if `exc` is nflverse answering 'that season is not published yet'.
+
+    Matched on the message rather than an exception type, because nflreadpy
+    says this two different ways: a dataset published one parquet per season
+    404s on the file (`player_week_2026.parquet`), while one that validates
+    its arguments first refuses the call outright with "Season must be
+    between 2012 and 2025". Both mean the same thing — upstream has nothing
+    for that season yet — and both must be survivable, or a season that has
+    not kicked off takes the whole fetch down with it.
+    """
+    chain, seen = [], exc
+    while seen is not None and len(chain) < 5:
+        chain.append(str(seen))
+        seen = seen.__cause__ or seen.__context__
+    return any("404" in m or "Season must be between" in m for m in chain)
+
+
 def fetch_dataset(name: str, seasons: list[int], current_season: int) -> None:
     """Fetch one dataset incrementally (missing historicals + current season)."""
     to_fetch = _seasons_to_fetch(name, seasons, current_season)
@@ -183,7 +220,26 @@ def fetch_dataset(name: str, seasons: list[int], current_season: int) -> None:
         print(f"{name}: all seasons cached — skipping")
         return
     print(f"Fetching {name} for seasons: {to_fetch}")
-    df = _LOADERS[name](seasons=to_fetch).to_pandas()
+    try:
+        df = _LOADERS[name](seasons=to_fetch).to_pandas()
+    except Exception as exc:
+        # A season that has not kicked off yet has a schedule but no game
+        # data, and nflverse publishes one parquet per season — so
+        # `player_week_2026.parquet` 404s until week 1 is played. That must
+        # not abort the run: the schedule fetch that follows is exactly what
+        # the new season needs (opponent, Vegas line, bye week), and dropping
+        # it leaves the pipeline blind to the season it is about to predict.
+        if not _is_missing_season(exc) or len(to_fetch) == 1:
+            if _is_missing_season(exc):
+                print(f"  {name}: no data published yet for {to_fetch} — skipping")
+                return
+            raise
+        retry = to_fetch[:-1]
+        print(
+            f"  {name}: no data published yet for {to_fetch[-1]} — retrying without it"
+        )
+        df = _LOADERS[name](seasons=retry).to_pandas()
+        to_fetch = retry
     validate_dataframe(df, name)
     _merge_and_save(name, df)
     _update_manifest(name, to_fetch)
