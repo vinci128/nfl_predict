@@ -209,6 +209,29 @@ def espn_optimal(league: str | None = None, week: int | None = None):
     return starters, bench, out, total
 
 
+# A lineup change has to be worth making. ESPN quotes projections to four
+# decimals, so the optimiser will happily tell you to bench George Kittle for
+# Pat Freiermuth on 0.069 points — a real roster move, giving up the higher
+# ceiling, for a gain indistinguishable from rounding.
+MIN_GAIN = 0.5
+
+
+def current_total(starters, bench, out) -> float:
+    """What the lineup as currently set on ESPN projects.
+
+    Players who cannot play count zero, which is the point: that is what an
+    unnoticed OUT in a starting slot actually costs.
+    """
+    total = 0.0
+    for p in list(starters) + list(bench) + list(out):
+        if p["current_slot"] in ("BE", "IR"):
+            continue
+        if p["injury_status"] in _CANNOT_PLAY:
+            continue
+        total += p["expected_ppr_points"] or 0.0
+    return round(total, 1)
+
+
 def print_espn_lineup(league: str | None = None, week: int | None = None) -> list[str]:
     """Print the best lineup by ESPN's projections; return the changes needed."""
     from nfl_predict.leagues import get_profile
@@ -247,14 +270,26 @@ def print_espn_lineup(league: str | None = None, week: int | None = None) -> lis
     # people start and the total is identical, so it is not a change to make
     # and reporting it sends you to ESPN for nothing.
 
-    if changes:
-        typer.echo("Changes needed:")
+    now = current_total(starters, bench, out)
+    gain = round(total - now, 1)
+
+    if not changes:
+        typer.echo(f"Lineup is already optimal ({now:.1f} projected).")
+    elif gain < MIN_GAIN:
+        # Worth showing, not worth doing: naming the players keeps the call
+        # yours rather than hiding it.
+        typer.echo(
+            f"No change worth making — the best alternative lineup gains "
+            f"{gain:+.1f} pts, inside the noise:"
+        )
+        for c in changes:
+            typer.echo(f"  (optional){c[9:]}")
+    else:
+        typer.echo(f"Changes needed ({now:.1f} -> {total:.1f}, {gain:+.1f}):")
         for c in changes:
             typer.echo(c)
-    else:
-        typer.echo("Lineup is already optimal.")
     typer.echo("")
-    return changes
+    return changes if gain >= MIN_GAIN else []
 
 
 if __name__ == "__main__":

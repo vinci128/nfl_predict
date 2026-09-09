@@ -168,3 +168,49 @@ def test_total_counts_only_starters(monkeypatch):
     assert total == pytest.approx(
         sum(s["expected_ppr_points"] for s in starters), abs=0.05
     )
+
+
+# ---------------------------------------------------------------------------
+# A change has to be worth making
+# ---------------------------------------------------------------------------
+
+
+def test_current_total_counts_a_ruled_out_starter_as_zero(monkeypatch):
+    """An unnoticed OUT in a starting slot costs the whole slot."""
+    rows = _hoh_roster()
+    rows[1] = _player("RB1", "RB", "RB", 0.0, injury="OUT")
+    _install(monkeypatch, rows)
+    starters, bench, out, _ = lineup.espn_optimal(league="hoh")
+    assert "RB1" not in {p["player_name"] for p in starters}
+    # RB1 still occupies the RB slot on ESPN, and contributes nothing.
+    assert lineup.current_total(starters, bench, out) == pytest.approx(
+        sum(
+            p["expected_ppr_points"]
+            for p in starters + bench + out
+            if p["current_slot"] not in ("BE", "IR")
+            and p["injury_status"] not in lineup._CANNOT_PLAY
+        ),
+        abs=0.05,
+    )
+
+
+def test_a_sub_noise_swap_is_not_reported_as_needed(monkeypatch, capsys):
+    """0.07 points is not a reason to bench the higher-ceiling player."""
+    rows = _hoh_roster()
+    rows[5] = _player("TE1", "TE", "TE", 8.3606, injury="QUESTIONABLE")
+    rows[8] = _player("WR3", "WR", "FLEX", 9.1)  # otherwise FLEX is a real gain
+    rows.append(_player("TE2", "TE", "BE", 8.4297))
+    _install(monkeypatch, rows)
+    changes = lineup.print_espn_lineup(league="hoh")
+    assert changes == []
+    assert "No change worth making" in capsys.readouterr().out
+
+
+def test_a_real_gain_is_reported(monkeypatch, capsys):
+    rows = _hoh_roster()
+    rows[5] = _player("TE1", "TE", "TE", 3.0)
+    rows.append(_player("TE2", "TE", "BE", 11.0))
+    _install(monkeypatch, rows)
+    changes = lineup.print_espn_lineup(league="hoh")
+    assert changes
+    assert "Changes needed" in capsys.readouterr().out
