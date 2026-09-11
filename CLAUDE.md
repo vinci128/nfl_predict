@@ -281,11 +281,36 @@ barely moved, because tackles dominate and tackles were right.
 - Ludopathy's 40+/50+ yard TD pass bonuses (PTD40 +2, PTD50 +3) need play-level
   data and are not modelled. They are declared in `ScoringRules.unmodelled` and
   printed by `nfl-predict leagues` rather than silently dropped.
-- Ludopathy's IDP scoring is verified against ESPN's own projected
-  `appliedTotal` (see above), which pins the rates exactly. Re-run the same
-  comparison against a real box score after week 1 —
-  `EspnFantasyClient.fetch_boxscore` returns ESPN's `actual_points` per player
-  — to confirm the *actual* stat feed lines up the way the projected one does.
+- ~~Re-run the IDP comparison against a real box score after week 1.~~ **Done
+  on 2026-09-11, against 2026 week 1: 13 of 13 defensive lines reproduced
+  exactly, 0 mismatches.** The actual feed scores the same way the projected
+  one did, so the `pointsOverrides` rates are confirmed — an interception is
+  **2.0**, not the 5 the settings page prints. A league-mate reading the
+  printed table guessed 5 in chat the same morning; the box score settles it.
+
+### ESPN IDP stat ids, decoded from a real box score
+The `appliedStats` map on a `statSourceId == 0` entry gives points *per stat
+id*, so dividing by the raw count recovers each rate directly. Ludopathy,
+2026 week 1:
+
+| id | category | rate |
+|---|---|---|
+| 109 | total tackles (every tackle) | 1.0 |
+| 108 | solo tackles, on top of 109 | 1.5 |
+| 107 | assisted tackles, on top of 109 | 0.5 |
+| 113 | passes defended | 1.0 |
+| 95 | interceptions | 2.0 |
+| 106 | fumbles (forced / recovered) | 2.0 |
+
+This is why `_LUDOPATHY_SCORING` folds the pair into one rate: a solo tackle
+is 109+108 = **2.5** and an assist is 109+107 = **1.5**.
+
+**Tackles are scored for every position, not just IDP slots.** In 2026 week 1
+Puka Nacua (WR) and George Kittle (TE) each took 2.5 points for one solo
+tackle. `ScoringRules.score` applies rates per row without consulting the
+position, and nflverse records the tackle, so this is already handled — but
+it is worth knowing it is deliberate and not a leak. Historically it reaches
+~10% of WR and ~12% of TE player-weeks, worth ~0.3 pts/game on average.
 
 ---
 
