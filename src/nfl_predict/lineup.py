@@ -168,7 +168,7 @@ def espn_optimal(league: str | None = None, week: int | None = None):
         reset_active_league,
         set_active_league,
     )
-    from nfl_predict.weekly_api import _build_lineup
+    from nfl_predict.weekly_api import _lineup_slots
 
     profile = get_profile(league)
     rows = EspnFantasyClient.from_env(profile.key).fetch_rosters(week=week)
@@ -178,24 +178,30 @@ def espn_optimal(league: str | None = None, week: int | None = None):
             f"No team flagged as yours in {profile.name} — check ESPN_TEAM_ID."
         )
 
-    pool, out = [], []
+    pool, out, locked = [], [], []
     for r in mine:
+        # Once a player's game has kicked off ESPN reports a real score, and
+        # the slot he is in cannot be changed. He is part of the week now,
+        # at what he actually scored — not at what he was projected to.
+        played = r["actual_points"] is not None
         rec = {
             "player_name": r["player_name"],
             "position": fantasy_position(r["position"]) or r["position"],
             "nfl_team": r["nfl_team"],
             "injury_status": r["injury_status"] or "",
             "current_slot": r["lineup_slot"],
-            "expected_ppr_points": r["projected_points"],
+            "expected_ppr_points": (
+                r["actual_points"] if played else r["projected_points"]
+            ),
+            "locked": played,
+            "actual_points": r["actual_points"],
         }
-        if rec["injury_status"] in _CANNOT_PLAY or rec["expected_ppr_points"] is None:
+        if played:
+            locked.append(rec)
+        elif rec["injury_status"] in _CANNOT_PLAY or rec["expected_ppr_points"] is None:
             out.append(rec)
         else:
             pool.append(rec)
-
-    df = pd.DataFrame(pool)
-    if df.empty:
-        return [], [], out, 0.0
 
     # `_build_lineup` reads the *active* league for its starting slots, not an
     # argument. Without pinning it, a Hell or Highwater lineup gets built
@@ -203,10 +209,62 @@ def espn_optimal(league: str | None = None, week: int | None = None):
     # silently benched with no slot to put it back in.
     token = set_active_league(profile.key)
     try:
-        starters, bench, total = _build_lineup(df)
+        slots = _lineup_slots()
+        flex_positions = list(profile.roster.flex_positions)
     finally:
         reset_active_league(token)
+
+    locked_starters = [x for x in locked if x["current_slot"] not in ("BE", "IR")]
+    for x in locked_starters:
+        x["slot"] = x["current_slot"]
+
+    starters, bench = _fill_open_slots(slots, flex_positions, locked_starters, pool)
+    bench += [x for x in locked if x["current_slot"] in ("BE", "IR")]
+    total = round(sum(s["expected_ppr_points"] or 0.0 for s in starters), 1)
     return starters, bench, out, total
+
+
+def _fill_open_slots(slots, flex_positions, locked_starters, movable):
+    """Fill whatever starting slots are still open, best projection first.
+
+    Slots already held by a player whose game has kicked off are spent: he
+    cannot be moved out and nobody else can be moved in. Returns
+    ``(starters, bench)`` with ``starters`` including the locked ones.
+    """
+    remaining = dict(slots)
+    flex_left = remaining.pop("FLEX", 0)
+    for x in locked_starters:
+        slot = x["slot"]
+        if slot == "FLEX":
+            flex_left = max(0, flex_left - 1)
+        elif slot in remaining:
+            remaining[slot] = max(0, remaining[slot] - 1)
+
+    left = sorted(movable, key=lambda z: -(z["expected_ppr_points"] or 0.0))
+    starters = list(locked_starters)
+    used: set[int] = set()
+
+    for pos, n in remaining.items():
+        for x in left:
+            if n <= 0:
+                break
+            if id(x) in used or x["position"] != pos:
+                continue
+            starters.append({**x, "slot": pos})
+            used.add(id(x))
+            n -= 1
+
+    for x in left:
+        if flex_left <= 0:
+            break
+        if id(x) in used or x["position"] not in flex_positions:
+            continue
+        starters.append({**x, "slot": "FLEX"})
+        used.add(id(x))
+        flex_left -= 1
+
+    bench = [{**x, "slot": "BN"} for x in left if id(x) not in used]
+    return starters, bench
 
 
 # A lineup change has to be worth making. ESPN quotes projections to four
@@ -232,6 +290,14 @@ def current_total(starters, bench, out) -> float:
     return round(total, 1)
 
 
+def _slot_order(profile):
+    """Starting slots in the order a lineup page lists them, FLEX last."""
+    slots = [p for p, n in profile.roster.starters.items() if n > 0]
+    if profile.roster.flex_spots:
+        slots.append("FLEX")
+    return slots
+
+
 def print_espn_lineup(league: str | None = None, week: int | None = None) -> list[str]:
     """Print the best lineup by ESPN's projections; return the changes needed."""
     from nfl_predict.leagues import get_profile
@@ -239,16 +305,37 @@ def print_espn_lineup(league: str | None = None, week: int | None = None) -> lis
     profile = get_profile(league)
     starters, bench, out, total = espn_optimal(league, week)
 
+    order = list(_slot_order(profile))
+    starters = sorted(
+        starters,
+        key=lambda z: order.index(z["slot"]) if z["slot"] in order else 99,
+    )
+
     typer.echo(f"\n{profile.name} — best lineup by ESPN projection\n")
+    settled = 0.0
     for s in starters:
-        flag = (
-            "" if s["injury_status"] in ("", "ACTIVE") else f"  [{s['injury_status']}]"
-        )
+        if s.get("locked"):
+            # Already scored: this is what he got, not what he might get.
+            note = "  final"
+            settled += s["expected_ppr_points"] or 0.0
+        elif s["injury_status"] not in ("", "ACTIVE"):
+            note = f"  [{s['injury_status']}]"
+        else:
+            note = ""
         typer.echo(
             f"  {s['slot']:<5} {s['position']:<3} {s['player_name']:<24} "
-            f"{s['expected_ppr_points']:>6.1f}{flag}"
+            f"{s['expected_ppr_points']:>6.1f}{note}"
         )
-    typer.echo(f"  {'':<5} {'':<3} {'TOTAL':<24} {total:>6.1f}\n")
+    n_locked = sum(1 for s in starters if s.get("locked"))
+    typer.echo(f"  {'':<5} {'':<3} {'TOTAL':<24} {total:>6.1f}")
+    if n_locked:
+        typer.echo(
+            f"  {'':<5} {'':<3} {'':<24} "
+            f"({settled:.1f} already scored across {n_locked} "
+            f"player{'s' if n_locked != 1 else ''}, "
+            f"{total - settled:.1f} still to play)"
+        )
+    typer.echo("")
 
     changes: list[str] = []
     for s in starters:

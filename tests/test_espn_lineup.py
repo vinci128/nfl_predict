@@ -26,7 +26,7 @@ class _FakeClient:
         return self._rows
 
 
-def _player(name, position, slot, proj, injury="ACTIVE", mine=True):
+def _player(name, position, slot, proj, injury="ACTIVE", mine=True, actual=None):
     return {
         "player_name": name,
         "position": position,
@@ -34,6 +34,7 @@ def _player(name, position, slot, proj, injury="ACTIVE", mine=True):
         "lineup_slot": slot,
         "injury_status": injury,
         "projected_points": proj,
+        "actual_points": actual,
         "is_mine": mine,
         "player_id": name.lower().replace(" ", "-"),
     }
@@ -214,3 +215,72 @@ def test_a_real_gain_is_reported(monkeypatch, capsys):
     changes = lineup.print_espn_lineup(league="hoh")
     assert changes
     assert "Changes needed" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# A game that has kicked off is settled
+# ---------------------------------------------------------------------------
+
+
+def test_a_played_starter_counts_at_what_he_scored(monkeypatch):
+    """Not at what he was projected to score — the week has happened."""
+    rows = _hoh_roster()
+    rows[0] = _player("QB1", "QB", "QB", 30.0, actual=11.4)
+    _install(monkeypatch, rows)
+    starters, _, _, total = lineup.espn_optimal(league="hoh")
+    qb = next(s for s in starters if s["player_name"] == "QB1")
+    assert qb["expected_ppr_points"] == 11.4
+    assert qb["locked"] is True
+    assert total == pytest.approx(
+        sum(s["expected_ppr_points"] for s in starters), abs=0.05
+    )
+
+
+def test_a_played_starter_is_never_proposed_for_benching(monkeypatch, capsys):
+    """His slot cannot be changed, so suggesting it wastes a trip to ESPN."""
+    rows = _hoh_roster()
+    rows[5] = _player("TE1", "TE", "TE", 8.4, actual=3.2)
+    rows.append(_player("TE2", "TE", "BE", 9.9))
+    _install(monkeypatch, rows)
+    changes = lineup.print_espn_lineup(league="hoh")
+    capsys.readouterr()
+    # TE1 is settled: never proposed for benching, and still in the TE slot.
+    assert not any("TE1" in c for c in changes)
+    starters, _, _, _ = lineup.espn_optimal(league="hoh")
+    te = next(s for s in starters if s["slot"] == "TE")
+    assert te["player_name"] == "TE1"
+
+
+def test_a_locked_slot_is_not_filled_twice(monkeypatch):
+    """The locked starter spends his slot; nobody else may take it."""
+    rows = _hoh_roster()
+    rows[5] = _player("TE1", "TE", "TE", 8.4, actual=3.2)
+    rows.append(_player("TE2", "TE", "BE", 20.0))
+    _install(monkeypatch, rows)
+    starters, bench, _, _ = lineup.espn_optimal(league="hoh")
+    te_slots = [s for s in starters if s["slot"] == "TE"]
+    assert len(te_slots) == 1
+    assert te_slots[0]["player_name"] == "TE1"
+    # TE2 may still take the open FLEX — a TE is flex-eligible here — but it
+    # must never be handed the TE slot a played player is sitting in.
+    te2 = next(p for p in starters + bench if p["player_name"] == "TE2")
+    assert te2["slot"] != "TE"
+
+
+def test_a_played_bench_player_stays_benched(monkeypatch):
+    rows = _hoh_roster()
+    rows[8] = _player("WR3", "WR", "BE", 9.1, actual=25.0)
+    _install(monkeypatch, rows)
+    starters, bench, _, _ = lineup.espn_optimal(league="hoh")
+    assert "WR3" in {b["player_name"] for b in bench}
+    assert "WR3" not in {s["player_name"] for s in starters}
+
+
+def test_an_unplayed_slot_still_optimises_around_locked_ones(monkeypatch):
+    """Locking the TE must not stop the open FLEX being filled."""
+    rows = _hoh_roster()
+    rows[5] = _player("TE1", "TE", "TE", 8.4, actual=3.2)
+    _install(monkeypatch, rows)
+    starters, _, _, _ = lineup.espn_optimal(league="hoh")
+    flex = [s for s in starters if s["slot"] == "FLEX"]
+    assert flex and flex[0]["player_name"] == "WR3"
