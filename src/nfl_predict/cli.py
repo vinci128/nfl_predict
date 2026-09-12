@@ -192,14 +192,23 @@ def espn_lineup_cmd(
     all_leagues: bool = typer.Option(
         False, "--all", help="Check every configured league."
     ),
+    survive: bool = typer.Option(
+        False,
+        "--survive",
+        help="Elimination league: minimise P(finishing last) instead of "
+        "maximising points.",
+    ),
 ) -> None:
     """Best lineup by ESPN's own projections, and what to change to get it."""
     from nfl_predict.leagues import league_keys
-    from nfl_predict.lineup import print_espn_lineup
+    from nfl_predict.lineup import print_espn_lineup, print_survival_lineup
 
     keys = league_keys() if all_leagues else [league]
     for key in keys:
-        print_espn_lineup(league=key, week=week)
+        if survive:
+            print_survival_lineup(league=key, week=week)
+        else:
+            print_espn_lineup(league=key, week=week)
 
 
 # ---------------------------------------------------------------------------

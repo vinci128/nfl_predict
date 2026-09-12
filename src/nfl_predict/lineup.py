@@ -381,3 +381,70 @@ def print_espn_lineup(league: str | None = None, week: int | None = None) -> lis
 
 if __name__ == "__main__":
     app()
+
+
+def print_survival_lineup(
+    league: str | None = None, week: int | None = None
+) -> list[str]:
+    """Print the lineup that minimises P(finishing last), and what to change.
+
+    For an elimination league only. Points above survival buy nothing there,
+    so the highest-mean lineup is not automatically the right one.
+    """
+    from nfl_predict.leagues import get_profile
+    from nfl_predict.survival import league_teams, simulate_last_place, survival_optimal
+
+    profile = get_profile(league)
+    starters, bench, before, after = survival_optimal(profile.key, week)
+
+    order = list(_slot_order(profile))
+    starters = sorted(
+        starters, key=lambda z: order.index(z["slot"]) if z["slot"] in order else 99
+    )
+
+    typer.echo(f"\n{profile.name} — lineup to survive (minimise P(last))\n")
+    for s in starters:
+        note = (
+            "  final"
+            if s.get("locked")
+            else (
+                f"  [{s['injury_status']}]"
+                if s["injury_status"] not in ("", "ACTIVE")
+                else ""
+            )
+        )
+        typer.echo(
+            f"  {s['slot']:<5} {s['position']:<3} {s['player_name']:<24} "
+            f"{s['expected_ppr_points']:>6.1f}{note}"
+        )
+    total = round(sum(s["expected_ppr_points"] or 0.0 for s in starters), 1)
+    typer.echo(f"  {'':<5} {'':<3} {'TOTAL':<24} {total:>6.1f}")
+    typer.echo(f"\n  P(last) — points-max lineup: {before:6.2%}")
+    typer.echo(f"  P(last) — survival lineup  : {after:6.2%}")
+
+    changes = [
+        f"  START  {s['player_name']:<24} -> {s['slot']}"
+        for s in starters
+        if s["current_slot"] in ("BE", "IR")
+    ] + [
+        f"  BENCH  {b['player_name']:<24} (was {b['current_slot']})"
+        for b in bench
+        if b["current_slot"] not in ("BE", "IR")
+    ]
+    if changes:
+        typer.echo(f"\nChanges ({before:.2%} -> {after:.2%} risk of going out):")
+        for c in changes:
+            typer.echo(c)
+    else:
+        typer.echo("\nAlready the safest lineup available.")
+
+    # One fetch, not one per printed row.
+    board = league_teams(profile.key, week)
+    typer.echo("\n  league-wide P(last), on lineups as they stand:")
+    for tid, p in sorted(simulate_last_place(board).items(), key=lambda kv: -kv[1]):
+        t = board[tid]
+        mark = "  <-- you" if t["is_mine"] else ""
+        if p > 0.001:
+            typer.echo(f"    {t['name']:<28} {p:6.2%}{mark}")
+    typer.echo("")
+    return changes
