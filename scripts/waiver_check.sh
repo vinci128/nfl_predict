@@ -72,7 +72,13 @@ if danger:
   echo "Act on anything above in the ESPN app, or ask Claude to drive it."
 } >"$REPORT" 2>&1
 
-# Surface it. A report nobody opens is the same as no report.
+# WhatsApp the short version to yourself. The report on disk has the detail;
+# this is the part that reaches you when you are not at the machine. A dead
+# bridge must not fail the check — the report is already written.
+uv run python "$PROJECT_DIR/scripts/waiver_notify.py" --league "$LEAGUE" \
+  >>"$REPORT" 2>&1 || echo "(WhatsApp notify failed — see report)" >>"$REPORT"
+
+# Surface it locally too. A report nobody opens is the same as no report.
 if command -v notify-send >/dev/null 2>&1; then
   SUMMARY="$(grep -cE '^  (QB|RB|WR|TE|K|DST|LB|DL|DB) ' "$REPORT" 2>/dev/null || echo 0)"
   notify-send -u normal "Fantasy waivers — $LEAGUE" \
