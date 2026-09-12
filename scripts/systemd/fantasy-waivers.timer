@@ -1,0 +1,12 @@
+[Unit]
+Description=Tuesday 09:00 fantasy waiver check
+
+[Timer]
+# Tuesday morning, after Monday Night Football has settled the week and the
+# first elimination is known. Local time, so it tracks Europe/Rome DST.
+OnCalendar=Tue *-*-* 09:00:00
+# A machine that was asleep at 09:00 still runs it when it wakes.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

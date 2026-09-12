@@ -142,3 +142,49 @@ def test_no_team_of_mine_is_an_error(monkeypatch):
     _install(monkeypatch, [], [_fa("Anyone", "RB", 10.0)])
     with pytest.raises(RuntimeError, match="No team flagged as yours"):
         waivers.waiver_candidates(league="rumble", week=2)
+
+
+# ---------------------------------------------------------------------------
+# Which week a claim is for
+# ---------------------------------------------------------------------------
+
+
+def _schedule(tmp_path, monkeypatch):
+    import datetime as dt
+
+    import pandas as pd
+
+    rows = []
+    for wk, day in ((1, "2026-09-13"), (2, "2026-09-20"), (3, "2026-09-27")):
+        rows.append({"season": 2026, "week": wk, "gameday": day, "gametime": "13:00"})
+    (tmp_path / "data").mkdir(exist_ok=True)
+    pd.DataFrame(rows).to_parquet(tmp_path / "data" / "schedules.parquet")
+    monkeypatch.setattr(waivers, "DATA_DIR", tmp_path / "data")
+    return dt
+
+
+def test_waiver_week_is_the_next_one_not_the_current_one(tmp_path, monkeypatch):
+    """On the Tuesday between weeks, the claim is for the week ahead.
+
+    `get_default_season_and_week` counts days since the opener and would
+    still answer 1 here, scoring the wire against games already played.
+    """
+    dt = _schedule(tmp_path, monkeypatch)
+    tuesday = dt.datetime(2026, 9, 15, 9, 0)
+    assert waivers.next_open_week(2026, tuesday) == 2
+
+
+def test_before_kickoff_the_current_week_is_still_open(tmp_path, monkeypatch):
+    dt = _schedule(tmp_path, monkeypatch)
+    assert waivers.next_open_week(2026, dt.datetime(2026, 9, 13, 9, 0)) == 1
+
+
+def test_after_the_last_game_there_is_no_open_week(tmp_path, monkeypatch):
+    dt = _schedule(tmp_path, monkeypatch)
+    assert waivers.next_open_week(2026, dt.datetime(2027, 1, 1)) is None
+
+
+def test_a_missing_schedule_is_not_fatal(tmp_path, monkeypatch):
+    """The caller falls back to the calendar week rather than crashing."""
+    monkeypatch.setattr(waivers, "DATA_DIR", tmp_path / "nope")
+    assert waivers.next_open_week(2026) is None

@@ -253,3 +253,41 @@ def survival_optimal(
                 break
 
     return best, pool, start_p, best_p
+
+
+def elimination_state(league: str | None = None) -> dict:
+    """Who is out, who is still alive, and which period we are in.
+
+    ESPN marks a team's exit with a non-zero ``eliminationMatchupPeriod``, so
+    "still alive" is that field being 0 or absent — not an absence of the
+    team from the schedule, which never happens.
+    """
+    from nfl_predict.espn_fantasy import EspnFantasyClient
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    c = EspnFantasyClient.from_env(profile.key)
+    data = c._get(["mMatchupScore", "mTeam"])
+    names = {str(t.get("id")): t.get("name") for t in data.get("teams") or []}
+
+    out: dict[str, int] = {}
+    status: dict[str, str] = {}
+    for game in data.get("schedule") or []:
+        for t in game.get("teams") or []:
+            tid = str(t.get("teamId") or "")
+            if not tid:
+                continue
+            period = t.get("eliminationMatchupPeriod") or 0
+            if period:
+                out[tid] = int(period)
+            if t.get("eliminationProbabilityStatus"):
+                status[tid] = t["eliminationProbabilityStatus"]
+
+    alive = [tid for tid in names if tid not in out]
+    return {
+        "names": names,
+        "eliminated": {tid: out[tid] for tid in out},
+        "alive": alive,
+        "status": status,
+        "n_eliminated": len(out),
+    }

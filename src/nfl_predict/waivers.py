@@ -15,6 +15,11 @@ better than nobody. Every suggestion therefore names the drop.
 
 from __future__ import annotations
 
+import datetime as _dt
+from pathlib import Path
+
+DATA_DIR = Path("data")
+
 # A claim has to clear this margin over the player it displaces. ESPN quotes
 # projections to four decimals and the honest error on any one of them is
 # points, not tenths; a swap that gains less than this is churn.
@@ -23,6 +28,39 @@ MIN_UPGRADE = 1.5
 # Never suggested as a drop, whatever the projection says: a settled score is
 # already banked, and an IR slot is not a roster spot you are competing for.
 _UNDROPPABLE_SLOTS = frozenset({"IR"})
+
+
+def next_open_week(season: int, now: _dt.datetime | None = None) -> int | None:
+    """The earliest week whose first game has not kicked off yet.
+
+    This is the week a claim is *for*, and it is not the week
+    `get_default_season_and_week` reports. That one is derived from days
+    since the opener, so on the Tuesday between week 1 and week 2 — exactly
+    when waivers run — it still answers 1, and the wire would be scored
+    against a set of games already played.
+
+    Returns None once the season's last game has started.
+    """
+    import pandas as pd
+
+    path = DATA_DIR / "schedules.parquet"
+    if not path.exists():
+        return None
+    s = pd.read_parquet(path)
+    s = s[(s["season"] == season) & s["gameday"].notna()]
+    if s.empty:
+        return None
+
+    now = now or _dt.datetime.now()
+    kick = pd.to_datetime(
+        s["gameday"].astype(str) + " " + s["gametime"].fillna("13:00").astype(str),
+        errors="coerce",
+    )
+    future = s.assign(kick=kick).dropna(subset=["kick"])
+    future = future[future["kick"] > pd.Timestamp(now)]
+    if future.empty:
+        return None
+    return int(future["week"].min())
 
 
 def _startable(profile) -> set[str]:
@@ -48,7 +86,8 @@ def waiver_candidates(
 
     profile = get_profile(league)
     if week is None:
-        week = get_default_season_and_week()[1]
+        season, fallback = get_default_season_and_week()
+        week = next_open_week(season) or fallback
 
     client = EspnFantasyClient.from_env(profile.key)
     roster = [r for r in client.fetch_rosters(week=week) if r["is_mine"]]

@@ -1,0 +1,10 @@
+[Unit]
+Description=Fantasy football waiver + survival check (Royal Rumble)
+Documentation=file:///home/vinci/nfl_predict/scripts/waiver_check.sh
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/vinci/nfl_predict
+ExecStart=/home/vinci/nfl_predict/scripts/waiver_check.sh
+# The script shells out to uv, which cron-like environments do not have on PATH.
+Environment=PATH=/home/vinci/.local/bin:/home/vinci/.cargo/bin:/usr/local/bin:/usr/bin:/bin
