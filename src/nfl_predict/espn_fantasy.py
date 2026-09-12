@@ -592,6 +592,61 @@ class EspnFantasyClient:
     # Weekly scoring
     # ------------------------------------------------------------------
 
+    def fetch_free_agents(
+        self, week: int, limit: int = 200, min_owned: float = 0.0
+    ) -> list[dict]:
+        """Everyone unrostered in this league, with ESPN's projection for `week`.
+
+        Ownership percentage is ESPN-wide, not league-specific, so it says
+        how highly the wider world rates a player rather than anything about
+        this league — useful only as a tiebreak. What matters here is
+        `projected_points`, which is league-scored.
+
+        The pool depends hard on league size: at eight teams Royal Rumble
+        leaves genuinely startable players unowned, so this is not a
+        streaming-only list.
+        """
+        import json as _json
+
+        filt = {
+            "players": {
+                "filterStatus": {"value": ["FREEAGENT", "WAIVERS"]},
+                "limit": int(limit),
+                "sortPercOwned": {"sortAsc": False, "sortPriority": 1},
+            }
+        }
+        data = self._get(
+            ["kona_player_info"],
+            extra_headers={"x-fantasy-filter": _json.dumps(filt)},
+            scoringPeriodId=week,
+        )
+        players = self._players()
+
+        rows: list[dict] = []
+        for entry in data.get("players") or []:
+            pl = entry.get("player") or {}
+            owned = float((pl.get("ownership") or {}).get("percentOwned") or 0.0)
+            if owned < min_owned:
+                continue
+            espn_id = pl.get("id")
+            known = players.get(espn_id, {})
+            actual, projected = _week_points(pl, week)
+            rows.append(
+                {
+                    "espn_player_id": espn_id,
+                    "player_name": pl.get("fullName"),
+                    "player_id": known.get("player_id"),
+                    "position": _position_name(pl.get("defaultPositionId")),
+                    "nfl_team": known.get("team"),
+                    "injury_status": pl.get("injuryStatus") or "",
+                    "percent_owned": round(owned, 1),
+                    "week": week,
+                    "projected_points": projected,
+                    "actual_points": actual,
+                }
+            )
+        return rows
+
     def fetch_boxscore(self, week: int) -> list[dict]:
         """
         Fetch one week's per-player scoring for every team.
@@ -756,6 +811,28 @@ def _team_names(payload: dict) -> dict[str, str]:
         )
         names[str(team.get("id") or "")] = name.strip()
     return names
+
+
+def _position_name(position_id: int | None) -> str:
+    """ESPN defaultPositionId -> a readable position.
+
+    Only the ids a fantasy roster can hold; anything else comes back as "?"
+    rather than guessing, since a wrong label would silently misfile a
+    player into the wrong slot comparison.
+    """
+    return {
+        1: "QB",
+        2: "RB",
+        3: "WR",
+        4: "TE",
+        5: "K",
+        16: "DST",
+        9: "DT",
+        10: "DE",
+        11: "LB",
+        12: "CB",
+        13: "S",
+    }.get(position_id or -1, "?")
 
 
 def _week_points(player: dict, week: int) -> tuple[float | None, float | None]:

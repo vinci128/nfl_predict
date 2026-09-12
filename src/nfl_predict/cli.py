@@ -211,6 +211,37 @@ def espn_lineup_cmd(
             print_espn_lineup(league=key, week=week)
 
 
+@app.command(name="waivers")
+def waivers_cmd(
+    league: str | None = typer.Option(
+        None, help="League profile key (see `nfl-predict leagues`)."
+    ),
+    week: int | None = typer.Option(None, help="Week to project for (default: next)."),
+    limit: int = typer.Option(200, help="How many free agents to consider."),
+) -> None:
+    """Free agents worth claiming, each paired with who to drop for them."""
+    from nfl_predict.leagues import get_profile
+    from nfl_predict.waivers import waiver_candidates
+
+    profile = get_profile(league)
+    ups, mine, pool = waiver_candidates(league=profile.key, week=week, limit=limit)
+
+    print(f"\n{profile.name} — waiver wire ({len(pool)} startable free agents)\n")
+    if not ups:
+        print("  Nothing on the wire beats what you already have.\n")
+        return
+    print(
+        f"  {'pos':<4} {'ADD':<22} {'proj':>6}   {'DROP':<22} {'proj':>6} {'gain':>6}"
+    )
+    for u in ups:
+        flag = "" if u["add_injury"] in ("", "ACTIVE") else f"  [{u['add_injury']}]"
+        print(
+            f"  {u['position']:<4} {u['add']:<22} {u['add_proj']:>6.1f}   "
+            f"{u['drop']:<22} {u['drop_proj']:>6.1f} {u['gain']:>+6.1f}{flag}"
+        )
+    print("\n  Claims are not automated — this is read-only. Make them in ESPN.\n")
+
+
 # ---------------------------------------------------------------------------
 # train: train models and register them
 # ---------------------------------------------------------------------------
