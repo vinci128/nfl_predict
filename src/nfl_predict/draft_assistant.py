@@ -205,6 +205,39 @@ def mark_drafted(
     return state
 
 
+def undo_last_pick(state: DraftState) -> DraftState:
+    """
+    Reverse the most recent pick.
+
+    Removes the last entry from picks, restores the player to the available
+    board, updates my_roster if it was the user's pick, and decrements the
+    pick counter.  A no-op if no picks have been recorded yet.
+    """
+    if not state.picks:
+        return state
+
+    last = state.picks.pop()
+
+    if last.drafter == "me":
+        state.my_picks = [
+            p for p in state.my_picks if p.overall_pick != last.overall_pick
+        ]
+        roster_slot = state.my_roster.get(last.position, [])
+        if last.player_name in roster_slot:
+            roster_slot.remove(last.player_name)
+
+    board_row = state.board[state.board["player_name"] == last.player_name]
+    if not board_row.empty:
+        state.available = (
+            pd.concat([state.available, board_row], ignore_index=True)
+            .sort_values("overall_rank")
+            .reset_index(drop=True)
+        )
+
+    state.current_pick = max(1, state.current_pick - 1)
+    return state
+
+
 def suggest_best_available(
     state: DraftState,
     needs: list[str] | None = None,

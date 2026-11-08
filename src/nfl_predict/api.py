@@ -5,9 +5,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from nfl_predict.draft_api import router as draft_router
 from nfl_predict.predict_week import run_predictions
 
 app = FastAPI(title="nfl-predict API", version="0.1.0")
+app.include_router(draft_router)
 
 # Serve a small single-page app from `static/`
 static_dir = Path(__file__).resolve().parent / "static"

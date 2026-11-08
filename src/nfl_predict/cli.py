@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import pandas as pd
 import typer
 
 from nfl_predict import features, fetch_nfl_data, predict_week, train_model
+
+OUTPUT_DIR = Path("outputs")
 
 app = typer.Typer(help="NFL fantasy prediction pipeline CLI.")
 
@@ -450,6 +454,97 @@ def draft_pick(
 
     save_state(state)
     print(f"\n{len(state.available)} players remaining.")
+
+
+# ---------------------------------------------------------------------------
+# fetch-adp: pull ADP from Sleeper / FantasyPros / synthetic
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="fetch-adp")
+def fetch_adp_cmd(
+    source: str = typer.Option(
+        "sleeper",
+        help="ADP source: 'sleeper', 'fantasypros', or 'synthetic'.",
+    ),
+    scoring: str = typer.Option("ppr", help="Scoring format: 'ppr', 'half', or 'std'."),
+    out: str = typer.Option("data/adp_current.csv", help="Output CSV path."),
+    no_fallback: bool = typer.Option(
+        False, help="Do not fall back to synthetic ADP on live-fetch failure."
+    ),
+) -> None:
+    """Fetch ADP data and save to CSV (use with `nfl-predict board --adp`)."""
+    from nfl_predict.adp_fetch import fetch_adp, save_adp_csv
+
+    df = fetch_adp(
+        source=source,
+        scoring=scoring,
+        fallback_to_synthetic=not no_fallback,
+    )
+    if df.empty:
+        print("No ADP data fetched.")
+        raise typer.Exit(1)
+
+    path = save_adp_csv(df, path=out)
+
+    print(f"\nTop 10 ADP:\n{df.head(10).to_string(index=False)}")
+    print(f"\nSaved {len(df)} players → {path}")
+
+
+# ---------------------------------------------------------------------------
+# nfl-sync: poll NFL Fantasy live draft and auto-record picks
+# ---------------------------------------------------------------------------
+
+
+@app.command(name="nfl-sync")
+def nfl_sync_cmd(
+    interval: int = typer.Option(30, help="Seconds between polls."),
+    max_rounds: int = typer.Option(
+        20, help="Stop polling after this many draft rounds."
+    ),
+) -> None:
+    """
+    Poll the NFL Fantasy draft and auto-record picks into the local state.
+
+    Requires NFL_FANTASY_USERNAME, NFL_FANTASY_PASSWORD, and
+    NFL_FANTASY_LEAGUE_ID environment variables.  Optionally set
+    NFL_FANTASY_TEAM_ID to identify your picks as 'mine'.
+
+    Run this in a separate terminal while the UI is open — it updates
+    the same draft_state.json that the web UI reads.
+    """
+    from nfl_predict.draft_assistant import load_state, mark_drafted, save_state
+    from nfl_predict.nfl_fantasy import NflFantasyClient, NflFantasyError, poll_draft
+
+    try:
+        client = NflFantasyClient.from_env()
+    except NflFantasyError as e:
+        print(f"Error: {e}")
+        raise typer.Exit(1) from e
+
+    state_path = OUTPUT_DIR / "draft_state.json"
+    if not state_path.exists():
+        print("No active draft session. Run `nfl-predict draft-start` first.")
+        raise typer.Exit(1)
+
+    def on_pick(pick: dict) -> None:
+        state = load_state(state_path)
+        try:
+            updated = mark_drafted(
+                state,
+                pick["player_name"],
+                drafter="me" if pick.get("is_mine") else "other",
+            )
+            save_state(updated)
+            marker = " ← MINE" if pick.get("is_mine") else ""
+            print(
+                f"  #{pick['overall_pick']:>3}  {pick['player_name']:<28} "
+                f"{pick.get('position', '')}{marker}"
+            )
+        except ValueError as e:
+            print(f"  Warning: Could not record {pick['player_name']!r}: {e}")
+
+    poll_draft(client, on_pick=on_pick, interval=interval, max_rounds=max_rounds)
 
 
 if __name__ == "__main__":

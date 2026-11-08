@@ -1,0 +1,6 @@
+<div id="llm-advice" class="p-3 bg-gray-800 rounded text-sm text-gray-200">
+  {% if needs %}
+  <p class="text-xs text-gray-400 mb-1">Needs: {{ needs | join(", ") }}</p>
+  {% endif %}
+  <p>{{ advice }}</p>
+</div>
