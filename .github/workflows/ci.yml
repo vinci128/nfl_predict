@@ -20,8 +20,20 @@ jobs:
           version: "latest"
           enable-cache: true          # cache .venv between runs on same branch
 
+      # `.python-version` is load-bearing, not decoration: catboost 1.2.8
+      # publishes wheels for cp38-cp313 and none for cp314, and its sdist
+      # cannot build on modern setuptools (`AttributeError: 'Distribution'
+      # object has no attribute 'dry_run'`). `requires-python = ">=3.12"` has
+      # no upper bound, so without the pin uv picks whatever the runner ships
+      # — 3.14 on ubuntu-26.04 — falls back to the sdist, and CI dies before a
+      # single test runs. Every run from 2026-09-06 to 2026-11-21 failed this
+      # way while passing locally on a 3.12 venv. Bump the pin only together
+      # with catboost.
       - name: Install dependencies
         run: uv sync --dev --frozen
+
+      - name: Show interpreter
+        run: uv run python -V
 
       # Hook environments are cloned and built on first use; cache them or
       # every run pays ~40s rebuilding the same pinned repos.
