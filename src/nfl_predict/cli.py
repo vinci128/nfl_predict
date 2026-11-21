@@ -9,6 +9,47 @@ app = typer.Typer(help="NFL fantasy prediction pipeline CLI.")
 OUTPUT_DIR = Path("outputs")
 
 
+def write_lineup_artefact(result: dict) -> Path:
+    """Record a lineup-write outcome where the notifier can pick it up.
+
+    One file per league per run, named so the newest sorts last. The Sunday
+    routine messages what happened, and a shell script has no way to carry a
+    structured result from one command to the next — so the command that knows
+    the answer writes it down instead.
+    """
+    import datetime as dt
+    import json
+
+    out_dir = OUTPUT_DIR / "lineups"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = out_dir / f"lineup-{result['league']}-{stamp}.json"
+
+    transaction = result.get("transaction") or {}
+    payload = {
+        "league": result["league"],
+        "name": result["name"],
+        "week": result["week"],
+        "status": result["status"],
+        "gain": result["gain"],
+        "error": result["error"],
+        "wrong": result["wrong"],
+        "transaction_id": transaction.get("id", ""),
+        "moves": [
+            {
+                "in": inc["player_name"],
+                "out": out_["player_name"],
+                "slot_id": out_["lineup_slot_id"],
+            }
+            for out_, inc in result["pairs"]
+        ],
+        "unplaced": [e["player_name"] for e in result["unplaced"]],
+        "written_at": dt.datetime.now().isoformat(timespec="seconds"),
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n")
+    return path
+
+
 # ---------------------------------------------------------------------------
 # leagues: show the configured league profiles
 # ---------------------------------------------------------------------------
@@ -198,17 +239,48 @@ def espn_lineup_cmd(
         help="Elimination league: minimise P(finishing last) instead of "
         "maximising points.",
     ),
+    apply_changes: bool = typer.Option(
+        False,
+        "--apply",
+        help="Set the lineup on ESPN instead of only describing it. Writes "
+        "one transaction per league that is worth making.",
+    ),
 ) -> None:
-    """Best lineup by ESPN's own projections, and what to change to get it."""
+    """Best lineup by ESPN's own projections, and what to change to get it.
+
+    With ``--apply`` the change is made rather than reported, and the result
+    written to ``outputs/lineups/`` so the Sunday routine can message it.
+    """
     from nfl_predict.leagues import league_keys
-    from nfl_predict.lineup import print_espn_lineup, print_survival_lineup
+    from nfl_predict.lineup import (
+        apply_espn_lineup,
+        print_espn_lineup,
+        print_survival_lineup,
+        summarise_lineup_write,
+    )
+
+    if survive and apply_changes:
+        typer.echo(
+            "  --survive picks the lineup that minimises P(finishing last), "
+            "which is a probability over\nthe whole league rather than a "
+            "projected-point total. Read it and set it yourself.\n"
+        )
+        raise typer.Exit(code=2)
 
     keys = league_keys() if all_leagues else [league]
     for key in keys:
         if survive:
             print_survival_lineup(league=key, week=week)
-        else:
-            print_espn_lineup(league=key, week=week)
+            continue
+
+        print_espn_lineup(league=key, week=week)
+        if not apply_changes:
+            continue
+
+        result = apply_espn_lineup(league=key, week=week)
+        typer.echo("\n" + summarise_lineup_write(result) + "\n")
+        artefact = write_lineup_artefact(result)
+        typer.echo(f"  written to {artefact}\n")
 
 
 @app.command(name="waivers")

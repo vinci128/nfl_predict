@@ -26,6 +26,16 @@ class _FakeClient:
         return self._rows
 
 
+_ESPN_IDS: dict[str, int] = {}
+
+
+def _espn_id(name: str) -> int:
+    """A stable, collision-free stand-in for ESPN's own player id."""
+    if name not in _ESPN_IDS:
+        _ESPN_IDS[name] = 1000 + len(_ESPN_IDS)
+    return _ESPN_IDS[name]
+
+
 def _player(name, position, slot, proj, injury="ACTIVE", mine=True, actual=None):
     return {
         "player_name": name,
@@ -37,6 +47,9 @@ def _player(name, position, slot, proj, injury="ACTIVE", mine=True, actual=None)
         "actual_points": actual,
         "is_mine": mine,
         "player_id": name.lower().replace(" ", "-"),
+        # ESPN's own id. The writer joins the optimiser's picks to the raw
+        # roster on this, never on the name.
+        "espn_player_id": _espn_id(name),
     }
 
 
@@ -138,6 +151,59 @@ def test_questionable_players_still_start(monkeypatch):
     _install(monkeypatch, rows)
     starters, _, _, _ = lineup.espn_optimal(league="hoh")
     assert "WR1" in {s["player_name"] for s in starters}
+
+
+def test_a_player_in_an_ir_slot_is_never_started(monkeypatch):
+    """IR is a roster state, not a deeper bench.
+
+    Reaching a starting slot from IR takes an activation — a transaction, and
+    one that needs a free roster spot. ESPN leaves a live designation on a
+    player sitting there rather than overwriting it with INJURY_RESERVE, so
+    the status does not rule him out and the slot has to.
+    """
+    rows = _hoh_roster()
+    rows.append(_player("RB3", "RB", "IR", 25.0, injury="QUESTIONABLE"))
+    _install(monkeypatch, rows)
+    starters, _, out, _ = lineup.espn_optimal(league="hoh")
+    assert "RB3" not in {s["player_name"] for s in starters}
+    assert "RB3" in {o["player_name"] for o in out}
+
+
+def test_an_ir_slot_player_does_not_inflate_the_best_total(monkeypatch):
+    """The defect itself: a big projection in IR raised the lineup it proposed.
+
+    Hell or Highwater's week 8 read 122.0 against a real best of 117.9,
+    because Zach Charbonnet was counted from IR.
+    """
+    _install(monkeypatch, _hoh_roster())
+    _, _, _, baseline = lineup.espn_optimal(league="hoh")
+    rows = _hoh_roster()
+    rows.append(_player("RB3", "RB", "IR", 25.0, injury="QUESTIONABLE"))
+    _install(monkeypatch, rows)
+    _, _, _, total = lineup.espn_optimal(league="hoh")
+    assert total == pytest.approx(baseline, abs=0.05)
+
+
+def test_an_ir_slot_player_is_never_proposed_as_a_start(monkeypatch, capsys):
+    """Advice that needs a drop to follow is not a lineup change."""
+    rows = _hoh_roster()
+    rows[2] = _player("RB2", "RB", "RB", 6.0)
+    rows.append(_player("RB3", "RB", "IR", 25.0, injury="QUESTIONABLE"))
+    _install(monkeypatch, rows)
+    changes = lineup.print_espn_lineup(league="hoh")
+    capsys.readouterr()
+    assert not any("RB3" in c for c in changes)
+
+
+def test_an_ir_slot_player_is_not_counted_in_the_current_total(monkeypatch):
+    _install(monkeypatch, _hoh_roster())
+    starters, bench, out, _ = lineup.espn_optimal(league="hoh")
+    before = lineup.current_total(starters, bench, out)
+    rows = _hoh_roster()
+    rows.append(_player("RB3", "RB", "IR", 25.0, injury="QUESTIONABLE"))
+    _install(monkeypatch, rows)
+    starters, bench, out, _ = lineup.espn_optimal(league="hoh")
+    assert lineup.current_total(starters, bench, out) == pytest.approx(before, abs=0.05)
 
 
 def test_a_player_without_a_projection_is_not_started(monkeypatch):
@@ -284,3 +350,364 @@ def test_an_unplayed_slot_still_optimises_around_locked_ones(monkeypatch):
     starters, _, _, _ = lineup.espn_optimal(league="hoh")
     flex = [s for s in starters if s["slot"] == "FLEX"]
     assert flex and flex[0]["player_name"] == "WR3"
+
+
+# ---------------------------------------------------------------------------
+# Setting it on ESPN
+#
+# Everything below is about the one path that writes. The client is stubbed
+# and the stub applies what it is sent, so the read-back verification is
+# exercised rather than assumed.
+# ---------------------------------------------------------------------------
+
+_SLOT_ID = {
+    "QB": 0,
+    "RB": 2,
+    "WR": 4,
+    "TE": 6,
+    "DST": 16,
+    "K": 17,
+    "FLEX": 23,
+    "BE": 20,
+    "IR": 21,
+}
+
+_ELIGIBLE = {
+    "QB": [0, 7, 20, 21],
+    "RB": [2, 3, 23, 7, 20, 21],
+    "WR": [3, 4, 5, 23, 7, 20, 21],
+    "TE": [5, 6, 23, 7, 20, 21],
+    "DST": [16, 20, 21],
+    "K": [17, 20, 21],
+    "LB": [10, 15, 20, 21],
+    "DL": [9, 11, 15, 20, 21],
+    "DB": [13, 14, 15, 20, 21],
+}
+
+
+class _WritingClient:
+    """A stub that serves both reads and the write, and remembers the write."""
+
+    def __init__(self, rows, apply_on_submit=True):
+        self.submitted = None
+        self._apply = apply_on_submit
+        self.rows = rows
+        self._raw = [
+            {
+                "espn_player_id": r["espn_player_id"],
+                "player_name": r["player_name"],
+                "lineup_slot_id": _SLOT_ID[r["lineup_slot"]],
+                "eligible_slots": list(_ELIGIBLE.get(r["position"], [20, 21])),
+                "injury_status": r["injury_status"],
+                "actual_points": r["actual_points"],
+                "projected_points": r["projected_points"],
+            }
+            for r in rows
+        ]
+
+    def fetch_rosters(self, week=None):
+        return self.rows
+
+    def fetch_roster_slots(self, week=None):
+        # Copies, as the real client builds fresh rows on every fetch. Serving
+        # the live objects would let the writer's bookkeeping alias the plan.
+        return {"team_id": "9", "week": 9, "entries": [dict(e) for e in self._raw]}
+
+    def submit_lineup(self, items, week=None):
+        self.submitted = {"items": items, "week": week}
+        if self._apply:
+            by_id = {e["espn_player_id"]: e for e in self._raw}
+            for it in items:
+                by_id[it["espn_player_id"]]["lineup_slot_id"] = it["to_slot_id"]
+        return {"id": "txn-1", "type": "ROSTER", "status": "EXECUTED"}
+
+
+def _install_writer(monkeypatch, rows, apply_on_submit=True):
+    from nfl_predict import espn_fantasy
+
+    client = _WritingClient(rows, apply_on_submit)
+    monkeypatch.setattr(
+        espn_fantasy.EspnFantasyClient,
+        "from_env",
+        staticmethod(lambda league=None: client),
+    )
+    return client
+
+
+def _bench_upgrade():
+    """TE1 starts at 3.0; TE2 sits on the bench at 11.0."""
+    rows = _hoh_roster()
+    rows[5] = _player("TE1", "TE", "TE", 3.0)
+    rows.append(_player("TE2", "TE", "BE", 11.0))
+    return rows
+
+
+def test_a_bench_upgrade_is_paired_with_the_man_it_replaces(monkeypatch):
+    _install_writer(monkeypatch, _bench_upgrade())
+    plan = lineup.plan_lineup_moves(league="hoh")
+    assert [(o["player_name"], i["player_name"]) for o, i in plan["pairs"]] == [
+        ("TE1", "TE2")
+    ]
+    assert plan["gain"] == pytest.approx(8.0)
+
+
+def test_a_surplus_starter_stays_where_he_is(monkeypatch):
+    """Two starters should go, one player should come in.
+
+    Benching both would leave the bench holding more players than it has
+    slots — an illegal roster, and one ESPN rejects whole. So the better of
+    the two stays: he is worth nothing less there than on the bench, since
+    nothing replaces him either way.
+    """
+    rows = _hoh_roster()
+    rows[1] = _player("RB1", "RB", "RB", 0.0, injury="OUT")
+    rows[2] = _player("RB2", "RB", "RB", 4.0, injury="OUT")
+    rows.append(_player("RB3", "RB", "BE", 9.0))
+    _install_writer(monkeypatch, rows)
+    plan = lineup.plan_lineup_moves(league="hoh")
+    benched = [o["player_name"] for o, _ in plan["pairs"]]
+    assert benched == ["RB1"]
+    assert sum(1 for _o, i in plan["pairs"] if i["player_name"] == "RB3") == 1
+
+
+def test_an_empty_starting_slot_is_left_empty(monkeypatch):
+    """An unplaceable starter is named, not forced.
+
+    Filling a slot nobody is leaving would mean naming a slot id outright —
+    the guess that the swap form exists to avoid. Rare enough to prefer the
+    safe failure, and it is visible in ``unplaced`` rather than silent.
+    """
+    rows = [r for r in _hoh_roster() if r["player_name"] != "WR3"]
+    rows.append(_player("WR3", "WR", "BE", 25.0))
+    _install_writer(monkeypatch, rows)
+    plan = lineup.plan_lineup_moves(league="hoh")
+    assert [e["player_name"] for e in plan["unplaced"]] == ["WR3"]
+    assert plan["pairs"] == []
+
+
+def test_an_unreachable_upgrade_is_not_called_optimal(monkeypatch):
+    """ "Already the best lineup" is a claim about ESPN's roster, not ours."""
+    rows = [r for r in _hoh_roster() if r["player_name"] != "WR3"]
+    rows.append(_player("WR3", "WR", "BE", 25.0))
+    _install_writer(monkeypatch, rows)
+    result = lineup.apply_espn_lineup(league="hoh")
+    assert result["status"] == "unreachable"
+    assert "WR3 should start" in lineup.summarise_lineup_write(result)
+
+
+def test_a_change_inside_the_noise_is_not_written(monkeypatch):
+    rows = _hoh_roster()
+    rows[5] = _player("TE1", "TE", "TE", 8.3606)
+    rows[8] = _player("WR3", "WR", "FLEX", 9.1)
+    rows.append(_player("TE2", "TE", "BE", 8.4297))
+    client = _install_writer(monkeypatch, rows)
+    result = lineup.apply_espn_lineup(league="hoh")
+    assert result["status"] == "not_worth_it"
+    assert client.submitted is None
+
+
+def test_a_dry_run_writes_nothing(monkeypatch):
+    client = _install_writer(monkeypatch, _bench_upgrade())
+    result = lineup.apply_espn_lineup(league="hoh", dry_run=True)
+    assert result["status"] == "dry_run"
+    assert client.submitted is None
+
+
+def test_the_write_is_one_transaction_and_is_verified(monkeypatch):
+    """Both sides of the swap travel together, and the roster must agree."""
+    client = _install_writer(monkeypatch, _bench_upgrade())
+    result = lineup.apply_espn_lineup(league="hoh")
+
+    assert result["status"] == "applied"
+    assert result["wrong"] == []
+    assert client.submitted is not None
+    items = client.submitted["items"]
+    assert len(items) == 2
+    # The incoming player takes the exact slot the other is leaving; the
+    # outgoing one goes to the bench.
+    incoming, outgoing = items
+    assert incoming["from_slot_id"] == 20
+    assert outgoing["from_slot_id"] == incoming["to_slot_id"]
+    assert outgoing["to_slot_id"] == 20
+
+
+def test_a_write_espn_ignores_is_reported_as_unverified(monkeypatch):
+    """A 200 means ESPN accepted a transaction, not that the lineup changed."""
+    rows = _bench_upgrade()
+    client = _install_writer(monkeypatch, rows, apply_on_submit=False)
+    result = lineup.apply_espn_lineup(league="hoh")
+    assert result["status"] == "unverified"
+    assert "TE2" in result["wrong"][0]
+    assert client.submitted is not None
+
+
+def test_a_rejected_write_says_what_espn_said(monkeypatch):
+    from nfl_predict.espn_fantasy import EspnFantasyError
+
+    client = _install_writer(monkeypatch, _bench_upgrade())
+
+    def _reject(items, week=None):
+        raise EspnFantasyError("ESPN rejected the lineup change: Invalid Input.")
+
+    monkeypatch.setattr(client, "submit_lineup", _reject)
+    result = lineup.apply_espn_lineup(league="hoh")
+    assert result["status"] == "rejected"
+    assert "Invalid Input" in result["error"]
+
+
+def test_a_league_espn_will_not_talk_about_is_not_called_optimal(monkeypatch):
+    """A read that fails must not read as 'nothing to change'."""
+    from nfl_predict import espn_fantasy
+
+    def _boom(league=None):
+        raise espn_fantasy.EspnFantasyError("ESPN returned HTTP 404 for league 1")
+
+    monkeypatch.setattr(espn_fantasy.EspnFantasyClient, "from_env", staticmethod(_boom))
+    result = lineup.apply_espn_lineup(league="hoh")
+    assert result["status"] == "unavailable"
+    assert "404" in result["error"]
+    assert "could not read" in lineup.summarise_lineup_write(result)
+
+
+def test_expected_points_is_zero_for_a_player_who_cannot_play():
+    entry = {"injury_status": "OUT", "actual_points": None, "projected_points": 6.0}
+    assert lineup._expected_points(entry) == 0.0
+
+
+def test_expected_points_is_what_he_scored_once_he_has():
+    entry = {"injury_status": "ACTIVE", "actual_points": 14.5, "projected_points": 9.0}
+    assert lineup._expected_points(entry) == 14.5
+
+
+def test_every_status_says_something_on_its_own(monkeypatch):
+    """A silent no-op and a refused write must not look alike."""
+    base = {
+        "name": "Hell or Highwater",
+        "week": 9,
+        "pairs": [],
+        "unplaced": [],
+        "gain": 12.0,
+        "error": "",
+        "wrong": [],
+    }
+    for status in (
+        "applied",
+        "dry_run",
+        "already_optimal",
+        "not_worth_it",
+        "rejected",
+        "unverified",
+        "unreachable",
+        "unavailable",
+    ):
+        text = lineup.summarise_lineup_write({**base, "status": status})
+        assert status not in text or status == "applied", text
+        assert "Hell or Highwater" in text
+        assert len(text) > 30
+
+
+# ---------------------------------------------------------------------------
+# The transaction ESPN actually receives
+# ---------------------------------------------------------------------------
+
+
+def _bare_client(**kwargs):
+    from nfl_predict.espn_fantasy import EspnFantasyClient
+
+    return EspnFantasyClient(league_id="581348581", season=2026, team_id="9", **kwargs)
+
+
+def test_the_current_period_is_a_roster_transaction(monkeypatch):
+    """Not "LINEUP" — that is the *item* type, and ESPN answers 400 with it.
+
+    The type names come from ESPN's own bundle, and nothing about a 400 says
+    which field was wrong; the first attempt at this sent LINEUP and read the
+    rejection as a malformed body for an hour.
+    """
+    client = _bare_client()
+    sent = {}
+
+    monkeypatch.setattr(
+        client, "get_league", lambda: {"status": {"latestScoringPeriod": 9}}
+    )
+    monkeypatch.setattr(client, "_post", lambda path, body: sent.update(body))
+    client.submit_lineup(
+        [{"espn_player_id": 123, "from_slot_id": 20, "to_slot_id": 6}], week=9
+    )
+    assert sent["type"] == "ROSTER"
+    assert sent["scoringPeriodId"] == 9
+    assert sent["executionType"] == "EXECUTE"
+    assert sent["teamId"] == 9
+    assert sent["items"][0] == {
+        "playerId": 123,
+        "type": "LINEUP",
+        "fromLineupSlotId": 20,
+        "toLineupSlotId": 6,
+        "fromTeamId": 0,
+        "toTeamId": 0,
+        "isKeeper": False,
+        "overallPickNumber": 0,
+    }
+
+
+def test_a_later_period_is_a_future_roster_transaction(monkeypatch):
+    """Setting next week's lineup is legal — it just uses the other type."""
+    client = _bare_client()
+    sent = {}
+    monkeypatch.setattr(
+        client, "get_league", lambda: {"status": {"latestScoringPeriod": 8}}
+    )
+    monkeypatch.setattr(client, "_post", lambda path, body: sent.update(body))
+    client.submit_lineup(
+        [{"espn_player_id": 1, "from_slot_id": 20, "to_slot_id": 4}], week=10
+    )
+    assert sent["type"] == "FUTURE_ROSTER"
+    assert sent["scoringPeriodId"] == 10
+
+
+def test_an_earlier_period_is_booked_against_the_current_one(monkeypatch):
+    """ESPN ignores the week you ask for; mirror that rather than fight it."""
+    client = _bare_client()
+    sent = {}
+    monkeypatch.setattr(
+        client, "get_league", lambda: {"status": {"latestScoringPeriod": 9}}
+    )
+    monkeypatch.setattr(client, "_post", lambda path, body: sent.update(body))
+    client.submit_lineup(
+        [{"espn_player_id": 1, "from_slot_id": 20, "to_slot_id": 4}], week=7
+    )
+    assert sent["type"] == "ROSTER"
+    assert sent["scoringPeriodId"] == 9
+
+
+def test_the_transaction_goes_to_the_write_host(monkeypatch):
+    """The read host answers the same path with 405, so this is not cosmetic."""
+    from nfl_predict import espn_fantasy
+
+    client = _bare_client(espn_s2="s2", swid="{SWID}")
+    seen = {}
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b'{"id": "txn"}'
+
+    def _urlopen(req, timeout=None):
+        seen["url"] = req.full_url
+        seen["headers"] = dict(req.headers)
+        return _Response()
+
+    monkeypatch.setattr(espn_fantasy.urllib.request, "urlopen", _urlopen)
+    client._post("/transactions/", {"type": "ROSTER"})
+    assert seen["url"].startswith("https://lm-api-writes.fantasy.espn.com/")
+    assert seen["url"].endswith(
+        "/seasons/2026/segments/0/leagues/581348581/transactions/"
+    )
+    assert seen["headers"]["X-fantasy-platform"] == "espn-fantasy-web"
+    assert seen["headers"]["X-fantasy-source"] == "kona"
+    assert "SWID" in seen["headers"]["Cookie"]

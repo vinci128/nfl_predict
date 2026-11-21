@@ -186,6 +186,7 @@ def espn_optimal(league: str | None = None, week: int | None = None):
         played = r["actual_points"] is not None
         rec = {
             "player_name": r["player_name"],
+            "espn_player_id": r["espn_player_id"],
             "position": fantasy_position(r["position"]) or r["position"],
             "nfl_team": r["nfl_team"],
             "injury_status": r["injury_status"] or "",
@@ -196,9 +197,22 @@ def espn_optimal(league: str | None = None, week: int | None = None):
             "locked": played,
             "actual_points": r["actual_points"],
         }
+        # A player parked in IR is not a lineup decision. Starting him means
+        # activating him first, which is a transaction and needs a free roster
+        # spot — so proposing it is advice that cannot be taken. Gating on
+        # injury_status alone missed this, because ESPN leaves the real
+        # designation on a player sitting in IR rather than overwriting it with
+        # INJURY_RESERVE: on 2026-10-29 Zach Charbonnet read QUESTIONABLE with
+        # a 10.7 projection from Hell or Highwater's IR slot and was
+        # recommended over a healthy starter, on a roster already full at 16.
+        # Availability here is decided by the slot, not by the status.
         if played:
             locked.append(rec)
-        elif rec["injury_status"] in _CANNOT_PLAY or rec["expected_ppr_points"] is None:
+        elif (
+            rec["current_slot"] == "IR"
+            or rec["injury_status"] in _CANNOT_PLAY
+            or rec["expected_ppr_points"] is None
+        ):
             out.append(rec)
         else:
             pool.append(rec)
@@ -448,3 +462,264 @@ def print_survival_lineup(
             typer.echo(f"    {t['name']:<28} {p:6.2%}{mark}")
     typer.echo("")
     return changes
+
+
+# ---------------------------------------------------------------------------
+# Setting the lineup on ESPN, rather than describing it
+# ---------------------------------------------------------------------------
+
+
+def _expected_points(entry: dict) -> float:
+    """What one raw roster entry is expected to add this week.
+
+    Zero for anyone who cannot play, which is the honest number: an OUT
+    player starting and an empty slot cost the same points. A player whose
+    game has finished is worth what he actually scored, not his projection.
+    """
+    if entry["actual_points"] is not None:
+        return entry["actual_points"]
+    if entry["injury_status"] in _CANNOT_PLAY:
+        return 0.0
+    return entry["projected_points"] or 0.0
+
+
+def plan_lineup_moves(league: str | None = None, week: int | None = None) -> dict:
+    """Work out the moves that would set the best lineup on ESPN.
+
+    Returns the plan without writing anything. ``pairs`` is a list of
+    ``(out, in)`` raw roster entries, ``gain`` is what they are worth over the
+    lineup as it stands, and ``unplaced`` names any starter the optimiser
+    wanted whom no legal move could reach.
+
+    Two rules shape the pairing, and both come from ESPN's roster rules
+    rather than from taste:
+
+    - **A starter is benched only when someone replaces him.** The bench holds
+      a fixed number of players, so vacating a starting slot without filling
+      it overflows the bench and ESPN rejects the whole transaction. It is
+      also pointless — an OUT starter and an empty slot score the same zero.
+      Where two starters should go and only one player should come in, the
+      better of the two stays put.
+    - **The move is expressed as a swap, not an assignment.** Each incoming
+      player takes the exact slot id the outgoing player is leaving, which is
+      also the only form that cannot guess wrong about which of a league's
+      interchangeable slots — the two LB slots, the two DB slots — a player
+      is meant to occupy. It also rules out moving anyone from IR, which is
+      what "eligible for that slot" plus "on the bench" amounts to here.
+
+    Locked players need no special handling: a player whose game has kicked
+    off is a fixed starter in ``espn_optimal``, so he is never an outgoing
+    candidate, and he is never a bench player either, so he is never incoming.
+    """
+    from nfl_predict.espn_fantasy import BENCH_SLOT_ID, IR_SLOT_ID, EspnFantasyClient
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    client = EspnFantasyClient.from_env(profile.key)
+    starters, _bench, _out, _total = espn_optimal(profile.key, week)
+    roster = client.fetch_roster_slots(week)
+    by_id = {e["espn_player_id"]: e for e in roster["entries"]}
+
+    start_ids = {s["espn_player_id"] for s in starters}
+    incoming = [
+        by_id[s["espn_player_id"]]
+        for s in starters
+        if by_id.get(s["espn_player_id"], {}).get("lineup_slot_id") == BENCH_SLOT_ID
+    ]
+    # Least valuable first, so that if one of them has to stay it is the one
+    # who would score the most.
+    outgoing = sorted(
+        (
+            e
+            for e in roster["entries"]
+            if e["lineup_slot_id"] not in (BENCH_SLOT_ID, IR_SLOT_ID)
+            and e["espn_player_id"] not in start_ids
+        ),
+        key=_expected_points,
+    )
+
+    pairs: list[tuple[dict, dict]] = []
+    unplaced: list[dict] = []
+    for inc in sorted(incoming, key=_expected_points, reverse=True):
+        for out_ in outgoing:
+            if out_["lineup_slot_id"] in inc["eligible_slots"]:
+                pairs.append((out_, inc))
+                outgoing.remove(out_)
+                break
+        else:
+            unplaced.append(inc)
+
+    gain = round(
+        sum(_expected_points(inc) for _out, inc in pairs)
+        - sum(_expected_points(out_) for out_, _inc in pairs),
+        2,
+    )
+    return {
+        "league": profile.key,
+        "name": profile.name,
+        "week": roster["week"],
+        "pairs": pairs,
+        "unplaced": unplaced,
+        "gain": gain,
+    }
+
+
+def apply_espn_lineup(
+    league: str | None = None, week: int | None = None, dry_run: bool = False
+) -> dict:
+    """Set the best lineup on ESPN, then check ESPN actually took it.
+
+    Writes only when the plan clears ``MIN_GAIN`` — the same threshold the
+    report uses, for the same reason. A routine that reshuffles a lineup for
+    0.07 projected points several times a Sunday is worse than one that does
+    nothing, because each pass is a transaction you have to read.
+
+    Returns a result dict carrying ``status``: ``already_optimal``,
+    ``not_worth_it``, ``dry_run``, ``rejected``, ``applied`` or
+    ``unverified``.
+    """
+    from nfl_predict.espn_fantasy import (
+        BENCH_SLOT_ID,
+        EspnFantasyClient,
+        EspnFantasyError,
+    )
+    from nfl_predict.leagues import get_profile
+
+    profile = get_profile(league)
+    try:
+        plan = plan_lineup_moves(profile.key, week)
+    except EspnFantasyError as exc:
+        # Nothing to plan from — a missing team id, a league ESPN no longer
+        # serves. Say so rather than "no change needed", which reads as fine.
+        return {
+            "league": profile.key,
+            "name": profile.name,
+            "week": week,
+            "pairs": [],
+            "unplaced": [],
+            "gain": 0.0,
+            "status": "unavailable",
+            "error": str(exc),
+            "transaction": None,
+            "wrong": [],
+        }
+    result = {**plan, "status": "", "error": "", "transaction": None, "wrong": []}
+
+    if not plan["pairs"]:
+        # "Already the best lineup" is a claim about ESPN's roster, not about
+        # ours: when the optimiser wanted someone the moves cannot reach, the
+        # lineup is *not* optimal and saying so would be a lie.
+        result["status"] = "unreachable" if plan["unplaced"] else "already_optimal"
+        return result
+    if plan["gain"] < MIN_GAIN:
+        result["status"] = "not_worth_it"
+        return result
+    if dry_run:
+        result["status"] = "dry_run"
+        return result
+
+    client = EspnFantasyClient.from_env(profile.key)
+    items: list[dict] = []
+    for out_, inc in plan["pairs"]:
+        items.append(
+            {
+                "espn_player_id": inc["espn_player_id"],
+                "from_slot_id": inc["lineup_slot_id"],
+                "to_slot_id": out_["lineup_slot_id"],
+            }
+        )
+        items.append(
+            {
+                "espn_player_id": out_["espn_player_id"],
+                "from_slot_id": out_["lineup_slot_id"],
+                "to_slot_id": BENCH_SLOT_ID,
+            }
+        )
+
+    try:
+        result["transaction"] = client.submit_lineup(items, plan["week"])
+    except EspnFantasyError as exc:
+        result["status"] = "rejected"
+        result["error"] = str(exc)
+        return result
+
+    # A 200 means ESPN accepted a transaction. Only the roster says the lineup
+    # is the one that was asked for, and this client has silently read a
+    # correct-looking roster for the wrong week before.
+    try:
+        after = client.fetch_roster_slots(plan["week"])
+        slots = {e["espn_player_id"]: e["lineup_slot_id"] for e in after["entries"]}
+        names = {e["espn_player_id"]: e["player_name"] for e in after["entries"]}
+        for player_id, expected in _wanted_ids(plan["pairs"]):
+            if slots.get(player_id) != expected:
+                result["wrong"].append(
+                    f"{names.get(player_id, player_id)} is in slot "
+                    f"{slots.get(player_id)}, asked for {expected}"
+                )
+    except EspnFantasyError as exc:
+        result["status"] = "unverified"
+        result["error"] = f"applied, but could not read the lineup back: {exc}"
+        return result
+
+    result["status"] = "unverified" if result["wrong"] else "applied"
+    if result["wrong"]:
+        result["error"] = "ESPN applied a different lineup than asked"
+    return result
+
+
+def _wanted_ids(pairs):
+    """What each player's slot id should read after an applied transaction."""
+    from nfl_predict.espn_fantasy import BENCH_SLOT_ID
+
+    for out_, inc in pairs:
+        yield inc["espn_player_id"], out_["lineup_slot_id"]
+        yield out_["espn_player_id"], BENCH_SLOT_ID
+
+
+def summarise_lineup_write(result: dict) -> str:
+    """Render one league's outcome as the short paragraph a message can carry.
+
+    Every status has to say something on its own, including the ones where
+    nothing happened: "no change needed" and "ESPN refused the change" look
+    identical from the outside if they both go silent.
+    """
+    head = f"{result['name']} — week {result['week']}: "
+    status = result["status"]
+    moves = [
+        f"  {inc['player_name']} in for {out_['player_name']} "
+        f"({out_['lineup_slot_id']})"
+        for out_, inc in result["pairs"]
+    ]
+    detail = "\n".join(moves)
+
+    if status == "applied":
+        return f"{head}lineup set, +{result['gain']:.1f} projected\n{detail}"
+    if status == "dry_run":
+        return (
+            f"{head}would set the lineup, +{result['gain']:.1f} projected "
+            f"(nothing written)\n{detail}"
+        )
+    if status == "already_optimal":
+        return f"{head}already the best lineup ESPN offers — nothing to do"
+    if status == "unreachable":
+        wanted = ", ".join(e["player_name"] for e in result["unplaced"])
+        return (
+            f"{head}no legal move reaches the best lineup — {wanted} should "
+            "start but no starting slot is free to take him"
+        )
+    if status == "not_worth_it":
+        return (
+            f"{head}best change is worth +{result['gain']:.2f}, under the "
+            f"{MIN_GAIN} threshold — left alone"
+        )
+    if status == "rejected":
+        return f"{head}ESPN refused the change — {result['error']}\n{detail}"
+    if status == "unavailable":
+        return f"{head}could not read the roster from ESPN — {result['error']}"
+    if status == "unverified":
+        wrong = "; ".join(result["wrong"]) or result["error"]
+        return (
+            f"{head}ESPN accepted the change but the roster does not match it "
+            f"— {wrong}\n{detail}"
+        )
+    return f"{head}unexpected result: {status}"

@@ -15,7 +15,7 @@ Only live pick sync changes.
 
 Authentication
 --------------
-ESPN's fantasy API is undocumented but stable and read-only here.
+ESPN's fantasy API is undocumented but stable.
 
   - **Public leagues** need no credentials at all.
   - **Private leagues** need the ``espn_s2`` and ``SWID`` cookies from a
@@ -23,8 +23,14 @@ ESPN's fantasy API is undocumented but stable and read-only here.
     fantasy.espn.com). There is no password grant; these cookies *are* the
     credential, and they expire, so expect to refresh them periodically.
 
-The host moved from ``fantasy.espn.com`` to ``lm-api-reads.fantasy.espn.com``
-in 2024; the old host now returns 403 for many leagues.
+Reads and writes live on different hosts. Reads go to
+``lm-api-reads.fantasy.espn.com``; the one write this client makes — a lineup
+change — goes to ``lm-api-writes.fantasy.espn.com``, which serves the same
+paths. Everything else here is a GET and never touches the write host; adding
+a player or making a claim still has no code path.
+
+The read host moved from ``fantasy.espn.com`` in 2024; the old host now
+returns 403 for many leagues.
 
 Player identity
 ---------------
@@ -94,6 +100,12 @@ from typing import Any
 # The pre-2024 host (fantasy.espn.com) now 403s for many leagues.
 _API_BASE = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl"
 
+# The write endpoint is a *different host*, not a different path. ESPN's own
+# web bundle assembles it as `{uri_nextgen_api}/seasons/{season}/segments/0/
+# leagues/{league_id}/transactions/` and POSTs a transaction there; the read
+# host answers the same path with 405.
+_WRITE_API_BASE = "https://lm-api-writes.fantasy.espn.com/apis/v3/games/ffl"
+
 # ESPN sends a browser User-Agent check on some edges; a plain urllib agent
 # is the most common cause of an unexplained 403.
 _USER_AGENT = (
@@ -144,6 +156,12 @@ _LINEUP_SLOTS = {
 # start, including league-specific ones we do not use.
 _BENCH_SLOTS = frozenset({20, 21})
 
+# The two housekeeping slots, named because a lineup change has to say which
+# one a player is leaving. Writing a player *to* 21 is an IR move, which is a
+# separate transaction and needs a roster spot; nothing here ever sends it.
+BENCH_SLOT_ID = 20
+IR_SLOT_ID = 21
+
 # Slots naming exactly one position, so they can identify a player whom the
 # crosswalk misses. The combination slots (RB/WR, FLEX, OP) and the roster
 # housekeeping ones (BE, IR, HC) say nothing about what a player *is*.
@@ -193,10 +211,12 @@ class EspnFantasyError(Exception):
 @dataclass
 class EspnFantasyClient:
     """
-    Thin read-only wrapper around ESPN's private fantasy API.
+    Thin wrapper around ESPN's private fantasy API.
 
     Endpoints and payload shapes are undocumented and may change without
-    notice. Everything here is a GET; nothing writes to ESPN.
+    notice. Reads are GETs against the read host. The single exception is
+    ``submit_lineup``, which POSTs a transaction to the write host — see the
+    module docstring.
     """
 
     league_id: str
@@ -324,6 +344,45 @@ class EspnFantasyClient:
 
         # leagueHistory-style responses come back as a single-element list.
         return payload[0] if isinstance(payload, list) and payload else payload
+
+    def _post(self, path: str, body: dict[str, Any]) -> Any:
+        """
+        POST a JSON body to the write host, as ESPN's own web app does.
+
+        Two headers are load-bearing and neither is guessable: the write host
+        wants ``x-fantasy-platform: espn-fantasy-web`` (not the ``kona-PROD``
+        the read side accepts) and ``x-fantasy-source: kona``. Sent without
+        the right pair it answers a bare ``{"messages": ["Invalid Input."]}``,
+        which reads like a malformed body and is not.
+
+        ``path`` is everything after the league: `/transactions/` today.
+        """
+        url = (
+            f"{_WRITE_API_BASE}/seasons/{self.season}"
+            f"/segments/0/leagues/{self.league_id}{path}"
+        )
+
+        headers = {
+            "User-Agent": _USER_AGENT,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "x-fantasy-source": "kona",
+            "x-fantasy-platform": "espn-fantasy-web",
+        }
+        if self.espn_s2 and self.swid:
+            headers["Cookie"] = f"espn_s2={self.espn_s2}; SWID={self.swid}"
+
+        req = urllib.request.Request(
+            url, data=json.dumps(body).encode(), headers=headers, method="POST"
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                return json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            raise EspnFantasyError(_explain_write_error(e, self)) from e
+        except Exception as e:
+            raise EspnFantasyError(f"ESPN write error ({path}): {e}") from e
 
     # ------------------------------------------------------------------
     # League info
@@ -587,6 +646,101 @@ class EspnFantasyClient:
                 rows.append(row)
 
         return rows
+
+    # ------------------------------------------------------------------
+    # Lineup changes — the only path in this client that writes
+    # ------------------------------------------------------------------
+
+    def fetch_roster_slots(self, week: int | None = None) -> dict:
+        """
+        My roster with ESPN's own numeric slot ids, for planning a write.
+
+        ``fetch_rosters`` deliberately reports slots in *our* vocabulary —
+        ``lineup_slot`` is "RB" or "BE", and its separate CB and S slots both
+        read "DB". A lineup change needs the raw ids and, per player, the list
+        of ids he is eligible for, neither of which survives that
+        normalisation. Nothing is fetched twice: this is the same ``mRoster``
+        call, read at a lower level.
+        """
+        data = self._get(["mRoster", "mTeam"], scoringPeriodId=week)
+        team_id = self.get_my_team_id()
+        effective_week = week if week is not None else data.get("scoringPeriodId")
+
+        entries: list[dict] = []
+        for team in data.get("teams") or []:
+            if str(team.get("id")) != str(team_id):
+                continue
+            for entry in (team.get("roster") or {}).get("entries") or []:
+                player = (entry.get("playerPoolEntry") or {}).get("player") or {}
+                actual = projected = None
+                if effective_week is not None:
+                    actual, projected = _week_points(player, int(effective_week))
+                entries.append(
+                    {
+                        "espn_player_id": entry.get("playerId"),
+                        "player_name": player.get("fullName")
+                        or f"ESPN player {entry.get('playerId')}",
+                        "lineup_slot_id": entry.get("lineupSlotId"),
+                        "eligible_slots": list(player.get("eligibleSlots") or []),
+                        "injury_status": player.get("injuryStatus") or "",
+                        "actual_points": actual,
+                        "projected_points": projected,
+                    }
+                )
+
+        return {"team_id": team_id, "week": effective_week, "entries": entries}
+
+    def submit_lineup(self, items: list[dict], week: int | None = None) -> dict:
+        """
+        Apply lineup moves to ESPN as one atomic transaction.
+
+        ``items`` are ``{"espn_player_id", "from_slot_id", "to_slot_id"}``
+        pairs — one per player, both sides of every swap. ESPN executes the
+        transaction as a whole, so a rejected one leaves the roster exactly as
+        it found it. That is the property the caller leans on: a bad plan
+        costs a 400, never half a lineup.
+
+        The transaction *type* is not "LINEUP". ESPN's own bundle picks
+        "ROSTER" for the current scoring period and "FUTURE_ROSTER", carrying
+        its own period, for a later one; sending either id with the other's
+        type is answered with a generic ``Invalid Input`` that says nothing
+        about which field was wrong. Read from the bundle, not guessed.
+        """
+        latest = ((self.get_league().get("status")) or {}).get("latestScoringPeriod")
+        if week is None:
+            week = latest
+
+        if latest and week and week > latest:
+            txn_type = "FUTURE_ROSTER"
+            period = week
+        else:
+            # ESPN ignores anything earlier than the latest period and books
+            # the change against the latest one.
+            txn_type = "ROSTER"
+            period = latest or week
+
+        body = {
+            "isActingAsTeamOwner": False,
+            "isLeagueManager": False,
+            "scoringPeriodId": period,
+            "teamId": int(self.get_my_team_id()),
+            "type": txn_type,
+            "executionType": "EXECUTE",
+            "items": [
+                {
+                    "playerId": int(it["espn_player_id"]),
+                    "type": "LINEUP",
+                    "fromLineupSlotId": int(it["from_slot_id"]),
+                    "toLineupSlotId": int(it["to_slot_id"]),
+                    "fromTeamId": 0,
+                    "toTeamId": 0,
+                    "isKeeper": False,
+                    "overallPickNumber": 0,
+                }
+                for it in items
+            ],
+        }
+        return self._post("/transactions/", body)
 
     # ------------------------------------------------------------------
     # Weekly scoring
@@ -889,6 +1043,39 @@ def _normalise_swid(swid: str | None) -> str | None:
     if not swid.endswith("}"):
         swid = swid + "}"
     return swid
+
+
+def _explain_write_error(e: urllib.error.HTTPError, client: EspnFantasyClient) -> str:
+    """Say what a rejected write actually means.
+
+    ESPN answers a bad lineup transaction with a generic ``Invalid Input.``
+    and no field name, so the useful work is narrowing it by hand. The three
+    that have actually happened, in the order they are worth checking:
+
+      * 400 on a lineup that looks fine — the transaction type is wrong. A
+        change in the current period is ``ROSTER``; a later one is
+        ``FUTURE_ROSTER`` and carries its own ``scoringPeriodId``. Neither is
+        ``LINEUP``, which the items are called.
+      * 400 with the type right — somebody in the plan has already kicked off,
+        or a player is being moved into a slot he is not eligible for.
+      * 409 — the period asked for does not exist yet, or has none left.
+    """
+    detail = ""
+    try:
+        payload = json.loads(e.read())
+        messages = payload.get("messages") or []
+        detail = "; ".join(str(m) for m in messages)
+        if not detail:
+            detail = "; ".join(
+                str(d.get("message") or d.get("shortMessage") or "")
+                for d in payload.get("details") or []
+            )
+    except Exception:  # noqa: BLE001 — an unreadable body is not the message
+        detail = ""
+
+    if detail:
+        return f"ESPN rejected the lineup change: {detail} (HTTP {e.code})"
+    return f"ESPN rejected the lineup change with HTTP {e.code}."
 
 
 def _explain_http_error(e: urllib.error.HTTPError, client: EspnFantasyClient) -> str:

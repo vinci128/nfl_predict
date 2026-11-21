@@ -258,6 +258,13 @@ class LeagueProfile:
     # from fitting the same model twice. Checked at import by
     # _validate_shared_artifacts.
     shares_artifacts_with: str | None = None
+    # Last place each week is knocked out, so the season is survival rather
+    # than points. Everything under `survival.py` — elimination state, the
+    # last-place simulation, `espn-lineup --survive` — only means anything
+    # here. In a normal league `elimination_state` does not fail, it just
+    # reports nobody out, which reads as reassurance rather than as "this
+    # question does not apply"; gate on this instead of on an exception.
+    elimination: bool = False
     # How deep to go at each position by the end of the draft. Sums to the
     # roster size, so a draft that hits every target fills the roster exactly.
     roster_targets: Mapping[str, int] = field(default_factory=dict)
@@ -680,6 +687,7 @@ ROYAL_RUMBLE = LeagueProfile(
     },
     espn_league_id="1546288813",
     espn_team_id="12",
+    elimination=True,
     # 14 roster spots: 2+4+4+2+1+1.
     roster_targets={"QB": 2, "RB": 4, "WR": 4, "TE": 2, "DST": 1, "K": 1},
     # ESPN's own per-position maximums.

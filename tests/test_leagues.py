@@ -533,3 +533,22 @@ class TestRoyalRumbleScoring:
         assert self.profile.shares_artifacts_with is None
         assert self.profile.features_path != PROFILES["hoh"].features_path
         assert self.profile.model_dir != PROFILES["hoh"].model_dir
+
+
+class TestEliminationFlag:
+    """Only one league knocks last place out, and the survival code is gated on it.
+
+    `survival.elimination_state()` does not raise for a normal league — it
+    reports nobody eliminated, which reads as reassurance rather than as a
+    question that does not apply. So callers have to ask the profile, and
+    the Tuesday waiver check does.
+    """
+
+    def test_only_royal_rumble_eliminates(self) -> None:
+        assert PROFILES["rumble"].elimination is True
+        assert PROFILES["ludopathy"].elimination is False
+        assert PROFILES["hoh"].elimination is False
+
+    def test_a_league_is_not_an_elimination_league_by_default(self) -> None:
+        """The flag has to be opted into, so a new profile cannot inherit it."""
+        assert [p.key for p in PROFILES.values() if p.elimination] == ["rumble"]
