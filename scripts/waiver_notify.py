@@ -13,7 +13,7 @@ one keystroke away and posting your own waiver targets into one hands nine
 rivals your homework.
 
 Usage:
-    waiver_notify.py [--league rumble] [--to <jid|self>] [--dry-run]
+    waiver_notify.py [--league ludopathy] [--to <jid|self>] [--dry-run]
 """
 
 from __future__ import annotations
@@ -76,21 +76,22 @@ def build_message(league: str, week: int | None = None) -> str:
 
     lines = [f"*{profile.name}* — waivers for week {week}", ""]
 
-    try:
-        st = elimination_state(league)
-        if st["n_eliminated"]:
-            gone = ", ".join(
-                st["names"][t]
-                for t in sorted(st["eliminated"], key=lambda x: st["eliminated"][x])
-            )
-            lines.append(f"Eliminated so far: {gone}")
-        danger = [st["names"][t] for t, v in st["status"].items() if v == "DANGER"]
-        if danger:
-            lines.append(f"In danger: {', '.join(danger)}")
-        lines.append("")
-    except Exception:
-        # An elimination read failing must not cost you the waiver tips.
-        pass
+    if profile.elimination:
+        try:
+            st = elimination_state(league)
+            if st["n_eliminated"]:
+                gone = ", ".join(
+                    st["names"][t]
+                    for t in sorted(st["eliminated"], key=lambda x: st["eliminated"][x])
+                )
+                lines.append(f"Eliminated so far: {gone}")
+            danger = [st["names"][t] for t, v in st["status"].items() if v == "DANGER"]
+            if danger:
+                lines.append(f"In danger: {', '.join(danger)}")
+            lines.append("")
+        except Exception:
+            # An elimination read failing must not cost you the waiver tips.
+            pass
 
     ups, _, pool = waiver_candidates(league=league, week=week)
     if ups:
@@ -104,20 +105,23 @@ def build_message(league: str, week: int | None = None) -> str:
         lines.append("Nothing on the wire beats what you have.")
     lines.append("")
 
-    try:
-        board = league_teams(league)
-        probs = simulate_last_place(board)
-        mine = next((t for t in board if board[t]["is_mine"]), None)
-        if mine:
-            rank = sorted(probs.values(), reverse=True).index(probs[mine]) + 1
-            lines.append(
-                f"Risk of going out: *{probs[mine]:.1%}* "
-                f"({rank}th most exposed of {len(probs)})"
-            )
-            worst = max(probs, key=lambda t: probs[t])
-            lines.append(f"Likeliest out: {board[worst]['name']} {probs[worst]:.1%}")
-    except Exception:
-        pass
+    if profile.elimination:
+        try:
+            board = league_teams(league)
+            probs = simulate_last_place(board)
+            mine = next((t for t in board if board[t]["is_mine"]), None)
+            if mine:
+                rank = sorted(probs.values(), reverse=True).index(probs[mine]) + 1
+                lines.append(
+                    f"Risk of going out: *{probs[mine]:.1%}* "
+                    f"({rank}th most exposed of {len(probs)})"
+                )
+                worst = max(probs, key=lambda t: probs[t])
+                lines.append(
+                    f"Likeliest out: {board[worst]['name']} {probs[worst]:.1%}"
+                )
+        except Exception:
+            pass
 
     lines.append("")
     lines.append("_Claims are not automatic — make them in the ESPN app._")
@@ -126,7 +130,7 @@ def build_message(league: str, week: int | None = None) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--league", default="rumble")
+    ap.add_argument("--league", default="ludopathy")
     ap.add_argument("--to", default="self", help='jid, or "self" for your own chat')
     ap.add_argument("--week", type=int, default=None, help="override the week")
     ap.add_argument("--dry-run", action="store_true", help="print, do not send")

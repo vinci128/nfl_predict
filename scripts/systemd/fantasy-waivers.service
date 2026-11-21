@@ -1,5 +1,10 @@
 [Unit]
-Description=Fantasy football waiver + survival check (Royal Rumble)
+Description=Fantasy football waiver check (Ludopathy Bowl, Hell or Highwater)
+# Persistent=true fires this the instant a sleeping machine wakes, which is
+# routinely before the network is up. Without this the first ESPN call fails
+# and the check reports an outage as an expired cookie.
+After=network-online.target
+Wants=network-online.target
 Documentation=file:///home/vinci/nfl_predict/scripts/waiver_check.sh
 
 [Service]

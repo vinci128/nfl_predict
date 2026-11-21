@@ -1,0 +1,14 @@
+[Unit]
+Description=Fantasy football lineup check (sets the lineups on ESPN)
+# This one writes to ESPN, so a network that is not up yet is a failure to
+# act, not just a report that cannot be produced.
+After=network-online.target
+Wants=network-online.target
+Documentation=file:///home/vinci/nfl_predict/scripts/lineup_check.sh
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/vinci/nfl_predict
+ExecStart=/home/vinci/nfl_predict/scripts/lineup_check.sh
+# The script shells out to uv, which systemd's minimal PATH does not have.
+Environment=PATH=/home/vinci/.local/bin:/home/vinci/.cargo/bin:/usr/local/bin:/usr/bin:/bin

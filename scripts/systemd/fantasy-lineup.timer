@@ -1,0 +1,23 @@
+[Unit]
+Description=Sunday fantasy lineup check (twice, before the 19:00 CET slate)
+
+[Timer]
+# Twice on Sunday, local time, so it tracks Europe/Rome DST. The NFL's 13:00
+# ET slate is 19:00 CET, and both runs sit before it:
+#
+#   11:00  catches Saturday's news and sets a lineup even on a morning you
+#          slept through.
+#   18:00  an hour before kickoff, when the inactive lists land. This is the
+#          run that matters for a player whose status changed overnight.
+#
+# The 9:30 ET London game is 15:30 CET and falls between them — it is not
+# covered. Set that week's lineup the night before.
+OnCalendar=Sun *-*-* 11:00:00
+OnCalendar=Sun *-*-* 18:00:00
+# A machine that was asleep at 11:00 still runs it when it wakes. Late is
+# survivable: a player whose game has kicked off is locked, and the check
+# only ever moves players who are still free to move.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
