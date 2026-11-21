@@ -918,6 +918,46 @@ class EspnFantasyClient:
             return self.get_my_team_id()
         return None
 
+    def my_team_state(self) -> dict:
+        """Is our team still playing in this league?
+
+        A survival league knocks the last-place team out each week, and ESPN
+        then does two things that read as a broken client if you do not expect
+        them: it flags the team ``eliminated``/``isActive: false``, and it
+        **empties its roster** — measured on Royal Rumble 2026-11-21, the
+        eliminated team returned 0 roster entries while every live team returned
+        its full roster. So a caller that only reads rosters sees "no team
+        flagged as yours" and is tempted to blame the team id, when the real
+        answer is that the season is over for that team.
+
+        Returns ``{found, name, eliminated, active}``. ``found`` is False when
+        the team id cannot be resolved at all, which *is* a configuration
+        problem and a different answer.
+        """
+        team_id = self._my_team_id_or_none()
+        if not team_id:
+            return {"found": False, "name": "", "eliminated": False, "active": False}
+
+        league = self.get_league()
+        team = next(
+            (t for t in league.get("teams") or [] if str(t.get("id")) == str(team_id)),
+            None,
+        )
+        if team is None:
+            return {"found": False, "name": "", "eliminated": False, "active": False}
+
+        # ESPN has used both flags across seasons; either one means the season
+        # is done for this team. `isActive` defaults to True when absent, so an
+        # older response cannot be misread as eliminated.
+        eliminated = bool(team.get("eliminated"))
+        active = bool(team.get("isActive", True))
+        return {
+            "found": True,
+            "name": team.get("name") or "",
+            "eliminated": eliminated or not active,
+            "active": active,
+        }
+
 
 # ---------------------------------------------------------------------------
 # Helpers

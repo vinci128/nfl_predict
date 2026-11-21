@@ -253,6 +253,7 @@ def espn_lineup_cmd(
     """
     from nfl_predict.leagues import league_keys
     from nfl_predict.lineup import (
+        EliminatedTeamError,
         apply_espn_lineup,
         print_espn_lineup,
         print_survival_lineup,
@@ -273,7 +274,15 @@ def espn_lineup_cmd(
             print_survival_lineup(league=key, week=week)
             continue
 
-        print_espn_lineup(league=key, week=week)
+        # One league being out of season for us is not a reason to lose the
+        # report for the others: `--all` is the Sunday path, and a survival
+        # league stops applying the week we are knocked out while the rest
+        # keep playing. Say it in one line and carry on.
+        try:
+            print_espn_lineup(league=key, week=week)
+        except EliminatedTeamError as exc:
+            typer.echo(f"\n{exc} — no lineup to set for that league.\n")
+            continue
         if not apply_changes:
             continue
 

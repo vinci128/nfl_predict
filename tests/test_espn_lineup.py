@@ -711,3 +711,124 @@ def test_the_transaction_goes_to_the_write_host(monkeypatch):
     assert seen["headers"]["X-fantasy-platform"] == "espn-fantasy-web"
     assert seen["headers"]["X-fantasy-source"] == "kona"
     assert "SWID" in seen["headers"]["Cookie"]
+
+
+# ---------------------------------------------------------------------------
+# A team knocked out of a survival league is not a misconfigured client
+# ---------------------------------------------------------------------------
+
+
+class _EliminatedClient(_FakeClient):
+    """An eliminated team: ESPN reports no roster and flags the season over."""
+
+    def __init__(self):
+        super().__init__([])
+
+    def my_team_state(self):
+        return {
+            "found": True,
+            "name": "Peschici Malangators",
+            "eliminated": True,
+            "active": False,
+        }
+
+
+class _LiveClient(_FakeClient):
+    """A team that is simply not in the roster rows handed back."""
+
+    def __init__(self, rows):
+        super().__init__(rows)
+
+    def my_team_state(self):
+        return {
+            "found": True,
+            "name": "Foggia Fuggianidd",
+            "eliminated": False,
+            "active": True,
+        }
+
+
+def test_an_eliminated_team_is_reported_as_eliminated(monkeypatch):
+    """A survival league empties the roster of the team it knocks out.
+
+    Measured on Royal Rumble 2026-11-21: the eliminated team returned 0 roster
+    entries while every live team returned its full roster, so "no team flagged
+    as yours" reads identically to a wrong ESPN_TEAM_ID. Saying so sends you
+    hunting for a configuration problem that does not exist.
+    """
+    from nfl_predict import espn_fantasy, lineup
+
+    monkeypatch.setattr(
+        espn_fantasy.EspnFantasyClient,
+        "from_env",
+        staticmethod(lambda league=None: _EliminatedClient()),
+    )
+
+    with pytest.raises(lineup.EliminatedTeamError) as caught:
+        lineup.espn_optimal("rumble", week=11)
+
+    assert "Royal Rumble" in str(caught.value)
+    assert "Peschici Malangators" in str(caught.value)
+
+
+def test_a_missing_team_is_still_a_configuration_error(monkeypatch):
+    """The opposite diagnosis must survive: an unresolvable team id is a bug.
+
+    An eliminated team and a wrong team id produce the same empty roster, so
+    the fix has to separate them — otherwise the eliminated case would swallow
+    the real misconfiguration and hide it.
+    """
+    from nfl_predict import espn_fantasy, lineup
+
+    class _NoRowsClient(_FakeClient):
+        def __init__(self):
+            super().__init__([])
+
+        def my_team_state(self):
+            return {"found": False, "name": "", "eliminated": False, "active": False}
+
+    monkeypatch.setattr(
+        espn_fantasy.EspnFantasyClient,
+        "from_env",
+        staticmethod(lambda league=None: _NoRowsClient()),
+    )
+
+    with pytest.raises(RuntimeError) as caught:
+        lineup.espn_optimal("hoh", week=11)
+
+    assert "ESPN_TEAM_ID" in str(caught.value)
+    assert not isinstance(caught.value, lineup.EliminatedTeamError)
+
+
+def test_my_team_state_reads_eliminated_and_active_flags(monkeypatch):
+    """Both flags ESPN has used mean the same thing; absent means still playing.
+
+    `isActive` is missing on older responses, and reading that as "eliminated"
+    would silently kill a live league's report.
+    """
+    from nfl_predict import espn_fantasy
+
+    client = espn_fantasy.EspnFantasyClient.__new__(espn_fantasy.EspnFantasyClient)
+    client.team_id = "12"
+
+    monkeypatch.setattr(
+        type(client), "_my_team_id_or_none", lambda self: "12", raising=True
+    )
+
+    for flags, expected in (
+        ({"eliminated": True, "isActive": False}, True),
+        ({"eliminated": False, "isActive": False}, True),
+        ({"eliminated": True, "isActive": True}, True),
+        ({"eliminated": False, "isActive": True}, False),
+        ({}, False),  # older response: no flags at all
+    ):
+        monkeypatch.setattr(
+            type(client),
+            "get_league",
+            lambda self, _f=flags: {
+                "teams": [{"id": 12, "name": "Peschici Malangators", **_f}]
+            },
+        )
+        state = client.my_team_state()
+        assert state["eliminated"] is expected, flags
+        assert state["found"] is True

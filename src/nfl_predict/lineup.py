@@ -147,6 +147,22 @@ def suggest(
 _CANNOT_PLAY = {"OUT", "DOUBTFUL", "INJURY_RESERVE", "SUSPENSION", "NOT_ACTIVE"}
 
 
+class EliminatedTeamError(Exception):
+    """Our team is out of a survival league, so there is no lineup to set.
+
+    Not a failure to report as an error: the season is over for this team and
+    nothing is wrong with the client or its configuration. It is its own
+    exception so a caller can say that plainly instead of surfacing a
+    traceback, which is what a report about a *live* league would deserve.
+    """
+
+    def __init__(self, league_name: str, team_name: str = "") -> None:
+        self.league_name = league_name
+        self.team_name = team_name
+        who = team_name or "our team"
+        super().__init__(f"{who} has been eliminated from {league_name}")
+
+
 def espn_optimal(league: str | None = None, week: int | None = None):
     """Best startable lineup for one league, ranked on ESPN's projections.
 
@@ -171,9 +187,25 @@ def espn_optimal(league: str | None = None, week: int | None = None):
     from nfl_predict.weekly_api import _lineup_slots
 
     profile = get_profile(league)
-    rows = EspnFantasyClient.from_env(profile.key).fetch_rosters(week=week)
+    client = EspnFantasyClient.from_env(profile.key)
+    rows = client.fetch_rosters(week=week)
     mine = [r for r in rows if r["is_mine"]]
     if not mine:
+        # An eliminated team is not a misconfigured client. ESPN empties the
+        # roster of a team knocked out of a survival league, so "no team
+        # flagged as yours" is the same symptom as a wrong team id and the
+        # opposite diagnosis. Measured on Royal Rumble 2026-11-21: the team
+        # read eliminated with 0 roster entries while the league was live at
+        # period 11 — the old code reported it as a finished season, and a
+        # naive fix would send you hunting for ESPN_TEAM_ID.
+        #
+        # `getattr` because asking the team's season state is an extra call a
+        # stub client may not implement, and a client that cannot answer must
+        # fall back to the plain message rather than turn its own gap into an
+        # AttributeError on the reporter's path.
+        state = getattr(client, "my_team_state", lambda: {"found": False})()
+        if state.get("found") and state.get("eliminated"):
+            raise EliminatedTeamError(profile.name, str(state.get("name") or ""))
         raise RuntimeError(
             f"No team flagged as yours in {profile.name} — check ESPN_TEAM_ID."
         )
