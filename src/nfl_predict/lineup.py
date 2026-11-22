@@ -215,7 +215,22 @@ def espn_optimal(league: str | None = None, week: int | None = None):
         # Once a player's game has kicked off ESPN reports a real score, and
         # the slot he is in cannot be changed. He is part of the week now,
         # at what he actually scored — not at what he was projected to.
+        #
+        # "Reported a score" is NOT the same as "is locked", and conflating the
+        # two hides the most expensive mistake on the page. A player who is OUT
+        # has a finished game and a real 0.0, so `actual_points is not None`
+        # calls him locked and spends his slot — no substitute is ever proposed
+        # for a hole that is still open. Measured on Ludopathy 2026-11-22:
+        # Woody Marks (OUT, 0.0, game final) held RB2 through both Sunday runs
+        # while Kimani Vidal (ACTIVE, 6.1) sat on the bench; `--apply` reported
+        # "already optimal" and did nothing, indefinitely, because the bench
+        # candidate was never compared. A zero that came from not playing is a
+        # hole, not a result.
         played = r["actual_points"] is not None
+        cannot_play = (r["injury_status"] or "") in _CANNOT_PLAY or r[
+            "lineup_slot"
+        ] == "IR"
+        locked_player = played and not cannot_play
         rec = {
             "player_name": r["player_name"],
             "espn_player_id": r["espn_player_id"],
@@ -224,10 +239,15 @@ def espn_optimal(league: str | None = None, week: int | None = None):
             "injury_status": r["injury_status"] or "",
             "current_slot": r["lineup_slot"],
             "expected_ppr_points": (
-                r["actual_points"] if played else r["projected_points"]
+                r["actual_points"] if locked_player else r["projected_points"]
             ),
-            "locked": played,
+            "locked": locked_player,
             "actual_points": r["actual_points"],
+            # Kept so the report can say why a starter scores zero, and so a
+            # "hole" (OUT in a starting slot) is distinguishable from a player
+            # who genuinely scored nothing.
+            "cannot_play": cannot_play,
+            "already_scored_zero": played and cannot_play,
         }
         # A player parked in IR is not a lineup decision. Starting him means
         # activating him first, which is a transaction and needs a free roster
@@ -238,7 +258,7 @@ def espn_optimal(league: str | None = None, week: int | None = None):
         # a 10.7 projection from Hell or Highwater's IR slot and was
         # recommended over a healthy starter, on a roster already full at 16.
         # Availability here is decided by the slot, not by the status.
-        if played:
+        if locked_player:
             locked.append(rec)
         elif (
             rec["current_slot"] == "IR"

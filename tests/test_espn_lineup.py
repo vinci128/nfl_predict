@@ -574,6 +574,59 @@ def test_expected_points_is_zero_for_a_player_who_cannot_play():
     assert lineup._expected_points(entry) == 0.0
 
 
+def test_an_out_starter_who_already_scored_zero_is_a_hole_not_a_result(monkeypatch):
+    """ESPN reports 0.0 for an OUT player whose game has finished.
+
+    `actual_points is not None` read that as "locked", spent the slot, and
+    never compared the bench — so `--apply` called the lineup optimal and left
+    the hole open forever. Measured on Ludopathy 2026-11-22: Woody Marks (OUT,
+    0.0, final) held RB2 through both Sunday runs while Kimani Vidal (ACTIVE,
+    6.1) sat unused. A zero that came from not playing is a hole, and the
+    optimiser has to fill it.
+    """
+    rows = [
+        _player("RB1", "RB", "RB", 19.2),
+        _player("Marks", "RB", "RB", 0.0, injury="OUT", actual=0.0),
+        _player("Vidal", "RB", "BE", 6.1),
+    ]
+    _install(monkeypatch, rows)
+
+    starters, bench, out, total = lineup.espn_optimal("hoh")
+
+    names = [s["player_name"] for s in starters]
+    assert "Vidal" in names, "the bench candidate must take the open slot"
+    assert "Marks" not in names, "an OUT starter who scored nothing is not a starter"
+    assert total == pytest.approx(19.2 + 6.1, abs=0.05)
+
+
+def test_a_healthy_starter_who_scored_zero_is_still_locked(monkeypatch):
+    """The fix must not re-open the slot of someone who genuinely played.
+
+    An ACTIVE player on a real 0.0 (a dud game) cannot be substituted — his
+    game has kicked off and ESPN will refuse the transaction with a 409. Only
+    the OUT path is a hole. HOH starts two RBs plus a FLEX that takes an RB,
+    so three RB-eligibles can start at once: this asserts the played starters
+    keep their slots and are not offered up, which is the property that
+    matters. That Vidal may still fill a genuinely open slot is correct.
+    """
+    rows = [
+        _player("RB1", "RB", "RB", 11.0, actual=0.0),
+        _player("RB2", "RB", "RB", 8.0, actual=0.0),
+        _player("Vidal", "RB", "BE", 6.1),
+    ]
+    _install(monkeypatch, rows)
+
+    starters, _bench, _out, _total = lineup.espn_optimal("hoh")
+    by_name = {s["player_name"]: s for s in starters}
+
+    assert by_name["RB1"]["slot"] == "RB", "a player who played keeps his slot"
+    assert by_name["RB2"]["slot"] == "RB", "and so does the second one"
+    assert by_name["RB1"]["locked"] is True
+    assert by_name["RB2"]["locked"] is True
+    # Vidal only ever fills the FLEX, never displaces a played starter.
+    assert by_name["Vidal"]["slot"] == "FLEX"
+
+
 def test_expected_points_is_what_he_scored_once_he_has():
     entry = {"injury_status": "ACTIVE", "actual_points": 14.5, "projected_points": 9.0}
     assert lineup._expected_points(entry) == 14.5

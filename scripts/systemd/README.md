@@ -5,7 +5,15 @@ Two systemd user timers, both on this machine:
 | when | script | what it does |
 |---|---|---|
 | Tue 09:00 | `waiver_check.sh` | waiver wire + best lineup, **reported** |
+| Wed 10:00 and Thu 20:30 | `lineup_check.sh` | best lineup, **set on ESPN** |
 | Sun 11:00 and 18:00 | `lineup_check.sh` | best lineup, **set on ESPN** |
+
+The Wednesday/Thursday runs matter because the Sunday ones are late for a
+player who was ruled OUT earlier in the week: by Sunday his slot may already
+be locked, so the hole cannot be filled. Wednesday is when the NFL injury
+report lands and the week's designations become visible; Thursday 20:30 is
+about an hour before the Thursday-night kickoff, the one slate that locks
+before Sunday.
 
 The first is described in full below; the Sunday one follows it.
 

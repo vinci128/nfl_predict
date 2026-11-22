@@ -1,0 +1,24 @@
+[Unit]
+Description=Midweek fantasy lineup check (Wednesday, and Thursday before the first kickoff)
+
+[Timer]
+# The Sunday runs catch the inactive lists, but by then a starter who was
+# already ruled OUT has been sitting in the lineup all week and the only
+# substitute is someone still free to move. Wednesday is when the NFL injury
+# report lands and the week's OUT designations become visible, so this is the
+# run that replaces them while every option is still on the table.
+#
+#   10:00 Wed  after the injury report, with the whole week still ahead.
+#   20:30 Thu  ~1h before the Thursday-night game, the one slate that locks
+#              before Sunday. A Thursday starter ruled out is otherwise a
+#              hole nobody can fix: the Sunday runs are too late for him.
+#
+# Local time, so it tracks Europe/Rome DST. Missed runs fire on wake
+# (Persistent=true) and a late run is still worth having — the check only
+# ever moves players whose games have not started.
+OnCalendar=Wed *-*-* 10:00:00
+OnCalendar=Thu *-*-* 20:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
