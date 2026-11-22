@@ -1,21 +1,25 @@
 # Scheduled fantasy jobs
 
-Two systemd user timers, both on this machine:
+Three systemd user timers, all on this machine:
 
 | when | script | what it does |
 |---|---|---|
 | Tue 09:00 | `waiver_check.sh` | waiver wire + best lineup, **reported** |
 | Wed 10:00 and Thu 20:30 | `lineup_check.sh` | best lineup, **set on ESPN** |
-| Sun 11:00 and 18:00 | `lineup_check.sh` | best lineup, **set on ESPN** |
+| Sat 22:00, Sun 11:00 and 18:00 | `lineup_check.sh` | best lineup, **set on ESPN** |
 
-The Wednesday/Thursday runs matter because the Sunday ones are late for a
-player who was ruled OUT earlier in the week: by Sunday his slot may already
-be locked, so the hole cannot be filled. Wednesday is when the NFL injury
-report lands and the week's designations become visible; Thursday 20:30 is
-about an hour before the Thursday-night kickoff, the one slate that locks
-before Sunday.
+The midweek and Saturday-night runs exist because the Sunday ones are late for
+a player ruled out before them: by the time they fire his slot may already be
+locked and the hole cannot be filled.
 
-The first is described in full below; the Sunday one follows it.
+- **Wed 10:00** is when the NFL injury report lands, so the week's
+  designations are replaced while every substitute is still free to move.
+- **Thu 20:30** is ~1h before the Thursday-night kickoff, the one slate that
+  locks before Sunday.
+- **Sat 22:00** is what covers the 9:30 ET London game (15:30 CET), which
+  otherwise falls in a dead zone between the Sunday runs.
+
+The Tuesday check is described in full below; the lineup ones follow it.
 
 ---
 
@@ -118,31 +122,39 @@ The lineup is the exception, as of the Sunday check below: `espn-lineup
 
 ---
 
-# Sunday lineup check
+# Lineup check (Sat night, Sunday, and midweek)
 
-Runs `scripts/lineup_check.sh` twice on Sunday — 11:00 and 18:00 local — and
-**sets** each live league's lineup on ESPN: one report per league in
-`outputs/lineups/`, one JSON result per league the notifier reads, a desktop
-notification, and a WhatsApp message to yourself.
+Runs `scripts/lineup_check.sh` and **sets** each live league's lineup on ESPN:
+one report per league in `outputs/lineups/`, one JSON result per league the
+notifier reads, a desktop notification, and a WhatsApp message to yourself.
+
+Two timers, both calling the same script:
 
 ```bash
 cp scripts/systemd/fantasy-lineup.{service,timer} ~/.config/systemd/user/
+cp scripts/systemd/fantasy-lineup-midweek.{service,timer} ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now fantasy-lineup.timer
-systemctl --user list-timers fantasy-lineup.timer
+systemctl --user enable --now fantasy-lineup.timer fantasy-lineup-midweek.timer
+systemctl --user list-timers 'fantasy*'
 ```
 
-## Why two runs, and why those hours
+## Why three runs, and why those hours
 
-The NFL's 13:00 ET slate is 19:00 CET. Both runs sit before it:
+The Sunday has two start times that matter: the 9:30 ET London game is 15:30
+CET, and the 13:00 ET main slate is 19:00 CET.
 
-- **11:00** catches Saturday's news and sets a lineup even on a morning you
-  slept through.
-- **18:00** is an hour before kickoff, which is when the inactive lists land.
-  That is the run that matters for a player whose status changed overnight.
+- **Sat 22:00** — after Saturday practice reports, the night before. This is
+  the run that covers **London**: by 15:30 Sunday a player ruled out overnight
+  is already locked, so only a run before Sunday morning can still move him.
+- **Sun 11:00** — catches overnight news and sets a lineup even on a morning
+  you slept through.
+- **Sun 18:00** — an hour before the main slate, when the final inactive lists
+  land. This is the run that matters for a player whose status changed that
+  morning.
 
-The occasional 9:30 ET London game is 15:30 CET and falls *between* them — it
-is not covered. Set that week's lineup the night before.
+Earlier versions ran only at 11:00 and 18:00 and left the London game in a dead
+zone: a starter ruled out between them was unfixable, and the 18:00 run could
+only report it, not fill it.
 
 `Persistent=true` means a machine asleep at 11:00 runs it on waking. Lateness
 is survivable by design: a player whose game has kicked off is a locked

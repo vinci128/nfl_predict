@@ -9,13 +9,23 @@ on:
 jobs:
   test:
     name: Lint & Test (Python 3.12)
-    runs-on: ubuntu-latest
+    # Pinned, not `ubuntu-latest`. The image decides which Pythons exist and
+    # which one uv picks, and this job spent eleven weeks red because of
+    # exactly that: `ubuntu-latest` moved to 26.04 with 3.14, uv resolved a
+    # project declaring only `>=3.12` to it, catboost 1.2.8 has no cp314 wheel,
+    # and its sdist cannot build on modern setuptools. The runner is named
+    # here so a change to the toolchain is a decision in a diff rather than
+    # something that drifts in under the job.
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      # These three are on the Node 20 deprecation path: the runtime comes from
+      # the action, and the old majors pin a Node GitHub is retiring. `@v7`,
+      # `@v10` and `@v6` are the current major tags.
+      - uses: actions/checkout@v7
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v10
         with:
           version: "latest"
           enable-cache: true          # cache .venv between runs on same branch
@@ -38,7 +48,7 @@ jobs:
       # Hook environments are cloned and built on first use; cache them or
       # every run pays ~40s rebuilding the same pinned repos.
       - name: Cache pre-commit environments
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}

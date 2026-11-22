@@ -1,22 +1,36 @@
 [Unit]
-Description=Sunday fantasy lineup check (twice, before the 19:00 CET slate)
+Description=Sunday fantasy lineup check (three times, before and around the 15:30 and 19:00 CET slates)
 
 [Timer]
-# Twice on Sunday, local time, so it tracks Europe/Rome DST. The NFL's 13:00
-# ET slate is 19:00 CET, and both runs sit before it:
+# Three runs on Sunday, local time, so it tracks Europe/Rome DST. The NFL
+# Sunday has two start times that matter here:
 #
-#   11:00  catches Saturday's news and sets a lineup even on a morning you
-#          slept through.
-#   18:00  an hour before kickoff, when the inactive lists land. This is the
-#          run that matters for a player whose status changed overnight.
+#   9:30 ET = 15:30 CET   the London game
+#  13:00 ET = 19:00 CET   the main slate
 #
-# The 9:30 ET London game is 15:30 CET and falls between them — it is not
-# covered. Set that week's lineup the night before.
+# and the runs are placed so that none of them is the first to notice a
+# problem that already locked:
+#
+#   Sat 22:00  the night before, after Saturday practice reports. This is what
+#              covers the London game: by the time the ball is kicked at 15:30
+#              a player ruled out overnight is already locked, so the only run
+#              that can still fix him is one before Sunday morning.
+#   Sun 11:00  catches overnight news and sets a lineup even on a morning you
+#              slept through.
+#   Sun 18:00  an hour before the main slate, when the final inactive lists
+#              land. This is the run that matters for a player whose status
+#              changed that morning.
+#
+# The gap this replaces: with only 11:00 and 18:00, a player ruled out between
+# them was unfixable — his London game had locked at 15:30 and the 18:00 run
+# could only report it, not move him. Saturday night is the run that has a
+# substitute still free to move.
+OnCalendar=Sat *-*-* 22:00:00
 OnCalendar=Sun *-*-* 11:00:00
 OnCalendar=Sun *-*-* 18:00:00
-# A machine that was asleep at 11:00 still runs it when it wakes. Late is
-# survivable: a player whose game has kicked off is locked, and the check
-# only ever moves players who are still free to move.
+# A machine that was asleep still runs the timer when it wakes. Late is
+# survivable: a player whose game has kicked off is locked, and the check only
+# ever moves players who are still free to move.
 Persistent=true
 
 [Install]
