@@ -506,6 +506,55 @@ def test_a_change_inside_the_noise_is_not_written(monkeypatch):
     assert client.submitted is None
 
 
+def test_an_out_starter_is_replaced_even_when_the_gain_is_small(monkeypatch):
+    """A hole is filled on its own merits, not on the size of the swap.
+
+    An OUT starter is not a small move: it is a slot scoring nothing, and the
+    replacement's value is whatever happens to be on the bench. Gating it on
+    MIN_GAIN would leave him in whenever the bench is thin — the exact case
+    where a `--apply` routine is worth having at all.
+    """
+    rows = _hoh_roster()
+    # The RB who would otherwise start cannot play, and the only backup
+    # projects 0.2 — under MIN_GAIN, but a hole either way.
+    rows[1] = _player("RB1", "RB", "RB", 0.0, injury="OUT")
+    rows.append(_player("RB3", "RB", "BE", 0.2))
+    client = _install_writer(monkeypatch, rows)
+
+    result = lineup.apply_espn_lineup(league="hoh")
+
+    assert result["status"] == "applied", result
+    assert client.submitted is not None, "the hole must be filled automatically"
+    moved = {i["espn_player_id"] for i in client.submitted["items"]}
+    assert _espn_id("RB3") in moved
+    assert _espn_id("RB1") in moved
+
+
+def test_an_urgent_swap_does_not_smuggle_a_nudge_through(monkeypatch):
+    """One urgent pair must not carry a cosmetic one into ESPN with it.
+
+    The transaction is atomic, so gating on the plan total let a 6-point hole
+    drag a 0.2-point nudge along — the sum cleared MIN_GAIN and both were
+    written. The urgent move is kept, the nudge is not.
+
+    The nudge is at K: one slot, no FLEX, so it cannot be a knock-on of the RB
+    hole. The two pairs are independent and only one is worth a transaction.
+    """
+    rows = _hoh_roster()
+    rows[1] = _player("RB1", "RB", "RB", 0.0, injury="OUT")
+    rows.append(_player("RB3", "RB", "BE", 8.0))  # fills the hole
+    rows[7] = _player("K1", "K", "K", 8.5)
+    rows.append(_player("K2", "K", "BE", 8.7))  # +0.2, under MIN_GAIN
+    client = _install_writer(monkeypatch, rows)
+
+    result = lineup.apply_espn_lineup(league="hoh")
+
+    assert result["status"] == "applied", result
+    moved = {i["espn_player_id"] for i in client.submitted["items"]}
+    assert _espn_id("RB3") in moved, "the hole is fixed"
+    assert _espn_id("K2") not in moved, "the nudge stays out of the transaction"
+
+
 def test_a_dry_run_writes_nothing(monkeypatch):
     client = _install_writer(monkeypatch, _bench_upgrade())
     result = lineup.apply_espn_lineup(league="hoh", dry_run=True)

@@ -613,7 +613,29 @@ def plan_lineup_moves(league: str | None = None, week: int | None = None) -> dic
         "pairs": pairs,
         "unplaced": unplaced,
         "gain": gain,
+        "urgent": [pair for pair in pairs if _is_urgent(*pair)],
     }
+
+
+def _is_urgent(out_: dict, inc: dict) -> bool:
+    """A move that fixes a starter who cannot play, rather than one that edges
+    a projection up.
+
+    Two things travel in one plan. A starter who is OUT (or has already scored
+    zero without playing) is a **hole**: leaving him in costs whatever the
+    replacement would have scored, and the fix is not a preference. A swap
+    that turns 11.3 projected into 11.5 is a **nudge**: real, but the kind of
+    thing that should not spend a transaction on its own.
+
+    They have to be separable because the plan is written atomically. Gating on
+    the plan total alone means one urgent swap drags every nudge in the same
+    plan through with it — the whole set clears `MIN_GAIN` together even when
+    each nudge is 0.1 on its own. That is the wrong way round: the urgency
+    should decide, not the sum.
+    """
+    if _expected_points(out_) > 0:
+        return False
+    return _expected_points(inc) > 0
 
 
 def apply_espn_lineup(
@@ -663,16 +685,42 @@ def apply_espn_lineup(
         # lineup is *not* optimal and saying so would be a lie.
         result["status"] = "unreachable" if plan["unplaced"] else "already_optimal"
         return result
-    if plan["gain"] < MIN_GAIN:
+
+    # An urgent pair (a starter who cannot play, replaced by one who can) is
+    # worth a transaction on its own and is never dropped for being small: it
+    # is not a small move, it is a hole being filled, and its size depends on
+    # who happens to be on the bench. A nudge between two players who can both
+    # play has to clear MIN_GAIN by itself, or it is the churn the threshold
+    # exists to prevent.
+    #
+    # Filtering per pair rather than on the total is what keeps one urgent move
+    # from smuggling every nudge in the same plan through with it. Measured on
+    # Ludopathy 2026-11-22: the plan was a 6.1-point hole plus nothing else,
+    # but a plan of (6.1 hole + 0.2 nudge) would have written both.
+    keep = [
+        (out_, inc)
+        for out_, inc in plan["pairs"]
+        if _is_urgent(out_, inc)
+        or round(_expected_points(inc) - _expected_points(out_), 2) >= MIN_GAIN
+    ]
+    if not keep:
         result["status"] = "not_worth_it"
         return result
+
+    result["pairs"] = keep
+    result["gain"] = round(
+        sum(_expected_points(inc) for _out, inc in keep)
+        - sum(_expected_points(out_) for out_, _inc in keep),
+        2,
+    )
+
     if dry_run:
         result["status"] = "dry_run"
         return result
 
     client = EspnFantasyClient.from_env(profile.key)
     items: list[dict] = []
-    for out_, inc in plan["pairs"]:
+    for out_, inc in result["pairs"]:
         items.append(
             {
                 "espn_player_id": inc["espn_player_id"],
@@ -702,7 +750,7 @@ def apply_espn_lineup(
         after = client.fetch_roster_slots(plan["week"])
         slots = {e["espn_player_id"]: e["lineup_slot_id"] for e in after["entries"]}
         names = {e["espn_player_id"]: e["player_name"] for e in after["entries"]}
-        for player_id, expected in _wanted_ids(plan["pairs"]):
+        for player_id, expected in _wanted_ids(result["pairs"]):
             if slots.get(player_id) != expected:
                 result["wrong"].append(
                     f"{names.get(player_id, player_id)} is in slot "
