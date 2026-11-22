@@ -20,12 +20,16 @@ jobs:
 
     steps:
       # These three are on the Node 20 deprecation path: the runtime comes from
-      # the action, and the old majors pin a Node GitHub is retiring. `@v7`,
-      # `@v10` and `@v6` are the current major tags.
+      # the action, and the old majors pin a Node GitHub is retiring.
+      #
+      # Note setup-uv's major tag lags its releases: the latest release is
+      # v10.4.0 but the only major tags are up to v7. `@v10` fails to resolve
+      # and takes the whole job down from `Set up job`, so this is `@v7` - the
+      # current major tag, not the version number.
       - uses: actions/checkout@v7
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
           enable-cache: true          # cache .venv between runs on same branch
