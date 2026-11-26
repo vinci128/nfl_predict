@@ -946,15 +946,19 @@ class EspnFantasyClient:
         if team is None:
             return {"found": False, "name": "", "eliminated": False, "active": False}
 
-        # ESPN has used both flags across seasons; either one means the season
-        # is done for this team. `isActive` defaults to True when absent, so an
-        # older response cannot be misread as eliminated.
+        # `eliminated` is the flag that means eliminated. `isActive` is not a substitute:
+        # measured across all three leagues on 2026-11-26, `isActive` was false for EVERY
+        # team — 10 of 10 in Ludopathy Bowl, 14 of 14 in Hell or Highwater, 8 of 8 in Royal
+        # Rumble — including the two whose team sat in a playoff position with a full roster.
+        # Reading `not isActive` as elimination therefore marked every league finished for
+        # this user and produced the "no team flagged as yours" error on a live league.
+        # It stays in the returned dict as information; it does not decide anything.
         eliminated = bool(team.get("eliminated"))
         active = bool(team.get("isActive", True))
         return {
             "found": True,
             "name": team.get("name") or "",
-            "eliminated": eliminated or not active,
+            "eliminated": eliminated,
             "active": active,
         }
 

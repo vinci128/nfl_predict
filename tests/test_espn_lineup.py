@@ -903,10 +903,12 @@ def test_a_missing_team_is_still_a_configuration_error(monkeypatch):
 
 
 def test_my_team_state_reads_eliminated_and_active_flags(monkeypatch):
-    """Both flags ESPN has used mean the same thing; absent means still playing.
+    """`eliminated` decides. `isActive` does not, and cannot be read as a substitute.
 
-    `isActive` is missing on older responses, and reading that as "eliminated"
-    would silently kill a live league's report.
+    Measured on 2026-11-26 across all three leagues: `isActive` was false for every team —
+    10 of 10, 14 of 14, 8 of 8 — including the two still in a playoff position with full
+    rosters. So `eliminated: False, isActive: False` is a LIVE team, which is what this
+    test used to assert the opposite of. `isActive` stays in the state dict as information.
     """
     from nfl_predict import espn_fantasy
 
@@ -919,7 +921,7 @@ def test_my_team_state_reads_eliminated_and_active_flags(monkeypatch):
 
     for flags, expected in (
         ({"eliminated": True, "isActive": False}, True),
-        ({"eliminated": False, "isActive": False}, True),
+        ({"eliminated": False, "isActive": False}, False),  # every team, 2026 season
         ({"eliminated": True, "isActive": True}, True),
         ({"eliminated": False, "isActive": True}, False),
         ({}, False),  # older response: no flags at all
